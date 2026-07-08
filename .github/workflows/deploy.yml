@@ -1,0 +1,127 @@
+# =============================================================================
+# GitHub Actions — Auto Deploy Perfex CRM ke cPanel (Namecheap) via FTPS
+# =============================================================================
+#
+# Trigger : push ke branch `master` (default branch repo ini)
+# Action  : SamKirkland/FTP-Deploy-Action@v4.4.0
+# Target  : /home/ibragjlf/otmain.com/crm/
+#
+# REQUIRED GitHub Secrets (Settings → Secrets and variables → Actions):
+#   FTP_SERVER   = ftp.ibramani.nl
+#   FTP_USERNAME = otmain_perfex@otmain.com
+#   FTP_PASSWORD = <password FTP — jangan commit ke repo>
+#   FTP_PORT     = 21
+#
+# SECURITY:
+#   - Jangan pernah commit kredensial FTP ke repository.
+#   - Gunakan protocol `ftps` (FTP over TLS), bukan plain FTP.
+#   - Folder `uploads/` dan `application/config/app-config.php` DIECUALIKAN
+#     agar data user & kredensial production tidak tertimpa/terhapus.
+#
+# DRY-RUN (aktif sekarang — tidak mengubah file di server):
+#   1. Monitor log di tab Actions → pastikan tidak ada delete berbahaya.
+#   2. Pastikan uploads/ dan app-config.php TIDAK muncul di daftar sync.
+#   3. Jika aman: set dry-run: false (atau hapus barisnya), commit & push lagi.
+#
+# FTP ROOT CHECK (wajib sebelum first deploy):
+#   Login FTP → lihat apakah root menampilkan folder `crm/`.
+#   - Ada folder `crm/`     → server-dir: crm/   (default di bawah)
+#   - Langsung isi CRM      → server-dir: ./     (ganti di bawah)
+#
+# INCREMENTAL DEPLOY:
+#   Action menyimpan `.ftp-deploy-sync-state.json` di server.
+#   Deploy berikutnya hanya meng-upload file yang hash-nya berubah.
+# =============================================================================
+
+name: Deploy Perfex CRM to cPanel
+
+on:
+  push:
+    branches:
+      - master
+
+  # Izinkan trigger manual dari tab Actions (berguna untuk re-deploy / dry-run)
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    name: FTPS Deploy to cPanel
+    runs-on: ubuntu-latest
+
+    steps:
+      # -----------------------------------------------------------------------
+      # 1. Checkout kode dari branch yang men-trigger workflow
+      # -----------------------------------------------------------------------
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          # fetch-depth 1 cukup — action membandingkan dengan state file di server,
+          # bukan dengan git history
+          fetch-depth: 1
+
+      # -----------------------------------------------------------------------
+      # 2. Sync file ke server via FTPS (encrypted, port 21)
+      #
+      # Kenapa pilihan opsi ini aman untuk shared hosting Perfex CRM:
+      #   protocol: ftps
+      #     → Enkripsi credentials & file transfer (mandatory di shared hosting)
+      #   dangerous-clean-slate: false
+      #     → JANGAN hapus semua file di server pada sync pertama
+      #   exclude:
+      #     → File/folder di daftar ini tidak di-upload DAN tidak dihapus
+      #       (penting untuk uploads/ dan app-config.php production)
+      # -----------------------------------------------------------------------
+      - name: Deploy via FTPS
+        uses: SamKirkland/FTP-Deploy-Action@v4.4.0
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          protocol: ftps
+          port: ${{ secrets.FTP_PORT }}
+
+          # Path relatif terhadap FTP root akun otmain_perfex@otmain.com
+          # Pastikan FTP root = /home/ibragjlf/otmain.com/ (lihat header di atas)
+          server-dir: crm/
+
+          # Local path — root repo adalah isi perfex_crm/, jadi ./ sudah benar
+          local-dir: ./
+
+          # Jangan wipe server pada first sync (aman untuk production existing)
+          dangerous-clean-slate: false
+
+          # DRY-RUN AKTIF — hanya simulasi, tidak mengubah file di server.
+          # Setelah monitoring aman, ubah ke false atau hapus baris ini.
+          dry-run: true
+
+          # -------------------------------------------------------------------
+          # EXCLUDE — file/folder yang TIDAK di-upload dan TIDAK dihapus
+          # -------------------------------------------------------------------
+          exclude: |
+            **/.git*
+            **/.git*/**
+            **/.github/**
+            **/.gitignore
+            **/node_modules/**
+            **/.vscode/**
+            **/.editorconfig
+            **/.DS_Store
+            **/Thumbs.db
+            **/*.swp
+            **/*~
+            **/*.log
+            **/.env
+            **/.env.*
+            **/package.json
+            **/package-lock.json
+            **/webpack.mix.js
+            **/tailwind.config.js
+            **/README.md
+            **/docs/**
+            **/tests/**
+            **/vendor/bin/**
+            uploads/**
+            application/config/app-config.php
+            application/logs/**
+            application/cache/**
+            temp/**
