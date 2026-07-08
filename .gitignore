@@ -1,0 +1,33 @@
+# Local config (contains DB credentials and encryption key)
+application/config/app-config.php
+
+# Runtime logs and cache
+application/logs/*
+!application/logs/index.html
+application/cache/*
+!application/cache/index.html
+!application/cache/.htaccess
+
+# User uploads
+uploads/**
+!uploads/**/
+!uploads/**/.htaccess
+!uploads/**/index.html
+
+# Temp files
+temp/*
+!temp/index.html
+
+# Vendor generated cache
+application/vendor/**/DefinitionCache/Serializer/**
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.swp
+*~
+
+# Env files (if ever added)
+.env
+.env.*
+!.env.example

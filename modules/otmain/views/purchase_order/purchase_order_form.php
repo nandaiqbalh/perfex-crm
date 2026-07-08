@@ -1,0 +1,133 @@
+<?php defined('BASEPATH') or exit('No direct script access allowed');
+$po       = $po ?? null;
+$defaults = $po_defaults ?? otmain_get_po_company_defaults();
+$poNumber = isset($po) ? $po->formatted_number : ($next_po_number ?? otmain_preview_purchase_order_number());
+?>
+<div class="panel_s">
+    <div class="panel-body">
+        <?php echo form_open($this->uri->uri_string(), ['id' => 'otmain-purchase-order-form']); ?>
+        <div class="row">
+            <div class="col-md-4">
+                <?php echo render_input('document_title', _l('otmain_document_title'), isset($po) ? ($po->document_title ?? $defaults['document_title']) : $defaults['document_title']); ?>
+            </div>
+            <div class="col-md-4">
+                <div class="form-group">
+                    <label class="control-label"><?php echo _l('otmain_po_number'); ?></label>
+                    <input type="text" class="form-control" id="otmain-po-number-preview" value="<?php echo e($poNumber); ?>" readonly>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <?php echo render_date_input('date', 'date', isset($po) ? _d($po->date) : _d(date('Y-m-d'))); ?>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-md-6">
+                <div class="form-group select-placeholder">
+                    <label class="control-label"><?php echo _l('otmain_po_to'); ?></label>
+                    <select name="supplierid" id="supplierid" class="ajax-search" data-width="100%" data-live-search="true" data-none-selected-text="<?php echo _l('dropdown_non_selected_tex'); ?>">
+                        <?php if (!empty($po->supplierid)) {
+                            echo '<option value="' . $po->supplierid . '" selected>' . e(get_company_name($po->supplierid)) . '</option>';
+                        } ?>
+                    </select>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <?php echo render_input('supplier_quote_ref', 'otmain_supplier_quote_ref', isset($po) ? ($po->supplier_quote_ref ?? '') : ''); ?>
+            </div>
+            <div class="col-md-12">
+                <?php
+                $supplierAddress = isset($po) ? clear_textarea_breaks($po->supplier_address ?? '') : '';
+                echo render_textarea('supplier_address', 'otmain_supplier_address', $supplierAddress, ['rows' => 3]);
+                ?>
+            </div>
+        </div>
+
+        <hr />
+        <h5 class="bold"><?php echo _l('otmain_supplier_contact'); ?></h5>
+        <div class="row">
+            <div class="col-md-4">
+                <div class="form-group">
+                    <label class="control-label"><?php echo _l('otmain_contact_person_select'); ?></label>
+                    <select name="otmain_contact_id" id="otmain_po_contact_id" class="selectpicker" data-width="100%" data-live-search="true" data-none-selected-text="<?php echo _l('dropdown_non_selected_tex'); ?>">
+                        <option value=""></option>
+                        <?php if (isset($po) && !empty($po->otmain_contact_id)) { ?>
+                        <option value="<?php echo (int) $po->otmain_contact_id; ?>" selected></option>
+                        <?php } ?>
+                    </select>
+                </div>
+            </div>
+            <div class="col-md-4"><?php echo render_input('contact_person', 'otmain_contact_person', isset($po) ? ($po->contact_person ?? '') : ''); ?></div>
+            <div class="col-md-4"><?php echo render_input('email', 'client_email', isset($po) ? ($po->email ?? '') : ''); ?></div>
+            <div class="col-md-4"><?php echo render_input('phone', 'client_phonenumber', isset($po) ? ($po->phone ?? '') : ''); ?></div>
+        </div>
+
+        <hr />
+        <h5 class="bold"><?php echo _l('otmain_po_issuer'); ?></h5>
+        <div class="row">
+            <div class="col-md-6"><?php echo render_input('company_name', 'name', isset($po) ? ($po->company_name ?? $defaults['company_name']) : $defaults['company_name']); ?></div>
+            <div class="col-md-6"><?php echo render_input('company_address', 'address', isset($po) ? ($po->company_address ?? $defaults['company_address']) : $defaults['company_address']); ?></div>
+            <div class="col-md-3"><?php echo render_input('company_postal_code', 'zip', isset($po) ? ($po->company_postal_code ?? $defaults['company_postal_code']) : $defaults['company_postal_code']); ?></div>
+            <div class="col-md-3"><?php echo render_input('company_city', 'city', isset($po) ? ($po->company_city ?? $defaults['company_city']) : $defaults['company_city']); ?></div>
+            <div class="col-md-6"><?php echo render_input('company_country', 'country', isset($po) ? ($po->company_country ?? $defaults['company_country']) : $defaults['company_country']); ?></div>
+            <div class="col-md-4"><?php echo render_input('company_phone', 'client_phonenumber', isset($po) ? ($po->company_phone ?? $defaults['company_phone']) : $defaults['company_phone']); ?></div>
+            <div class="col-md-4"><?php echo render_input('company_email_invoices', 'otmain_email_invoices', isset($po) ? ($po->company_email_invoices ?? $defaults['company_email_invoices']) : $defaults['company_email_invoices']); ?></div>
+            <div class="col-md-4"><?php echo render_input('company_website', 'website', isset($po) ? ($po->company_website ?? $defaults['company_website']) : $defaults['company_website']); ?></div>
+            <div class="col-md-4"><?php echo render_input('company_vat', 'otmain_vat_number', isset($po) ? ($po->company_vat ?? $defaults['company_vat']) : $defaults['company_vat']); ?></div>
+            <div class="col-md-4"><?php echo render_input('company_coc', 'otmain_coc_number', isset($po) ? ($po->company_coc ?? $defaults['company_coc']) : $defaults['company_coc']); ?></div>
+            <div class="col-md-4"><?php echo render_input('iban', 'otmain_iban', isset($po) ? ($po->iban ?? $defaults['iban']) : $defaults['iban']); ?></div>
+            <div class="col-md-4">
+                <?php echo render_select('currency', $currencies, ['id', 'name', 'symbol'], 'currency', isset($po) ? ($po->currency ?? '') : ''); ?>
+            </div>
+        </div>
+
+        <hr />
+        <div class="table-responsive">
+            <table class="table items table-main-estimate-edit has-calculations no-margin" id="otmain-po-items">
+                <thead>
+                    <tr>
+                        <th width="8%"><?php echo _l('otmain_qty'); ?></th>
+                        <th><?php echo _l('invoice_table_item_heading'); ?></th>
+                        <th width="15%"><?php echo _l('invoice_table_rate_heading'); ?></th>
+                        <th width="10%">VAT %</th>
+                        <th width="15%"><?php echo _l('total'); ?></th>
+                        <th width="5%"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php if (!empty($po->items)) { foreach ($po->items as $i => $item) {
+                        $lineTotal = (float) $item['qty'] * (float) $item['unit_price'];
+                    ?>
+                    <tr class="item-row">
+                        <td><input type="number" step="any" name="items[<?php echo $i; ?>][qty]" class="form-control otmain-po-qty" value="<?php echo e($item['qty']); ?>"></td>
+                        <td><input type="text" name="items[<?php echo $i; ?>][description]" class="form-control" value="<?php echo e($item['description']); ?>"></td>
+                        <td><input type="number" step="any" name="items[<?php echo $i; ?>][unit_price]" class="form-control otmain-po-rate" value="<?php echo e($item['unit_price']); ?>"></td>
+                        <td><input type="number" step="any" name="items[<?php echo $i; ?>][taxrate]" class="form-control otmain-po-tax" value="<?php echo e($item['taxrate']); ?>"></td>
+                        <td><input type="text" class="form-control otmain-po-line-total" readonly value="<?php echo e(app_format_number($lineTotal)); ?>"></td>
+                        <td><button type="button" class="btn btn-danger btn-sm otmain-remove-row"><i class="fa fa-times"></i></button></td>
+                    </tr>
+                    <?php } } ?>
+                </tbody>
+            </table>
+        </div>
+        <button type="button" class="btn btn-default mtop10" id="otmain-add-po-row">
+            <i class="fa fa-plus tw-mr-1"></i><?php echo _l('add_item'); ?>
+        </button>
+
+        <div class="row mtop20">
+            <div class="col-md-6 col-md-offset-6">
+                <table class="table text-right">
+                    <tr><td><strong><?php echo _l('otmain_subtotal_eur'); ?></strong></td><td id="otmain-po-subtotal">0.00</td></tr>
+                    <tr><td><strong>VAT 21%</strong></td><td id="otmain-po-vat21">0.00</td></tr>
+                    <tr><td><strong>VAT 0%</strong></td><td id="otmain-po-vat0">0.00</td></tr>
+                    <tr><td><strong><?php echo _l('otmain_total_eur'); ?></strong></td><td id="otmain-po-total"><strong>0.00</strong></td></tr>
+                </table>
+            </div>
+        </div>
+
+        <div class="text-right mtop15">
+            <button type="submit" class="btn btn-primary"><?php echo _l('submit'); ?></button>
+        </div>
+        <?php echo form_close(); ?>
+    </div>
+</div>
