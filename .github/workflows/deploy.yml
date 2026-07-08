@@ -7,10 +7,13 @@
 # Target  : /home/ibragjlf/otmain.com/crm/
 #
 # REQUIRED GitHub Secrets (Settings → Secrets and variables → Actions):
-#   FTP_SERVER   = ftp.ibramani.nl
+#   FTP_SERVER   = ibramani.nl
+#                  JANGAN pakai ftp.ibramani.nl — DNS-nya resolve ke 10.10.10.12
+#                  (private IP) sehingga Timeout dari GitHub Actions.
+#                  Alternatif: IP publik server (mis. 162.0.217.124 dari cPanel).
 #   FTP_USERNAME = otmain_perfex@otmain.com
 #   FTP_PASSWORD = <password FTP — jangan commit ke repo>
-#   FTP_PORT     = 21
+#   FTP_PORT     = 21 (opsional; workflow sudah hardcode 21)
 #
 # SECURITY:
 #   - Jangan pernah commit kredensial FTP ke repository.
