@@ -47,6 +47,7 @@ jobs:
   deploy:
     name: FTPS Deploy to cPanel
     runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     steps:
       # -----------------------------------------------------------------------
@@ -60,16 +61,45 @@ jobs:
           fetch-depth: 1
 
       # -----------------------------------------------------------------------
+      # 1b. Diagnostik koneksi TCP ke port FTP (bantu bedakan DNS vs firewall)
+      # -----------------------------------------------------------------------
+      - name: Probe FTP control port
+        run: |
+          set -euo pipefail
+          SERVER="${{ secrets.FTP_SERVER }}"
+          PORT="${{ secrets.FTP_PORT }}"
+          PORT="${PORT:-21}"
+          echo "Resolving ${SERVER}..."
+          getent ahostsv4 "${SERVER}" || true
+          echo "Probing TCP ${SERVER}:${PORT} (10s)..."
+          if timeout 10 bash -c "exec 3<>/dev/tcp/${SERVER}/${PORT} && head -c 120 <&3 || true"; then
+            echo
+            echo "TCP probe finished (banner above if server answered)."
+          else
+            echo "::warning::TCP ${SERVER}:${PORT} tidak merespons dari GitHub runner."
+            echo "Cek FTP_SERVER (coba IP server dari cPanel), firewall/CSF, atau gunakan hostname FTP resmi Namecheap."
+          fi
+
+      # -----------------------------------------------------------------------
       # 2. Sync file ke server via FTPS (encrypted, port 21)
       #
       # Kenapa pilihan opsi ini aman untuk shared hosting Perfex CRM:
       #   protocol: ftps
-      #     → Enkripsi credentials & file transfer (mandatory di shared hosting)
+      #     → Explicit FTPS (AUTH TLS) di port 21 — standar cPanel/Namecheap
+      #   security: loose
+      #     → Izinkan sertifikat shared hosting yang sering self-signed/mismatched
+      #   timeout: 120000
+      #     → Shared hosting sering lambat merespons control socket
       #   dangerous-clean-slate: false
       #     → JANGAN hapus semua file di server pada sync pertama
       #   exclude:
       #     → File/folder di daftar ini tidak di-upload DAN tidak dihapus
       #       (penting untuk uploads/ dan app-config.php production)
+      #
+      # Jika tetap Timeout (control socket):
+      #   - Ubah secret FTP_SERVER ke IP server (cPanel → Server Information)
+      #   - Atau hostname FTP dari FTP Accounts (bukan hanya ftp.ibramani.nl)
+      #   - Sebagai fallback terakhir: ganti protocol menjadi `ftp` (tanpa enkripsi)
       # -----------------------------------------------------------------------
       - name: Deploy via FTPS
         uses: SamKirkland/FTP-Deploy-Action@v4.4.0
@@ -78,7 +108,11 @@ jobs:
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
           protocol: ftps
-          port: ${{ secrets.FTP_PORT }}
+          # Hardcode 21 (lebih andal daripada secret string); sesuaikan jika host beda
+          port: 21
+          security: loose
+          timeout: 120000
+          log-level: verbose
 
           # Path relatif terhadap FTP root akun otmain_perfex@otmain.com
           # Pastikan FTP root = /home/ibragjlf/otmain.com/ (lihat header di atas)
