@@ -160,13 +160,17 @@ All invoices shall be governed by the laws of Indonesia and/or the Netherlands, 
 function otmain_pdf_append_quotation_terms($pdf, $font_name, $font_size, $currencyName = '')
 {
     otmain_pdf_append_customize_image_page($pdf, 'generated/Term and Condition Qutation_page-0001.jpg', true);
-    otmain_pdf_append_account_detail_proof($pdf, $currencyName);
+}
+
+function otmain_pdf_append_invoice_tc_page($pdf)
+{
+    otmain_pdf_append_customize_image_page($pdf, 'generated/Terms & Conditions – Invoices_page-0001.jpg', true);
 }
 
 function otmain_pdf_append_invoice_terms($pdf, $font_name, $font_size, $currencyName = '')
 {
-    otmain_pdf_append_customize_image_page($pdf, 'generated/Terms & Conditions – Invoices_page-0001.jpg', true);
-    otmain_pdf_append_account_detail_proof($pdf, $currencyName);
+    otmain_pdf_append_invoice_tc_page($pdf);
+    otmain_pdf_append_account_detail_proof($pdf);
 }
 
 function otmain_customize_file_path($relativePath)
@@ -259,16 +263,10 @@ function otmain_pdf_append_customize_image_sequence($pdf, $basenameWithoutPage, 
     }
 }
 
-function otmain_pdf_append_account_detail_proof($pdf, $currencyName = '')
+function otmain_pdf_append_account_detail_proof($pdf)
 {
-    $currencyName = strtoupper(trim((string) $currencyName));
-
-    $basename = 'generated/account_details_proof_eur';
-    if ($currencyName === 'USD' || $currencyName === 'US DOLLAR' || strpos($currencyName, 'USD') !== false) {
-        $basename = 'generated/account_details_proof_usd';
-    }
-
-    otmain_pdf_append_customize_image_sequence($pdf, $basename, false);
+    otmain_pdf_append_customize_image_sequence($pdf, 'generated/account_details_proof_eur', false);
+    otmain_pdf_append_customize_image_sequence($pdf, 'generated/account_details_proof_usd', false);
 }
 
 function otmain_get_bank_details($currencyName)

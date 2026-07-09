@@ -3,6 +3,5 @@ $CI->load->helper('otmain/otmain');
 
 $pdf->writeHTML(otmain_pdf_packing_list_html($packing), true, false, false, false, '');
 
-// Packing List & Invoice uses the same T&C and account proof pages as Invoice PDF.
-$currencyName = !empty($packing->currency_name) ? $packing->currency_name : 'EUR';
-otmain_pdf_append_invoice_terms($pdf, $font_name, $font_size, $currencyName);
+// Packing List uses the same T&C page as Invoice PDF (no account detail proof).
+otmain_pdf_append_invoice_tc_page($pdf);
