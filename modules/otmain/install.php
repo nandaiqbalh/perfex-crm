@@ -5,13 +5,17 @@ defined('BASEPATH') or exit('No direct script access allowed');
 $CI->load->helper(OTMAIN_MODULE_NAME . '/otmain');
 
 $estimateColumns = [
-    'client_ref'         => "VARCHAR(191) NULL DEFAULT NULL",
-    'shipment_terms'     => "TEXT NULL",
-    'delivery_time'      => "TEXT NULL",
-    'availability'       => "TEXT NULL",
-    'payment_terms_text' => "TEXT NULL",
-    'quote_title'        => "VARCHAR(191) NULL DEFAULT NULL",
-    'expiry_days'        => "INT(11) NULL DEFAULT NULL",
+    'client_ref'             => "VARCHAR(191) NULL DEFAULT NULL",
+    'shipment_terms'         => "TEXT NULL",
+    'delivery_time'          => "TEXT NULL",
+    'availability'           => "TEXT NULL",
+    'payment_terms_text'     => "TEXT NULL",
+    'quote_title'            => "VARCHAR(191) NULL DEFAULT NULL",
+    'expiry_days'            => "INT(11) NULL DEFAULT NULL",
+    'otmain_contact_id'      => "INT(11) NULL DEFAULT NULL",
+    'contact_person_name'    => "VARCHAR(191) NULL DEFAULT NULL",
+    'contact_person_email'   => "VARCHAR(191) NULL DEFAULT NULL",
+    'contact_person_phone'   => "VARCHAR(50) NULL DEFAULT NULL",
 ];
 
 foreach ($estimateColumns as $column => $definition) {
@@ -104,9 +108,13 @@ if (!$CI->db->table_exists(db_prefix() . 'otmain_packing_lists')) {
 }
 
 $packingColumns = [
-    'document_title' => "VARCHAR(191) NULL DEFAULT 'Packing List & Invoice'",
-    'quote_ref_ids'  => 'TEXT NULL',
-    'total_weight'   => 'DECIMAL(15,2) NOT NULL DEFAULT 0.00',
+    'document_title'       => "VARCHAR(191) NULL DEFAULT 'Packing List & Invoice'",
+    'quote_ref_ids'        => 'TEXT NULL',
+    'total_weight'         => 'DECIMAL(15,2) NOT NULL DEFAULT 0.00',
+    'otmain_contact_id'    => 'INT(11) NULL DEFAULT NULL',
+    'contact_person_name'  => 'VARCHAR(191) NULL DEFAULT NULL',
+    'contact_person_email' => 'VARCHAR(191) NULL DEFAULT NULL',
+    'contact_person_phone' => 'VARCHAR(50) NULL DEFAULT NULL',
 ];
 
 foreach ($packingColumns as $column => $definition) {

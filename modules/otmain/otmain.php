@@ -149,7 +149,7 @@ function otmain_admin_footer_assets()
         || strpos($uri, 'otmain/packing_list') !== false
         || strpos($uri, 'otmain/purchase_order') !== false
     ) {
-        echo '<script src="' . module_dir_url(OTMAIN_MODULE_NAME, 'assets/js/otmain.js') . '?v=1.0.5"></script>';
+        echo '<script src="' . module_dir_url(OTMAIN_MODULE_NAME, 'assets/js/otmain.js') . '?v=1.0.6"></script>';
     }
 }
 
@@ -190,6 +190,10 @@ function otmain_before_estimate_save($hookData)
 
     if (empty($data['terms'])) {
         $data['terms'] = nl2br_save_html(otmain_get_quotation_terms());
+    }
+
+    if (empty($data['otmain_contact_id'])) {
+        $data['otmain_contact_id'] = null;
     }
 
     $hookData['data'] = $data;

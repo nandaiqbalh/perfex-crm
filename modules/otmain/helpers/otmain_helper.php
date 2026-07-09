@@ -982,11 +982,24 @@ function otmain_pdf_quotation_header_html($estimate, $estimateNumber)
 {
     $logo    = otmain_pdf_logo_url(130);
     $company = otmain_pdf_company_meta_block(true);
-    $contact = otmain_get_primary_contact($estimate->clientid);
 
-    $contactName  = $contact ? trim(($contact['firstname'] ?? '') . ' ' . ($contact['lastname'] ?? '')) : '-';
-    $contactEmail = $contact['email'] ?? '-';
-    $contactPhone = $contact['phonenumber'] ?? '-';
+    $contactName  = trim((string) ($estimate->contact_person_name ?? ''));
+    $contactEmail = trim((string) ($estimate->contact_person_email ?? ''));
+    $contactPhone = trim((string) ($estimate->contact_person_phone ?? ''));
+
+    if ($contactName === '') {
+        $contact = otmain_get_primary_contact($estimate->clientid);
+        $contactName  = $contact ? trim(($contact['firstname'] ?? '') . ' ' . ($contact['lastname'] ?? '')) : '-';
+        $contactEmail = $contact['email'] ?? '-';
+        $contactPhone = $contact['phonenumber'] ?? '-';
+    }
+
+    if ($contactEmail === '') {
+        $contactEmail = '-';
+    }
+    if ($contactPhone === '') {
+        $contactPhone = '-';
+    }
 
     $leftMeta = '<div style="font-size:10px;color:#424242;line-height:1.6;">'
         . '<strong>Quotation to:</strong><br />'
@@ -1533,6 +1546,25 @@ function otmain_pdf_packing_left_block_html($packing)
     $consigneeAddress = process_text_content_for_display($packing->consignee_address ?? '-');
     $purchaserAddress = process_text_content_for_display($packing->purchaser_address ?? '-');
 
+    $contactName  = trim((string) ($packing->contact_person_name ?? ''));
+    $contactEmail = trim((string) ($packing->contact_person_email ?? ''));
+    $contactPhone = trim((string) ($packing->contact_person_phone ?? ''));
+
+    if ($contactName === '' && !empty($packing->clientid)) {
+        $contact = otmain_get_primary_contact($packing->clientid);
+        $contactName  = $contact ? trim(($contact['firstname'] ?? '') . ' ' . ($contact['lastname'] ?? '')) : '';
+        $contactEmail = $contact['email'] ?? '';
+        $contactPhone = $contact['phonenumber'] ?? '';
+    }
+
+    $contactBlock = '';
+    if ($contactName !== '' || $contactEmail !== '' || $contactPhone !== '') {
+        $contactBlock = '<br /><br />'
+            . '<strong>Contact Person:</strong> ' . e($contactName ?: '-') . '<br />'
+            . '<strong>Email Address:</strong> ' . e($contactEmail ?: '-') . '<br />'
+            . '<strong>Phone Number:</strong> ' . e($contactPhone ?: '-');
+    }
+
     return '<div style="font-size:10px;color:#424242;line-height:1.6;">'
         . '<strong>Consignee Details:</strong><br />'
         . e($packing->consignee_name ?? '-') . '<br />'
@@ -1545,6 +1577,7 @@ function otmain_pdf_packing_left_block_html($packing)
         . $purchaserAddress
         . '<br />Phone: ' . e($packing->purchaser_phone ?? '-') . '<br />'
         . 'E: ' . e($packing->purchaser_email ?? '-')
+        . $contactBlock
         . '<br /><br />'
         . '<strong>Vessel/System:</strong> ' . e($packing->vessel ?? '-')
         . '<br /><br />'

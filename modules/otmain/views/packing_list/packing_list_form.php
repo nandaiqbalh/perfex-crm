@@ -19,6 +19,35 @@ if (!empty($pl) && !empty($pl->quote_ref_ids)) {
             <div class="col-md-6">
                 <?php echo render_select('clientid', [], [], 'client', $pl->clientid ?? '', [], [], '', 'ajax-search'); ?>
             </div>
+            <div class="col-md-4">
+                <div class="form-group">
+                    <label class="control-label"><?php echo _l('otmain_contact_person_select'); ?></label>
+                    <select name="otmain_contact_id" id="otmain_pl_contact_id" class="selectpicker" data-width="100%" data-live-search="true" data-none-selected-text="<?php echo _l('dropdown_non_selected_tex'); ?>">
+                        <option value=""></option>
+                        <?php if (!empty($pl->otmain_contact_id)) { ?>
+                        <option value="<?php echo (int) $pl->otmain_contact_id; ?>" selected></option>
+                        <?php } ?>
+                    </select>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <?php
+                $value = isset($pl) ? ($pl->contact_person_name ?? '') : '';
+                echo render_input('contact_person_name', _l('otmain_contact_person'), $value);
+                ?>
+            </div>
+            <div class="col-md-4">
+                <?php
+                $value = isset($pl) ? ($pl->contact_person_email ?? '') : '';
+                echo render_input('contact_person_email', _l('otmain_contact_person_email'), $value, 'email');
+                ?>
+            </div>
+            <div class="col-md-4">
+                <?php
+                $value = isset($pl) ? ($pl->contact_person_phone ?? '') : '';
+                echo render_input('contact_person_phone', _l('otmain_contact_person_phone'), $value);
+                ?>
+            </div>
             <div class="col-md-6">
                 <div class="form-group select-placeholder">
                     <label for="packing_quote_ref" class="control-label"><?php echo _l('otmain_quote_reference'); ?></label>

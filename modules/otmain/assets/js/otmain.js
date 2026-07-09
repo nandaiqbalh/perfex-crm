@@ -22,7 +22,7 @@
         $(targetField).val(formatted).trigger('change');
     }
 
-    function otmainLoadContacts(clientId, selectField) {
+    function otmainLoadContacts(clientId, selectField, selectedId) {
         if (!clientId) {
             return;
         }
@@ -30,12 +30,19 @@
             var $select = $(selectField);
             $select.empty().append('<option value=""></option>');
             $.each(contacts, function(i, contact) {
-                var label = contact.firstname + ' ' + contact.lastname;
+                var name = $.trim((contact.firstname || '') + ' ' + (contact.lastname || ''));
+                var label = name;
                 if (contact.email) {
                     label += ' (' + contact.email + ')';
                 }
-                $select.append('<option value="' + contact.id + '" data-name="' + (contact.firstname + ' ' + contact.lastname) + '" data-email="' + (contact.email || '') + '" data-phone="' + (contact.phonenumber || '') + '">' + label + '</option>');
+                var selected = selectedId && String(contact.id) === String(selectedId) ? ' selected' : '';
+                $select.append(
+                    '<option value="' + contact.id + '" data-name="' + name + '" data-email="' + (contact.email || '') + '" data-phone="' + (contact.phonenumber || '') + '"' + selected + '>' + label + '</option>'
+                );
             });
+            if (selectedId) {
+                $select.val(selectedId);
+            }
             $select.selectpicker('refresh');
         }, 'json');
     }
@@ -162,13 +169,31 @@
                 otmainCalculateExpiryDate('input[name="date"]', '#expiry_days', 'input[name="expirydate"]');
             });
 
+            var estimateSelectedContact = $('#otmain_contact_id').val();
+
             $('.f_client_id #clientid').on('change', function() {
                 otmainLoadContacts($(this).val(), '#otmain_contact_id');
             });
 
             if ($('.f_client_id #clientid').val()) {
-                otmainLoadContacts($('.f_client_id #clientid').val(), '#otmain_contact_id');
+                otmainLoadContacts($('.f_client_id #clientid').val(), '#otmain_contact_id', estimateSelectedContact);
             }
+
+            $('body').on('change', '#otmain_contact_id', function() {
+                var $opt = $(this).find('option:selected');
+                var name = ($opt.data('name') || '').toString().trim();
+                var email = ($opt.data('email') || '').toString().trim();
+                var phone = ($opt.data('phone') || '').toString().trim();
+                if (name) {
+                    $('input[name="contact_person_name"]').val(name);
+                }
+                if (email) {
+                    $('input[name="contact_person_email"]').val(email);
+                }
+                if (phone) {
+                    $('input[name="contact_person_phone"]').val(phone);
+                }
+            });
         }
 
         if ($('body').find('.proposal-form').length) {
@@ -288,9 +313,11 @@
             init_ajax_search('proposal', '#packing_quote_ref.ajax-search', undefined, admin_url + 'misc/get_relation_data');
 
             var packingLoadedProposals = {};
+            var plSelectedContact = $('#otmain_pl_contact_id').val();
 
             $('select[name="clientid"]').on('change', function() {
                 var clientId = $(this).val();
+                otmainLoadContacts(clientId, '#otmain_pl_contact_id');
                 if (!clientId) {
                     return;
                 }
@@ -303,6 +330,26 @@
                     $('input[name="consignee_phone"], input[name="purchaser_phone"]').val(data.phone || '');
                     $('input[name="consignee_email"], input[name="purchaser_email"]').val(data.email || '');
                 }, 'json');
+            });
+
+            if ($('select[name="clientid"]').val()) {
+                otmainLoadContacts($('select[name="clientid"]').val(), '#otmain_pl_contact_id', plSelectedContact);
+            }
+
+            $('body').on('change', '#otmain_pl_contact_id', function() {
+                var $opt = $(this).find('option:selected');
+                var name = ($opt.data('name') || '').toString().trim();
+                var email = ($opt.data('email') || '').toString().trim();
+                var phone = ($opt.data('phone') || '').toString().trim();
+                if (name) {
+                    $('input[name="contact_person_name"]').val(name);
+                }
+                if (email) {
+                    $('input[name="contact_person_email"]').val(email);
+                }
+                if (phone) {
+                    $('input[name="contact_person_phone"]').val(phone);
+                }
             });
 
             $('#packing_quote_ref').on('change', function() {

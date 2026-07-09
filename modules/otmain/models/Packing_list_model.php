@@ -94,6 +94,10 @@ class Packing_list_model extends App_Model
             $data['document_title'] = 'Packing List & Invoice';
         }
 
+        if (empty($data['otmain_contact_id'])) {
+            $data['otmain_contact_id'] = null;
+        }
+
         foreach (['consignee_address', 'purchaser_address', 'quote_ref', 'adminnote'] as $field) {
             if (isset($data[$field])) {
                 $data[$field] = nl2br_save_html($data[$field]);
