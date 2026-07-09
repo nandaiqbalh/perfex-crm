@@ -664,17 +664,30 @@ function otmain_pdf_purchase_order_html($po)
         . otmain_pdf_purchase_order_footer_html($po, $currencyName);
 }
 
-function otmain_pdf_logo_url($width = 160)
+function otmain_get_pdf_logo_path()
 {
     $paths = array_filter([
+        FCPATH . 'media/removed-bg-logo.png',
+        FCPATH . 'uploads/company/otmain_logo.png',
         FCPATH . 'uploads/company/otmain_logo.jpeg',
+        otmain_customize_file_path('logo_otmain.png'),
         otmain_customize_file_path('logo_otmain.jpeg'),
     ]);
 
     foreach ($paths as $path) {
         if (file_exists($path)) {
-            return '<img width="' . (int) $width . 'px" src="' . $path . '">';
+            return $path;
         }
+    }
+
+    return '';
+}
+
+function otmain_pdf_logo_url($width = 160)
+{
+    $path = otmain_get_pdf_logo_path();
+    if ($path !== '') {
+        return '<img width="' . (int) $width . 'px" src="' . $path . '">';
     }
 
     return pdf_logo_url();

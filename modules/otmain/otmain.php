@@ -279,11 +279,21 @@ function otmain_before_invoice_save($hookData)
 
 function otmain_filter_pdf_logo_url($logoImage)
 {
+    $path = otmain_get_pdf_logo_path();
+    if ($path !== '') {
+        $width = get_option('pdf_logo_width');
+        if ($width == '') {
+            $width = 120;
+        }
+
+        return '<img width="' . $width . 'px" src="' . $path . '">';
+    }
+
     if (!empty($logoImage)) {
         return $logoImage;
     }
 
-    return otmain_pdf_logo_url();
+    return '';
 }
 
 function otmain_format_proposal_number($format, $id)
