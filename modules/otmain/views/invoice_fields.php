@@ -156,7 +156,7 @@
                         <strong><?php echo _l('otmain_total_cbm'); ?>: </strong><span id="otmain-total-cbm"><?php echo isset($invoice) ? app_format_number($invoice->total_cbm ?? 0) : '0.00'; ?></span>
                     </div>
                     <div class="col-md-6 text-right">
-                        <input type="hidden" name="packing_items_json" id="packing_items_json" value="">
+
                     </div>
                 </div>
             </div>
