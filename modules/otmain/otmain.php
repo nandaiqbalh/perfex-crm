@@ -224,7 +224,23 @@ function otmain_admin_footer_assets()
         || strpos($uri, 'otmain/purchase_order') !== false
     ) {
         echo '<link rel="stylesheet" href="' . module_dir_url(OTMAIN_MODULE_NAME, 'assets/css/otmain-forms.css') . '?v=1.0.2" />';
-        echo '<script src="' . module_dir_url(OTMAIN_MODULE_NAME, 'assets/js/otmain.js') . '?v=1.2.1"></script>';
+        echo '<script src="' . module_dir_url(OTMAIN_MODULE_NAME, 'assets/js/otmain.js') . '?v=1.2.5"></script>';
+    }
+
+    // Keep customer default currency freely editable (any currency from Settings → Currencies).
+    if (strpos($uri, 'clients/client') !== false) {
+        echo '<script>
+(function($){
+  $(function(){
+    var $currency = $(\'select[name="default_currency"]\');
+    if (!$currency.length) { return; }
+    $currency.prop("disabled", false);
+    if ($currency.hasClass("selectpicker") || $currency.parent().hasClass("bootstrap-select")) {
+      $currency.selectpicker("refresh");
+    }
+  });
+})(jQuery);
+</script>';
     }
 }
 
@@ -361,6 +377,20 @@ function otmain_before_invoice_save($hookData)
 
     if (empty($data['terms'])) {
         $data['terms'] = nl2br_save_html(otmain_get_invoice_terms());
+    }
+
+    if (array_key_exists('conversion_rate', $data)) {
+        $rate = trim((string) $data['conversion_rate']);
+        if ($rate === '') {
+            $data['conversion_rate'] = null;
+        } else {
+            $data['conversion_rate'] = (float) str_replace(',', '.', $rate);
+        }
+    }
+
+    if (array_key_exists('conversion_currency', $data)) {
+        $cid = (int) $data['conversion_currency'];
+        $data['conversion_currency'] = $cid > 0 ? $cid : null;
     }
 
     // Serialize packing items to JSON

@@ -137,11 +137,8 @@ if (is_admin() || get_option('staff_members_create_inline_customer_groups') == '
                                     data-toggle="tooltip"
                                     data-title="<?= _l('customer_currency_change_notice'); ?>"></i>
                                 <?php
-$s_attrs  = ['data-none-selected-text' => _l('system_default_string')];
+$s_attrs  = ['data-none-selected-text' => _l('system_default_string'), 'data-show-subtext' => true];
 $selected = '';
-if (isset($client) && client_have_transactions($client->userid)) {
-    $s_attrs['disabled'] = true;
-}
 
 foreach ($currencies as $currency) {
     if (isset($client)) {
@@ -151,6 +148,7 @@ foreach ($currencies as $currency) {
     }
 }
 // Do not remove the currency field from the customer profile!
+// Keep editable for any currency even if the customer already has transactions.
 echo render_select('default_currency', $currencies, ['id', 'name', 'symbol'], 'invoice_add_edit_currency', $selected, $s_attrs);
 ?>
                             </div>

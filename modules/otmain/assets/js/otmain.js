@@ -318,7 +318,7 @@
         calculate_total();
     }
 
-    function otmainBuildPackingRow(item, index) {
+    function otmainBuildPackingItemRow(item, index) {
         var taxrate = (item.taxrate !== undefined && item.taxrate !== null && item.taxrate !== '')
             ? item.taxrate
             : 0;
@@ -329,6 +329,18 @@
                 taxrate = parseFloat(parts.length > 1 ? parts[parts.length - 1] : rawTax) || 0;
             }
         }
+        return '<tr class="item-row" data-row-index="' + index + '">' +
+            '<td><input type="number" step="any" name="items[' + index + '][qty]" class="form-control otmain-packing-qty" value="' + (item.qty || 1) + '"></td>' +
+            '<td><input type="text" name="items[' + index + '][description]" class="form-control otmain-packing-description" value="' + (item.description || '') + '"></td>' +
+            '<td><input type="text" name="items[' + index + '][hs_code]" class="form-control" value="' + (item.hs_code || '') + '"></td>' +
+            '<td><input type="number" step="any" name="items[' + index + '][unit_price]" class="form-control otmain-packing-rate" value="' + (item.rate || item.unit_price || 0) + '"></td>' +
+            '<td><input type="number" step="any" min="0" name="items[' + index + '][taxrate]" class="form-control otmain-packing-tax" value="' + taxrate + '"></td>' +
+            '<td><input type="text" class="form-control otmain-packing-line-total" readonly value="0"></td>' +
+            '<td><button type="button" class="btn btn-danger btn-sm otmain-remove-row"><i class="fa fa-times"></i></button></td>' +
+            '</tr>';
+    }
+
+    function otmainBuildPackingDetailRow(item, index) {
         var unitType = (item.unit_type || 'box').toString().toLowerCase();
         var packingQty = item.packing_qty !== undefined && item.packing_qty !== null && item.packing_qty !== ''
             ? item.packing_qty
@@ -339,13 +351,8 @@
         var cbm = otmainCalcCbmMm(length, width, height, packingQty);
         var cbmDisplay = cbm > 0 ? cbm.toFixed(3) : '0.00';
         var volume = cbm > 0 ? (cbm.toFixed(3) + ' CBM') : (item.volume || '');
-        return '<tr class="item-row">' +
-            '<td><input type="number" step="any" name="items[' + index + '][qty]" class="form-control otmain-packing-qty" value="' + (item.qty || 1) + '"></td>' +
-            '<td><input type="text" name="items[' + index + '][description]" class="form-control" value="' + (item.description || '') + '"></td>' +
-            '<td><input type="text" name="items[' + index + '][hs_code]" class="form-control" value="' + (item.hs_code || '') + '"></td>' +
-            '<td><input type="number" step="any" name="items[' + index + '][unit_price]" class="form-control otmain-packing-rate" value="' + (item.rate || item.unit_price || 0) + '"></td>' +
-            '<td><input type="number" step="any" min="0" name="items[' + index + '][taxrate]" class="form-control otmain-packing-tax" value="' + taxrate + '"></td>' +
-            '<td><input type="text" class="form-control otmain-packing-line-total" readonly value="0"></td>' +
+        return '<tr class="item-row packing-detail-row" data-row-index="' + index + '">' +
+            '<td><input type="text" class="form-control otmain-packing-detail-item-label" readonly value="' + (item.description || '') + '"></td>' +
             '<td>' +
                 '<select name="items[' + index + '][unit_type]" class="form-control otmain-packing-unit-type">' +
                     otmainPackingUnitOptionsHtml(unitType) +
@@ -362,8 +369,47 @@
             '</td>' +
             '<td><input type="number" step="any" name="items[' + index + '][gross_weight]" class="form-control otmain-packing-gross-weight" value="' + (item.gross_weight || '') + '"></td>' +
             '<td><input type="number" step="any" name="items[' + index + '][net_weight]" class="form-control" value="' + (item.net_weight || '') + '"></td>' +
-            '<td><button type="button" class="btn btn-danger btn-sm otmain-remove-row"><i class="fa fa-times"></i></button></td>' +
             '</tr>';
+    }
+
+    function otmainBuildPackingRow(item, index) {
+        // Kept for callers; appends both commercial + packing detail rows.
+        otmainAppendPackingPair(item, index);
+        return '';
+    }
+
+    function otmainAppendPackingPair(item, index) {
+        $('#otmain-packing-list-form #otmain-packing-items tbody').append(otmainBuildPackingItemRow(item, index));
+        $('#otmain-packing-list-form #otmain-packing-details-items tbody').append(otmainBuildPackingDetailRow(item, index));
+    }
+
+    function otmainReindexPackingRows() {
+        $('#otmain-packing-list-form #otmain-packing-items tbody tr.item-row').each(function(i) {
+            $(this).attr('data-row-index', i);
+            $(this).find('input, select, textarea').each(function() {
+                var name = $(this).attr('name');
+                if (name) {
+                    $(this).attr('name', name.replace(/items\[\d+]/, 'items[' + i + ']'));
+                }
+            });
+        });
+        $('#otmain-packing-list-form #otmain-packing-details-items tbody tr.item-row').each(function(i) {
+            $(this).attr('data-row-index', i);
+            $(this).find('input, select, textarea').each(function() {
+                var name = $(this).attr('name');
+                if (name) {
+                    $(this).attr('name', name.replace(/items\[\d+]/, 'items[' + i + ']'));
+                }
+            });
+        });
+    }
+
+    function otmainSyncPackingDetailLabels() {
+        $('#otmain-packing-list-form #otmain-packing-items tbody tr.item-row').each(function(i) {
+            var desc = $(this).find('.otmain-packing-description').val() || '';
+            $('#otmain-packing-list-form #otmain-packing-details-items tbody tr.item-row').eq(i)
+                .find('.otmain-packing-detail-item-label').val(desc);
+        });
     }
 
     function otmainRecalculatePackingRow($row) {
@@ -426,8 +472,6 @@
             var taxAmount = line * (tax / 100);
             subtotal += line;
             totalTax += taxAmount;
-            totalWeight += parseFloat($(this).find('.otmain-packing-gross-weight').val()) || 0;
-            totalCbm += otmainRecalcPackingRowCbm($(this));
             var key = String(tax);
             if (!byRate[key]) {
                 byRate[key] = 0;
@@ -435,10 +479,25 @@
             byRate[key] += taxAmount;
         });
 
+        $('#otmain-packing-list-form #otmain-packing-details-items tbody tr.item-row').each(function() {
+            totalWeight += parseFloat($(this).find('.otmain-packing-gross-weight').val()) || 0;
+            totalCbm += otmainRecalcPackingRowCbm($(this));
+        });
+
         var currencyName = otmainSelectedCurrencyName('#otmain-packing-list-form');
-        var rate = parseFloat($('#otmain-eur-usd-rate').val());
-        var showUsd = (!currencyName || currencyName === 'EURO') && !isNaN(rate) && rate > 0;
-        var subtotalUsd = showUsd ? subtotal * rate : 0;
+        var rate = parseFloat($('#otmain-conversion-rate').val());
+        if (isNaN(rate) || rate <= 0) {
+            rate = parseFloat($('#otmain-conversion-rate-default').val());
+        }
+        var docCurrencyId = String($('#otmain-packing-list-form select[name="currency"]').val() || '');
+        var targetCurrencyId = String($('#otmain-conversion-currency').val() || '');
+        var targetName = '';
+        var $targetOpt = $('#otmain-conversion-currency option:selected');
+        if ($targetOpt.length) {
+            targetName = otmainCurrencyDisplayCode(($targetOpt.text() || '').toString().trim().split(/\s|\(/)[0]);
+        }
+        var showConverted = targetCurrencyId !== '' && docCurrencyId !== '' && targetCurrencyId !== docCurrencyId && !isNaN(rate) && rate > 0;
+        var subtotalConverted = showConverted ? subtotal * rate : 0;
 
         var $vatRows = [];
         Object.keys(byRate).sort(function(a, b) {
@@ -454,8 +513,12 @@
         $('#otmain-packing-subtotal-label').text(currencyName ? ('Subtotal ' + currencyName) : 'Subtotal');
         $('#otmain-packing-total-label').text(currencyName ? ('TOTAL ' + currencyName) : 'TOTAL');
         $('#otmain-packing-subtotal-eur').text(subtotal.toFixed(2) + (currencyName ? (' ' + currencyName) : ''));
-        $('#otmain-packing-subtotal-usd').text(subtotalUsd > 0 ? (subtotalUsd.toFixed(2) + ' USD') : '-');
-        $('#otmain-packing-usd-row').toggle(showUsd || subtotalUsd > 0);
+        $('#otmain-packing-converted-label').text(targetName ? ('Subtotal ' + targetName) : 'Subtotal converted');
+        $('#otmain-packing-subtotal-converted').text(subtotalConverted > 0 ? (subtotalConverted.toFixed(2) + (targetName ? (' ' + targetName) : '')) : '-');
+        $('#otmain-packing-converted-row').toggle(showConverted || subtotalConverted > 0);
+        var rateLabelFrom = currencyName || 'DOC';
+        var rateLabelTo = targetName || 'TARGET';
+        $('#otmain-conversion-rate-label').text('Conversion rate (' + rateLabelFrom + ' → ' + rateLabelTo + ')');
         $('#otmain-packing-total').html('<strong>' + (subtotal + totalTax).toFixed(2) + (currencyName ? (' ' + currencyName) : '') + '</strong>');
         $('#otmain-packing-total-weight').text(totalWeight > 0 ? totalWeight.toFixed(2) + ' KGS' : '-');
         $('#otmain-packing-total-cbm').text(totalCbm > 0 ? totalCbm.toFixed(3) : '0.00');
@@ -465,19 +528,18 @@
         if (!items || !items.length) {
             return;
         }
-        var $tbody = $('#otmain-packing-items tbody');
-        var startIndex = $tbody.find('tr.item-row').length;
+        var startIndex = $('#otmain-packing-list-form #otmain-packing-items tbody tr.item-row').length;
         $.each(items, function(offset, item) {
-            $tbody.append(otmainBuildPackingRow(item, startIndex + offset));
+            otmainAppendPackingPair(item, startIndex + offset);
         });
         otmainRecalculatePackingTotals();
     }
 
     function otmainFillPackingItems(items) {
-        var $tbody = $('#otmain-packing-items tbody');
-        $tbody.find('tr.item-row').remove();
+        $('#otmain-packing-list-form #otmain-packing-items tbody').find('tr.item-row').remove();
+        $('#otmain-packing-list-form #otmain-packing-details-items tbody').find('tr.item-row').remove();
         $.each(items, function(i, item) {
-            $tbody.append(otmainBuildPackingRow(item, i));
+            otmainAppendPackingPair(item, i);
         });
         otmainRecalculatePackingTotals();
     }
@@ -691,6 +753,13 @@
                     $('textarea[name="consignee_address"], textarea[name="purchaser_address"]').val(data.address || '');
                     $('input[name="consignee_phone"], input[name="purchaser_phone"]').val(data.phone || '');
                     $('input[name="consignee_email"], input[name="purchaser_email"]').val(data.email || '');
+                    if (data.default_currency) {
+                        var $cur = $('#otmain-packing-list-form select[name="currency"]');
+                        if ($cur.length) {
+                            $cur.selectpicker('val', String(data.default_currency));
+                            $cur.trigger('change');
+                        }
+                    }
                 }, 'json');
             });
 
@@ -741,12 +810,13 @@
 
             $('body').on(
                 'input change',
-                '#otmain-packing-list-form .otmain-packing-qty, #otmain-packing-list-form .otmain-packing-pack-qty, #otmain-packing-list-form .otmain-packing-rate, #otmain-packing-list-form .otmain-packing-tax, #otmain-packing-list-form .otmain-packing-gross-weight, #otmain-packing-list-form .otmain-packing-length, #otmain-packing-list-form .otmain-packing-width, #otmain-packing-list-form .otmain-packing-height',
+                '#otmain-packing-list-form .otmain-packing-qty, #otmain-packing-list-form .otmain-packing-pack-qty, #otmain-packing-list-form .otmain-packing-rate, #otmain-packing-list-form .otmain-packing-tax, #otmain-packing-list-form .otmain-packing-gross-weight, #otmain-packing-list-form .otmain-packing-length, #otmain-packing-list-form .otmain-packing-width, #otmain-packing-list-form .otmain-packing-height, #otmain-packing-list-form #otmain-conversion-rate',
                 otmainRecalculatePackingTotals
             );
             $('body').on('change', '#otmain-packing-list-form .otmain-packing-unit-type', function() {
                 otmainTogglePackingUnitLabel($(this).closest('tr'));
             });
+            $('#otmain-packing-list-form select[name="currency"], #otmain-packing-list-form #otmain-conversion-currency').on('change', otmainRecalculatePackingTotals);
             $('#otmain-packing-list-form select[name="currency"]').on('change', otmainRecalculatePackingTotals);
 
             otmainRecalculatePackingTotals();
@@ -755,8 +825,12 @@
 
     $(document).on('click', '#otmain-packing-list-form #otmain-add-packing-row', function() {
         var i = $('#otmain-packing-list-form #otmain-packing-items tbody tr.item-row').length;
-        $('#otmain-packing-list-form #otmain-packing-items tbody').append(otmainBuildPackingRow({}, i));
+        otmainAppendPackingPair({}, i);
         otmainRecalculatePackingTotals();
+    });
+
+    $(document).on('input', '#otmain-packing-list-form .otmain-packing-description', function() {
+        otmainSyncPackingDetailLabels();
     });
 
     function otmainLoadPoContacts(clientId, selectedId) {
@@ -890,7 +964,16 @@
     }
 
     $(document).on('click', '.otmain-remove-row', function() {
-        $(this).closest('tr').remove();
+        var $row = $(this).closest('tr');
+        if ($('#otmain-packing-list-form').length && $row.closest('#otmain-packing-items').length) {
+            var idx = $row.index();
+            $row.remove();
+            $('#otmain-packing-list-form #otmain-packing-details-items tbody tr.item-row').eq(idx).remove();
+            otmainReindexPackingRows();
+            otmainRecalculatePackingTotals();
+            return;
+        }
+        $row.remove();
         if ($('#otmain-packing-list-form').length) {
             otmainRecalculatePackingTotals();
         }

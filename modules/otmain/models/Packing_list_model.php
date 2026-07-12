@@ -132,7 +132,23 @@ class Packing_list_model extends App_Model
             'contact_person_phone',
             'adminnote',
             'date',
+            'conversion_rate',
+            'conversion_currency',
         ];
+
+        if (isset($data['conversion_rate'])) {
+            $rate = trim((string) $data['conversion_rate']);
+            if ($rate === '') {
+                $data['conversion_rate'] = null;
+            } else {
+                $data['conversion_rate'] = (float) str_replace(',', '.', $rate);
+            }
+        }
+
+        if (isset($data['conversion_currency'])) {
+            $cid = (int) $data['conversion_currency'];
+            $data['conversion_currency'] = $cid > 0 ? $cid : null;
+        }
 
         return array_intersect_key($data, array_flip($allowed));
     }
@@ -225,24 +241,36 @@ class Packing_list_model extends App_Model
             $this->db->insert($table, $row);
         }
 
-        $rate = (float) str_replace(',', '.', (string) get_option('otmain_eur_to_usd_rate'));
-        $subtotalUsd = 0;
-        $currencyName = '';
+        $rate = 0;
+        $subtotalConverted = 0;
+        $docCurrencyId = 0;
+        $headerRow = null;
         if (!empty($id)) {
-            $row = $this->db->select('currency')->where('id', $id)->get(db_prefix() . 'otmain_packing_lists')->row();
-            if ($row && !empty($row->currency)) {
-                $this->load->model('currencies_model');
-                $currency = $this->currencies_model->get($row->currency);
-                $currencyName = $currency ? strtoupper($currency->name) : '';
+            $selectCols = 'currency';
+            $table = db_prefix() . 'otmain_packing_lists';
+            if ($this->db->field_exists('conversion_rate', $table)) {
+                $selectCols .= ', conversion_rate';
+            }
+            if ($this->db->field_exists('conversion_currency', $table)) {
+                $selectCols .= ', conversion_currency';
+            }
+            $headerRow = $this->db->select($selectCols)->where('id', $id)->get($table)->row();
+            if ($headerRow) {
+                $rate = otmain_get_conversion_rate($headerRow);
+                $docCurrencyId = !empty($headerRow->currency) ? (int) $headerRow->currency : 0;
             }
         }
-        if ($rate > 0 && ($currencyName === '' || $currencyName === 'EUR')) {
-            $subtotalUsd = $subtotal * $rate;
+        if ($rate <= 0) {
+            $rate = otmain_get_conversion_rate(null);
+        }
+        $targetCurrencyId = otmain_get_conversion_currency_id($headerRow);
+        if ($rate > 0 && $targetCurrencyId > 0 && $targetCurrencyId !== $docCurrencyId) {
+            $subtotalConverted = $subtotal * $rate;
         }
 
         $update = [
             'subtotal'     => $subtotal,
-            'subtotal_usd' => $subtotalUsd,
+            'subtotal_usd' => $subtotalConverted,
             'total_weight' => $totalWeight,
         ];
 

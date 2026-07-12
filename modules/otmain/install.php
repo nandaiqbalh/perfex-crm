@@ -45,6 +45,8 @@ $invoiceColumns = [
     'total_gw'               => "DECIMAL(15,2) DEFAULT 0.00",
     'total_nw'               => "DECIMAL(15,2) DEFAULT 0.00",
     'total_cbm'              => "DECIMAL(15,2) DEFAULT 0.00",
+    'conversion_rate'        => "DECIMAL(15,6) NULL DEFAULT NULL",
+    'conversion_currency'    => "INT(11) NULL DEFAULT NULL",
 ];
 
 foreach ($invoiceColumns as $column => $definition) {
@@ -166,9 +168,11 @@ foreach ($packingItemColumns as $column => $definition) {
 }
 
 $packingHeaderColumns = [
-    'total_tax' => 'DECIMAL(15,2) NOT NULL DEFAULT 0.00',
-    'total'     => 'DECIMAL(15,2) NOT NULL DEFAULT 0.00',
-    'total_cbm' => 'DECIMAL(15,2) NOT NULL DEFAULT 0.00',
+    'total_tax'         => 'DECIMAL(15,2) NOT NULL DEFAULT 0.00',
+    'total'             => 'DECIMAL(15,2) NOT NULL DEFAULT 0.00',
+    'total_cbm'         => 'DECIMAL(15,2) NOT NULL DEFAULT 0.00',
+    'conversion_rate'   => 'DECIMAL(15,6) NULL DEFAULT NULL',
+    'conversion_currency' => 'INT(11) NULL DEFAULT NULL',
 ];
 
 foreach ($packingHeaderColumns as $column => $definition) {
@@ -261,8 +265,9 @@ $options = [
         'address'        => '108 W 13th St, Wilmington, DE, 19801, United States',
     ]),
     // Optional rates for auto-calculated totals in PDF
-    'otmain_eur_to_usd_rate'        => '',
-    'otmain_gold_price_eur_per_gram'=> '',
+    'otmain_eur_to_usd_rate'             => '',
+    'otmain_default_conversion_currency' => '',
+    'otmain_gold_price_eur_per_gram'     => '',
 ];
 
 foreach ($options as $name => $value) {

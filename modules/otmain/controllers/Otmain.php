@@ -150,10 +150,11 @@ class Otmain extends AdminController
         ])));
 
         echo json_encode([
-            'company' => $client->company,
-            'address' => $address,
-            'phone'   => $phone,
-            'email'   => $email,
+            'company'           => $client->company,
+            'address'           => $address,
+            'phone'             => $phone,
+            'email'             => $email,
+            'default_currency'  => !empty($client->default_currency) ? (int) $client->default_currency : 0,
         ]);
     }
 

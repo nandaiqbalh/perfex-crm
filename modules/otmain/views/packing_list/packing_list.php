@@ -120,7 +120,22 @@ $isEdit = !empty($pl);
                                     <table class="table text-right">
                                         <tr><td><strong><?php echo _l('otmain_total_weight'); ?></strong></td><td><?php echo isset($pl->total_weight) ? app_format_number($pl->total_weight) . ' KGS' : '-'; ?></td></tr>
                                         <tr><td><strong><?php echo _l('otmain_total_cbm'); ?></strong></td><td><?php echo isset($pl->total_cbm) ? app_format_number($pl->total_cbm) : '0.00'; ?></td></tr>
+                                        <tr><td><strong><?php echo _l('otmain_conversion_rate'); ?></strong></td><td><?php
+                                            $viewRate = otmain_get_conversion_rate($pl);
+                                            $viewTarget = otmain_get_conversion_currency($pl);
+                                            $viewFrom = otmain_currency_display_code($plCurrencyLabel);
+                                            $viewTo = $viewTarget ? otmain_currency_display_code($viewTarget) : '-';
+                                            echo $viewRate > 0 ? (e($viewFrom) . ' → ' . e($viewTo) . ': ' . app_format_number($viewRate)) : '-';
+                                        ?></td></tr>
                                         <tr><td><strong><?php echo _l('otmain_subtotal'); ?> <?php echo e(otmain_currency_display_code($plCurrencyLabel)); ?></strong></td><td><?php echo otmain_format_money_text($plSummary['subtotal'], $plCurrencyObj ?: $plCurrencyLabel); ?></td></tr>
+                                        <?php
+                                        $viewConverted = (float) ($pl->subtotal_usd ?? 0);
+                                        if ($viewConverted <= 0 && $viewRate > 0 && $viewTarget && (int) $viewTarget->id !== (int) ($pl->currency ?? 0)) {
+                                            $viewConverted = (float) $plSummary['subtotal'] * $viewRate;
+                                        }
+                                        if ($viewConverted > 0 && $viewTarget) { ?>
+                                        <tr><td><strong><?php echo _l('otmain_subtotal_converted'); ?> <?php echo e(otmain_currency_display_code($viewTarget)); ?></strong></td><td><?php echo otmain_format_money_text($viewConverted, $viewTarget); ?></td></tr>
+                                        <?php } ?>
                                         <?php foreach (($plSummary['by_rate'] ?? []) as $rate => $amount) { ?>
                                         <tr><td><strong>VAT <?php echo e((string) $rate); ?>%</strong></td><td><?php echo otmain_format_money_text($amount, $plCurrencyObj ?: $plCurrencyLabel); ?></td></tr>
                                         <?php } ?>
