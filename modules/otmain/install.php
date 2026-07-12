@@ -2,6 +2,10 @@
 
 defined('BASEPATH') or exit('No direct script access allowed');
 
+if (!isset($CI) || !is_object($CI)) {
+    $CI = &get_instance();
+}
+
 $CI->load->helper(OTMAIN_MODULE_NAME . '/otmain');
 
 $estimateColumns = [

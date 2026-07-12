@@ -162,6 +162,7 @@ function otmain_ensure_schema()
     }
     $done = true;
 
+    $CI = &get_instance();
     require_once __DIR__ . '/install.php';
 }
 
