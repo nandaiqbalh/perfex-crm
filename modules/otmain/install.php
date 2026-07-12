@@ -20,6 +20,10 @@ $estimateColumns = [
     'contact_person_name'    => "VARCHAR(191) NULL DEFAULT NULL",
     'contact_person_email'   => "VARCHAR(191) NULL DEFAULT NULL",
     'contact_person_phone'   => "VARCHAR(50) NULL DEFAULT NULL",
+    'total_usd_display'      => "VARCHAR(191) NULL DEFAULT NULL",
+    'total_gold_display'     => "VARCHAR(191) NULL DEFAULT NULL",
+    'conversion_rate'        => "DECIMAL(15,6) NULL DEFAULT NULL",
+    'conversion_currency'    => "INT(11) NULL DEFAULT NULL",
 ];
 
 foreach ($estimateColumns as $column => $definition) {
@@ -77,6 +81,8 @@ $proposalColumns = [
     'notes'                => "TEXT NULL",
     'total_usd_display'    => "VARCHAR(191) NULL DEFAULT NULL",
     'total_gold_display'   => "VARCHAR(191) NULL DEFAULT NULL",
+    'conversion_rate'      => "DECIMAL(15,6) NULL DEFAULT NULL",
+    'conversion_currency'  => "INT(11) NULL DEFAULT NULL",
 ];
 
 foreach ($proposalColumns as $column => $definition) {
@@ -230,6 +236,10 @@ $poColumns = [
     'company_website'        => "VARCHAR(100) NULL DEFAULT 'www.otmain.com'",
     'company_vat'            => "VARCHAR(50) NULL DEFAULT 'NL004830818B51'",
     'company_coc'            => "VARCHAR(50) NULL DEFAULT '90597427'",
+    'conversion_rate'        => 'DECIMAL(15,6) NULL DEFAULT NULL',
+    'conversion_currency'    => 'INT(11) NULL DEFAULT NULL',
+    'total_usd_display'      => 'VARCHAR(191) NULL DEFAULT NULL',
+    'total_gold_display'     => 'VARCHAR(191) NULL DEFAULT NULL',
 ];
 
 foreach ($poColumns as $column => $definition) {

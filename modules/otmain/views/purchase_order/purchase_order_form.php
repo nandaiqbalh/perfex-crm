@@ -145,7 +145,26 @@ $poNumber = isset($po) ? $po->formatted_number : ($next_po_number ?? otmain_prev
 
         <?php otmain_form_section_open(_l('otmain_section_totals')); ?>
         <div class="row">
-            <div class="col-md-6 col-md-offset-6 otmain-col-right">
+            <div class="col-md-6 otmain-col-left">
+                <div class="row">
+                    <?php echo otmain_render_conversion_fields_html(isset($po) ? $po : null, ['id_prefix' => 'otmain-po']); ?>
+                </div>
+                <div class="row">
+                    <div class="col-md-12">
+                        <?php
+                        $value = isset($po) ? ($po->total_usd_display ?? '') : '';
+                        echo render_input('total_usd_display', _l('otmain_total_usd_display'), $value, 'text', ['placeholder' => 'e.g. 9,00 USD']);
+                        ?>
+                    </div>
+                    <div class="col-md-12">
+                        <?php
+                        $value = isset($po) ? ($po->total_gold_display ?? '') : '';
+                        echo render_input('total_gold_display', _l('otmain_total_gold_display'), $value, 'text', ['placeholder' => 'e.g. 999.9 in GR.']);
+                        ?>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6 otmain-col-right">
                 <table class="table text-right" id="otmain-po-totals-table">
                     <tr id="otmain-po-subtotal-row"><td><strong id="otmain-po-subtotal-label"><?php echo _l('otmain_subtotal'); ?></strong></td><td id="otmain-po-subtotal">0.00</td></tr>
                     <tr id="otmain-po-total-row"><td><strong id="otmain-po-total-label"><?php echo _l('otmain_total'); ?></strong></td><td id="otmain-po-total"><strong>0.00</strong></td></tr>

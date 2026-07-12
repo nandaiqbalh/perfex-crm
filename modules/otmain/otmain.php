@@ -225,7 +225,7 @@ function otmain_admin_footer_assets()
         || strpos($uri, 'otmain/purchase_order') !== false
     ) {
         echo '<link rel="stylesheet" href="' . module_dir_url(OTMAIN_MODULE_NAME, 'assets/css/otmain-forms.css') . '?v=1.0.2" />';
-        echo '<script src="' . module_dir_url(OTMAIN_MODULE_NAME, 'assets/js/otmain.js') . '?v=1.2.6"></script>';
+        echo '<script src="' . module_dir_url(OTMAIN_MODULE_NAME, 'assets/js/otmain.js') . '?v=1.2.7"></script>';
     }
 
     // Keep customer default currency freely editable (any currency from Settings → Currencies).
@@ -342,6 +342,8 @@ function otmain_before_estimate_save($hookData)
         $data['otmain_contact_id'] = null;
     }
 
+    $data = otmain_normalize_conversion_fields($data);
+
     $hookData['data'] = $data;
 
     return $hookData;
@@ -380,18 +382,8 @@ function otmain_before_invoice_save($hookData)
         $data['terms'] = nl2br_save_html(otmain_get_invoice_terms());
     }
 
-    if (array_key_exists('conversion_rate', $data)) {
-        $rate = trim((string) $data['conversion_rate']);
-        if ($rate === '') {
-            $data['conversion_rate'] = null;
-        } else {
-            $data['conversion_rate'] = (float) str_replace(',', '.', $rate);
-        }
-    }
-
-    if (array_key_exists('conversion_currency', $data)) {
-        $cid = (int) $data['conversion_currency'];
-        $data['conversion_currency'] = $cid > 0 ? $cid : null;
+    if (array_key_exists('conversion_rate', $data) || array_key_exists('conversion_currency', $data)) {
+        $data = otmain_normalize_conversion_fields($data);
     }
 
     // Packing details belong on Packing List — ignore if posted from invoice form.
@@ -476,6 +468,8 @@ function otmain_before_proposal_save($hookData)
     if (empty($data['document_title'])) {
         $data['document_title'] = 'Quotation';
     }
+
+    $data = otmain_normalize_conversion_fields($data);
 
     $hookData['data'] = $data;
 

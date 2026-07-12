@@ -136,18 +136,8 @@ class Packing_list_model extends App_Model
             'conversion_currency',
         ];
 
-        if (isset($data['conversion_rate'])) {
-            $rate = trim((string) $data['conversion_rate']);
-            if ($rate === '') {
-                $data['conversion_rate'] = null;
-            } else {
-                $data['conversion_rate'] = (float) str_replace(',', '.', $rate);
-            }
-        }
-
-        if (isset($data['conversion_currency'])) {
-            $cid = (int) $data['conversion_currency'];
-            $data['conversion_currency'] = $cid > 0 ? $cid : null;
+        if (isset($data['conversion_rate']) || isset($data['conversion_currency'])) {
+            $data = otmain_normalize_conversion_fields($data);
         }
 
         return array_intersect_key($data, array_flip($allowed));

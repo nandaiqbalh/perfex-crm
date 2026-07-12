@@ -889,6 +889,97 @@ function otmain_packing_currency_name($packing)
 }
 
 /**
+ * Normalize conversion_rate / conversion_currency from POST into DB-ready values.
+ *
+ * @param array $data
+ * @return array
+ */
+function otmain_normalize_conversion_fields(array $data)
+{
+    if (array_key_exists('conversion_rate', $data)) {
+        $rate = trim((string) $data['conversion_rate']);
+        if ($rate === '') {
+            $data['conversion_rate'] = null;
+        } else {
+            $data['conversion_rate'] = (float) str_replace(',', '.', $rate);
+        }
+    }
+
+    if (array_key_exists('conversion_currency', $data)) {
+        $cid = (int) $data['conversion_currency'];
+        $data['conversion_currency'] = $cid > 0 ? $cid : null;
+    }
+
+    return $data;
+}
+
+/**
+ * Render Convert to + Conversion rate fields for admin forms.
+ *
+ * @param object|null $document
+ * @param array       $options id_prefix, col_class
+ * @return string
+ */
+function otmain_render_conversion_fields_html($document = null, array $options = [])
+{
+    $CI = &get_instance();
+    $CI->load->model('currencies_model');
+    $currencies = $CI->currencies_model->get();
+
+    $idPrefix = $options['id_prefix'] ?? 'otmain';
+    $colClass = $options['col_class'] ?? 'col-md-6';
+    $defaultConvRate = get_option('otmain_eur_to_usd_rate');
+
+    $convRate = '';
+    if (is_object($document) && isset($document->conversion_rate) && $document->conversion_rate !== null && $document->conversion_rate !== '') {
+        $convRate = $document->conversion_rate;
+    } else {
+        $convRate = $defaultConvRate;
+    }
+
+    $convCurrency = otmain_get_conversion_currency_id($document);
+
+    ob_start();
+    ?>
+    <div class="<?php echo e($colClass); ?>">
+        <?php
+        echo render_select(
+            'conversion_currency',
+            $currencies,
+            ['id', 'name', 'symbol'],
+            _l('otmain_conversion_currency'),
+            $convCurrency,
+            ['data-show-subtext' => true, 'id' => $idPrefix . '-conversion-currency'],
+            [],
+            '',
+            '',
+            false
+        );
+        ?>
+    </div>
+    <div class="<?php echo e($colClass); ?>">
+        <?php
+        echo render_input(
+            'conversion_rate',
+            _l('otmain_conversion_rate'),
+            $convRate,
+            'number',
+            [
+                'step'        => 'any',
+                'min'         => '0',
+                'id'          => $idPrefix . '-conversion-rate',
+                'placeholder' => $defaultConvRate !== '' ? $defaultConvRate : 'e.g. 1.09',
+            ]
+        );
+        ?>
+        <p class="text-muted"><?php echo _l('otmain_conversion_rate_help'); ?></p>
+    </div>
+    <?php
+
+    return ob_get_clean();
+}
+
+/**
  * Resolve conversion rate: document override, else settings default.
  *
  * @param mixed $document object/array with conversion_rate, or null
@@ -992,14 +1083,23 @@ function otmain_currency_display_code($currency)
     }
 
     $name = strtoupper(trim($name));
-    if ($name === '' || $name === '€' || $name === 'EURO') {
-        return 'EURO';
-    }
-    if ($name === 'EUR') {
-        return 'EURO';
-    }
-    // Strip leading symbol if name was stored oddly
+    $name = preg_replace('/\s+/', ' ', $name);
     $name = preg_replace('/^€\s*/u', '', $name);
+
+    if ($name === '' || $name === '€' || $name === 'EURO' || $name === 'EUR' || $name === 'EUROPEAN EURO') {
+        return 'EURO';
+    }
+    if ($name === 'USD' || $name === 'US DOLLAR' || $name === 'US DOLLARS' || $name === 'UNITED STATES DOLLAR' || strpos($name, 'US DOLLAR') !== false) {
+        return 'USD';
+    }
+    if ($name === 'IDR' || $name === 'INDONESIAN RUPIAH' || $name === 'RUPIAH' || strpos($name, 'RUPIAH') !== false) {
+        return 'IDR';
+    }
+
+    // Prefer ISO-looking codes already stored as short names
+    if (preg_match('/^[A-Z]{3}$/', $name)) {
+        return $name;
+    }
 
     return $name !== '' ? $name : 'EURO';
 }
@@ -1133,14 +1233,39 @@ function otmain_pdf_po_items_table_html($po, $currencyName = 'EUR')
 function otmain_pdf_po_totals_column_html($po, $currencyName = 'EUR')
 {
     $summary = otmain_pdf_po_calculate_vat_summary($po->items);
-    $currencyName = otmain_currency_display_code($currencyName);
+    $currencyLabel = otmain_currency_display_code($currencyName);
+
+    $usdDisplay  = isset($po->total_usd_display) ? trim((string) $po->total_usd_display) : '';
+    $goldDisplay = isset($po->total_gold_display) ? trim((string) $po->total_gold_display) : '';
+
+    $rate   = otmain_get_conversion_rate($po);
+    $target = otmain_get_conversion_currency($po);
+    $docCurrencyId = isset($po->currency) ? (int) $po->currency : 0;
+    $targetId = $target ? (int) $target->id : 0;
+    $canConvert = ($rate > 0 && $target && $targetId > 0 && $targetId !== $docCurrencyId);
+
+    if ($usdDisplay === '' && $canConvert) {
+        $usdDisplay = otmain_format_money_text(((float) $summary['total']) * $rate, $target);
+    }
+    if ($goldDisplay === '') {
+        $pricePerGram = (float) str_replace(',', '.', (string) get_option('otmain_gold_price_eur_per_gram'));
+        if ($pricePerGram > 0) {
+            $grams = ((float) $summary['total']) / $pricePerGram;
+            $goldDisplay = app_format_number($grams) . ' in Gram';
+        }
+    }
 
     $html = '<table cellpadding="3" cellspacing="0" width="100%" style="font-size:10px;color:#424242;">';
-    $html .= '<tr><td align="right" width="70%"><strong>Subtotal ' . e($currencyName) . '</strong></td><td align="right" width="30%">' . otmain_pdf_format_total_amount($summary['subtotal'], $currencyName) . '</td></tr>';
-    foreach ($summary['by_rate'] as $rate => $amount) {
-        $html .= '<tr><td align="right"><strong>VAT ' . e((string) $rate) . '%</strong></td><td align="right">' . otmain_pdf_format_total_amount($amount, $currencyName) . '</td></tr>';
+    $html .= '<tr><td align="right" width="70%"><strong>Subtotal ' . e($currencyLabel) . '</strong></td><td align="right" width="30%">' . otmain_pdf_format_total_amount($summary['subtotal'], $currencyName) . '</td></tr>';
+    foreach ($summary['by_rate'] as $vatRate => $amount) {
+        $html .= '<tr><td align="right"><strong>VAT ' . e((string) $vatRate) . '%</strong></td><td align="right">' . otmain_pdf_format_total_amount($amount, $currencyName) . '</td></tr>';
     }
-    $html .= '<tr><td align="right"><strong>TOTAL ' . e($currencyName) . '</strong></td><td align="right"><strong>' . otmain_pdf_format_total_amount($summary['total'], $currencyName) . '</strong></td></tr>';
+    $html .= '<tr><td align="right"><strong>TOTAL ' . e($currencyLabel) . '</strong></td><td align="right"><strong>' . otmain_pdf_format_total_amount($summary['total'], $currencyName) . '</strong></td></tr>';
+    if ($canConvert || $usdDisplay !== '') {
+        $convertedLabel = $target ? ('TOTAL ' . otmain_currency_display_code($target)) : 'TOTAL CONVERTED';
+        $html .= '<tr><td align="right"><strong>' . e($convertedLabel) . '</strong></td><td align="right">' . ($usdDisplay !== '' ? e($usdDisplay) : '-') . '</td></tr>';
+    }
+    $html .= '<tr><td align="right"><strong>TOTAL GOLD</strong></td><td align="right">' . ($goldDisplay !== '' ? e($goldDisplay) : '-') . '</td></tr>';
     $html .= '</table>';
 
     return $html;
@@ -1828,16 +1953,21 @@ function otmain_pdf_totals_column_html($document, $items, $currencyName)
     $usdDisplay  = isset($document->total_usd_display) ? trim((string) $document->total_usd_display) : '';
     $goldDisplay = isset($document->total_gold_display) ? trim((string) $document->total_gold_display) : '';
 
+    $rate   = otmain_get_conversion_rate($document);
+    $target = otmain_get_conversion_currency($document);
+    $docCurrencyId = isset($document->currency) ? (int) $document->currency : 0;
+    $targetId = $target ? (int) $target->id : 0;
+    $canConvert = ($rate > 0 && $target && $targetId > 0 && $targetId !== $docCurrencyId);
+
     // Auto-calc when display fields are empty (requires options / document rate).
-    if ($usdDisplay === '') {
-        $rate = otmain_get_conversion_rate($document);
-        $target = otmain_get_conversion_currency($document);
-        $docCurrencyId = isset($document->currency) ? (int) $document->currency : 0;
-        $targetId = $target ? (int) $target->id : 0;
-        if ($rate > 0 && $target && $targetId !== $docCurrencyId) {
-            $usdDisplay = otmain_format_money_text(((float) $document->total) * $rate, $target);
-        }
+    if ($usdDisplay === '' && $canConvert) {
+        $usdDisplay = otmain_format_money_text(((float) $document->total) * $rate, $target);
+    } elseif ($usdDisplay !== '' && !$canConvert && $targetId === $docCurrencyId) {
+        // Manual override still allowed; keep it.
+    } elseif (!$canConvert && $usdDisplay === '') {
+        $usdDisplay = '';
     }
+
     if ($goldDisplay === '') {
         $pricePerGram = (float) str_replace(',', '.', (string) get_option('otmain_gold_price_eur_per_gram'));
         if ($pricePerGram > 0) {
@@ -1855,17 +1985,20 @@ function otmain_pdf_totals_column_html($document, $items, $currencyName)
         }
         $html .= '<tr><td align="right" width="70%"><strong>' . e($discountLabel) . '</strong></td><td align="right" width="30%">-' . otmain_pdf_format_total_amount($document->discount_total, $currencyName) . '</td></tr>';
     }
-    foreach ($byRate as $rate => $amount) {
-        $html .= '<tr><td align="right" width="70%"><strong>VAT ' . e((string) $rate) . '%</strong></td><td align="right" width="30%">' . otmain_pdf_format_total_amount($amount, $currencyName) . '</td></tr>';
+    foreach ($byRate as $vatRate => $amount) {
+        $html .= '<tr><td align="right" width="70%"><strong>VAT ' . e((string) $vatRate) . '%</strong></td><td align="right" width="30%">' . otmain_pdf_format_total_amount($amount, $currencyName) . '</td></tr>';
     }
     $currencyLabel = otmain_currency_display_code($currencyName);
     $html .= '<tr><td align="right" width="70%"><strong>TOTAL ' . e($currencyLabel) . '</strong></td><td align="right" width="30%"><strong>' . otmain_pdf_format_total_amount($document->total, $currencyName) . '</strong></td></tr>';
-    $convertedLabel = 'TOTAL CONVERTED';
-    $target = otmain_get_conversion_currency($document);
-    if ($target) {
-        $convertedLabel = 'TOTAL ' . otmain_currency_display_code($target);
+
+    if ($canConvert || $usdDisplay !== '') {
+        $convertedLabel = 'TOTAL CONVERTED';
+        if ($target) {
+            $convertedLabel = 'TOTAL ' . otmain_currency_display_code($target);
+        }
+        $html .= '<tr><td align="right" width="70%"><strong>' . e($convertedLabel) . '</strong></td><td align="right" width="30%">' . ($usdDisplay !== '' ? e($usdDisplay) : '-') . '</td></tr>';
     }
-    $html .= '<tr><td align="right" width="70%"><strong>' . e($convertedLabel) . '</strong></td><td align="right" width="30%">' . ($usdDisplay !== '' ? e($usdDisplay) : '-') . '</td></tr>';
+
     $html .= '<tr><td align="right" width="70%"><strong>TOTAL GOLD</strong></td><td align="right" width="30%">' . ($goldDisplay !== '' ? e($goldDisplay) : '-') . '</td></tr>';
     $html .= '</table>';
 

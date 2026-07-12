@@ -128,6 +128,10 @@ class Purchase_order_model extends App_Model
             'subtotal',
             'total_tax',
             'total',
+            'conversion_rate',
+            'conversion_currency',
+            'total_usd_display',
+            'total_gold_display',
         ];
     }
 
@@ -160,6 +164,8 @@ class Purchase_order_model extends App_Model
         if (empty($data['otmain_contact_id'])) {
             $data['otmain_contact_id'] = null;
         }
+
+        $data = otmain_normalize_conversion_fields($data);
 
         return $data;
     }

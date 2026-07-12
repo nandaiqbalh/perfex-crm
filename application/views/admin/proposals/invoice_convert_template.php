@@ -61,6 +61,18 @@
         '<?= e($proposal->adjustment); ?>');
     $('input[name="show_quantity_as"][value="<?= e($proposal->show_quantity_as); ?>"]')
         .prop('checked', true).change();
+    <?php if (!empty($proposal->conversion_rate) || $proposal->conversion_rate === '0' || $proposal->conversion_rate === 0) { ?>
+    $('input[name="conversion_rate"]').val('<?= e($proposal->conversion_rate); ?>');
+    <?php } ?>
+    <?php if (!empty($proposal->conversion_currency)) { ?>
+    $('select[name="conversion_currency"]').selectpicker('val', '<?= (int) $proposal->conversion_currency; ?>');
+    <?php } ?>
+    <?php if (!empty($proposal->total_usd_display)) { ?>
+    $('input[name="total_usd_display"]').val(<?= json_encode($proposal->total_usd_display); ?>);
+    <?php } ?>
+    <?php if (!empty($proposal->total_gold_display)) { ?>
+    $('input[name="total_gold_display"]').val(<?= json_encode($proposal->total_gold_display); ?>);
+    <?php } ?>
     <?php if (! isset($project_id) || ! $project_id) { ?>
     $('#convert_to_invoice #clientid').change();
     <?php } else { ?>

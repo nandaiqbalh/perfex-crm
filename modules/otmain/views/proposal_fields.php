@@ -92,6 +92,7 @@ $proposal = $proposal ?? null;
 </div>
 <?php } elseif ($section === 'extras') { ?>
 <div class="row">
+    <?php echo otmain_render_conversion_fields_html(isset($proposal) ? $proposal : null, ['id_prefix' => 'otmain-proposal']); ?>
     <div class="col-md-12">
         <?php
         $value = isset($proposal) ? ($proposal->total_usd_display ?? '') : '';

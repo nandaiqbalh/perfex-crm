@@ -71,16 +71,17 @@
         echo render_input('availability', _l('otmain_availability'), $value);
         ?>
     </div>
+    <?php echo otmain_render_conversion_fields_html(isset($estimate) ? $estimate : null, ['id_prefix' => 'otmain-estimate', 'col_class' => 'col-md-4']); ?>
     <div class="col-md-4">
         <?php
         $value = isset($estimate) ? ($estimate->total_usd_display ?? '') : '';
-        echo render_input('total_usd_display', 'TOTAL USD (display)', $value, 'text', ['placeholder' => 'e.g. 9,00 USD']);
+        echo render_input('total_usd_display', _l('otmain_total_usd_display'), $value, 'text', ['placeholder' => 'e.g. 9,00 USD']);
         ?>
     </div>
     <div class="col-md-4">
         <?php
         $value = isset($estimate) ? ($estimate->total_gold_display ?? '') : '';
-        echo render_input('total_gold_display', 'TOTAL GOLD (display)', $value, 'text', ['placeholder' => 'e.g. 999.9 in Gram']);
+        echo render_input('total_gold_display', _l('otmain_total_gold_display'), $value, 'text', ['placeholder' => 'e.g. 999.9 in Gram']);
         ?>
     </div>
 </div>

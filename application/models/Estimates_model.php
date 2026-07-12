@@ -152,6 +152,18 @@ class Estimates_model extends App_Model
         $new_invoice_data['discount_total']   = $_estimate->discount_total;
         $new_invoice_data['discount_type']    = $_estimate->discount_type;
         $new_invoice_data['sale_agent']       = $_estimate->sale_agent;
+        if (isset($_estimate->conversion_rate)) {
+            $new_invoice_data['conversion_rate'] = $_estimate->conversion_rate;
+        }
+        if (isset($_estimate->conversion_currency)) {
+            $new_invoice_data['conversion_currency'] = $_estimate->conversion_currency;
+        }
+        if (isset($_estimate->total_usd_display)) {
+            $new_invoice_data['total_usd_display'] = $_estimate->total_usd_display;
+        }
+        if (isset($_estimate->total_gold_display)) {
+            $new_invoice_data['total_gold_display'] = $_estimate->total_gold_display;
+        }
         // Since version 1.0.6
         $new_invoice_data['billing_street']   = clear_textarea_breaks($_estimate->billing_street);
         $new_invoice_data['billing_city']     = $_estimate->billing_city;

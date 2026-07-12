@@ -144,47 +144,7 @@ $invoice = $invoice ?? null;
             </div>
         </div>
     </div>
-    <div class="col-md-6">
-        <?php
-        $CI = &get_instance();
-        $CI->load->model('currencies_model');
-        $currencies = $CI->currencies_model->get();
-        $defaultConvRate = get_option('otmain_eur_to_usd_rate');
-        $invConvRate = isset($invoice) && isset($invoice->conversion_rate) && $invoice->conversion_rate !== null && $invoice->conversion_rate !== ''
-            ? $invoice->conversion_rate
-            : $defaultConvRate;
-        $invConvCurrency = otmain_get_conversion_currency_id(isset($invoice) ? $invoice : null);
-        echo render_select(
-            'conversion_currency',
-            $currencies,
-            ['id', 'name', 'symbol'],
-            _l('otmain_conversion_currency'),
-            $invConvCurrency,
-            ['data-show-subtext' => true, 'id' => 'otmain-invoice-conversion-currency'],
-            [],
-            '',
-            '',
-            false
-        );
-        ?>
-    </div>
-    <div class="col-md-6">
-        <?php
-        echo render_input(
-            'conversion_rate',
-            _l('otmain_conversion_rate'),
-            $invConvRate,
-            'number',
-            [
-                'step'        => 'any',
-                'min'         => '0',
-                'id'          => 'otmain-invoice-conversion-rate',
-                'placeholder' => $defaultConvRate !== '' ? $defaultConvRate : 'e.g. 1.09',
-            ]
-        );
-        ?>
-        <p class="text-muted"><?php echo _l('otmain_conversion_rate_help'); ?></p>
-    </div>
+    <?php echo otmain_render_conversion_fields_html(isset($invoice) ? $invoice : null, ['id_prefix' => 'otmain-invoice']); ?>
     <div class="col-md-12">
         <?php
         $value = isset($invoice) ? ($invoice->total_usd_display ?? '') : '';

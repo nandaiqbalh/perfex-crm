@@ -1104,6 +1104,18 @@ class Proposals_model extends App_Model
         $new_invoice_data['discount_total']   = $proposal->discount_total;
         $new_invoice_data['discount_type']    = $proposal->discount_type;
         $new_invoice_data['sale_agent']       = $proposal->assigned;
+        if (isset($proposal->conversion_rate)) {
+            $new_invoice_data['conversion_rate'] = $proposal->conversion_rate;
+        }
+        if (isset($proposal->conversion_currency)) {
+            $new_invoice_data['conversion_currency'] = $proposal->conversion_currency;
+        }
+        if (isset($proposal->total_usd_display)) {
+            $new_invoice_data['total_usd_display'] = $proposal->total_usd_display;
+        }
+        if (isset($proposal->total_gold_display)) {
+            $new_invoice_data['total_gold_display'] = $proposal->total_gold_display;
+        }
 
         $new_invoice_data['billing_street']           = clear_textarea_breaks($proposal->address);
         $new_invoice_data['billing_city']             = $proposal->city;
