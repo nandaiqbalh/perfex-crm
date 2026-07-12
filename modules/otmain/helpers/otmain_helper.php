@@ -8,6 +8,199 @@ defined('BASEPATH') or exit('No direct script access allowed');
  * @param mixed $taxname string "VAT|21", array of those, or tax row arrays
  * @return float
  */
+/**
+ * Packing unit type options (box / pallet / other).
+ *
+ * @return array<string,string> value => label
+ */
+function otmain_packing_unit_types()
+{
+    return [
+        'box'    => _l('otmain_unit_box'),
+        'pallet' => _l('otmain_unit_pallet'),
+        'other'  => _l('otmain_unit_other'),
+    ];
+}
+
+/**
+ * Human-readable packing unit label.
+ *
+ * @param string $unitType
+ * @param string $unitLabel custom label when type is other
+ * @return string
+ */
+function otmain_packing_unit_display($unitType, $unitLabel = '')
+{
+    $unitType = strtolower(trim((string) $unitType));
+    if ($unitType === 'other') {
+        $custom = trim((string) $unitLabel);
+
+        return $custom !== '' ? $custom : _l('otmain_unit_other');
+    }
+
+    $types = otmain_packing_unit_types();
+
+    return $types[$unitType] ?? _l('otmain_unit_box');
+}
+
+/**
+ * CBM from dimensions in millimetres.
+ * Formula: (L × W × H × qty) / 1_000_000_000
+ *
+ * @param float $length
+ * @param float $width
+ * @param float $height
+ * @param float $qty
+ * @return float
+ */
+function otmain_calc_cbm_mm($length, $width, $height, $qty = 1)
+{
+    $length = (float) $length;
+    $width  = (float) $width;
+    $height = (float) $height;
+    $qty    = (float) $qty;
+
+    if ($length <= 0 || $width <= 0 || $height <= 0 || $qty <= 0) {
+        return 0.0;
+    }
+
+    return ($length * $width * $height * $qty) / 1000000000;
+}
+
+/**
+ * Build packing dimensions display string, e.g. "2 Box: L2630 x W860 x H1000mm".
+ *
+ * @param float  $qty
+ * @param string $unitType
+ * @param string $unitLabel
+ * @param float  $length
+ * @param float  $width
+ * @param float  $height
+ * @return string
+ */
+function otmain_format_packing_dimensions_string($qty, $unitType, $unitLabel, $length, $width, $height)
+{
+    $qtyDisplay = (fmod((float) $qty, 1.0) === 0.0) ? (string) (int) $qty : (string) $qty;
+    $unit       = otmain_packing_unit_display($unitType, $unitLabel);
+    $length     = (float) $length;
+    $width      = (float) $width;
+    $height     = (float) $height;
+
+    if ($length > 0 && $width > 0 && $height > 0) {
+        $l = (fmod($length, 1.0) === 0.0) ? (string) (int) $length : rtrim(rtrim(number_format($length, 2, '.', ''), '0'), '.');
+        $w = (fmod($width, 1.0) === 0.0) ? (string) (int) $width : rtrim(rtrim(number_format($width, 2, '.', ''), '0'), '.');
+        $h = (fmod($height, 1.0) === 0.0) ? (string) (int) $height : rtrim(rtrim(number_format($height, 2, '.', ''), '0'), '.');
+
+        return $qtyDisplay . ' ' . $unit . ': L' . $l . ' x W' . $w . ' x H' . $h . 'mm';
+    }
+
+    return $qtyDisplay . ' ' . $unit;
+}
+
+/**
+ * Parse legacy free-text dimensions (LxWxH) into CBM.
+ * Treats values as mm when "mm" is present or any side >= 100; otherwise cm.
+ *
+ * @param string $dims
+ * @param float  $qty
+ * @return float
+ */
+function otmain_cbm_from_dimensions_text($dims, $qty = 1)
+{
+    $dims = trim((string) $dims);
+    if ($dims === '' || !preg_match('/([\d.]+)\s*[xX*]\s*([\d.]+)\s*[xX*]\s*([\d.]+)/', $dims, $m)) {
+        return 0.0;
+    }
+
+    $l = (float) $m[1];
+    $w = (float) $m[2];
+    $h = (float) $m[3];
+    $qty = (float) $qty;
+
+    $isMm = (stripos($dims, 'mm') !== false) || ($l >= 100 || $w >= 100 || $h >= 100);
+    if ($isMm) {
+        return otmain_calc_cbm_mm($l, $w, $h, $qty);
+    }
+
+    // centimetres → m³
+    return ($l * $w * $h * max($qty, 1)) / 1000000;
+}
+
+/**
+ * Normalize a packing_items[] row from invoice form POST into stored JSON shape.
+ *
+ * @param array $pItem
+ * @return array{qty:float,unit_type:string,unit_label:string,length:?float,width:?float,height:?float,dimensions:string,gw:float,nw:float,cbm:float}
+ */
+function otmain_normalize_invoice_packing_item(array $pItem)
+{
+    $qty       = (float) ($pItem['qty'] ?? 1);
+    $gw        = (float) ($pItem['gw'] ?? 0);
+    $nw        = (float) ($pItem['nw'] ?? 0);
+    $unitType  = strtolower(trim((string) ($pItem['unit_type'] ?? 'box')));
+    if (!in_array($unitType, ['box', 'pallet', 'other'], true)) {
+        $unitType = 'box';
+    }
+    $unitLabel = trim((string) ($pItem['unit_label'] ?? ''));
+
+    $length = isset($pItem['length']) && $pItem['length'] !== '' ? (float) $pItem['length'] : null;
+    $width  = isset($pItem['width']) && $pItem['width'] !== '' ? (float) $pItem['width'] : null;
+    $height = isset($pItem['height']) && $pItem['height'] !== '' ? (float) $pItem['height'] : null;
+
+    $legacyDims = trim((string) ($pItem['dimensions'] ?? ''));
+    $cbm        = 0.0;
+
+    if ($length !== null && $width !== null && $height !== null && $length > 0 && $width > 0 && $height > 0) {
+        $cbm  = otmain_calc_cbm_mm($length, $width, $height, $qty);
+        $dims = otmain_format_packing_dimensions_string($qty, $unitType, $unitLabel, $length, $width, $height);
+    } else {
+        $dims = $legacyDims;
+        $cbm  = otmain_cbm_from_dimensions_text($dims, $qty);
+        if ($cbm <= 0 && !empty($pItem['cbm'])) {
+            $cbm = (float) $pItem['cbm'];
+        }
+        if ($dims === '' && $qty > 0) {
+            $dims = otmain_format_packing_dimensions_string($qty, $unitType, $unitLabel, 0, 0, 0);
+        }
+    }
+
+    return [
+        'qty'        => $qty,
+        'unit_type'  => $unitType,
+        'unit_label' => $unitType === 'other' ? $unitLabel : '',
+        'length'     => $length,
+        'width'      => $width,
+        'height'     => $height,
+        'dimensions' => $dims,
+        'gw'         => $gw,
+        'nw'         => $nw,
+        'cbm'        => $cbm,
+    ];
+}
+
+/**
+ * HTML select options for packing unit type.
+ *
+ * @param string $selected
+ * @param string $name
+ * @param string $extraClass
+ * @return string
+ */
+function otmain_packing_unit_select_html($selected, $name, $extraClass = '')
+{
+    $selected = strtolower(trim((string) $selected));
+    if ($selected === '') {
+        $selected = 'box';
+    }
+    $html = '<select name="' . e($name) . '" class="form-control otmain-packing-unit-type' . ($extraClass ? ' ' . e($extraClass) : '') . '">';
+    foreach (otmain_packing_unit_types() as $value => $label) {
+        $html .= '<option value="' . e($value) . '"' . ($selected === $value ? ' selected' : '') . '>' . e($label) . '</option>';
+    }
+    $html .= '</select>';
+
+    return $html;
+}
+
 function otmain_extract_tax_rate($taxname)
 {
     if ($taxname === null || $taxname === '') {
@@ -1338,14 +1531,27 @@ function otmain_pdf_invoice_two_table_html($items, $packingItems, $currencyName)
             $qtyPack = (float) ($pItem['qty'] ?? 1);
             $gw      = (float) ($pItem['gw'] ?? 0);
             $nw      = (float) ($pItem['nw'] ?? 0);
-            $dims    = $pItem['dimensions'] ?? '';
             $cbm     = (float) ($pItem['cbm'] ?? 0);
+            $unitDisp = otmain_packing_unit_display($pItem['unit_type'] ?? 'box', $pItem['unit_label'] ?? '');
+
+            $length = $pItem['length'] ?? null;
+            $width  = $pItem['width'] ?? null;
+            $height = $pItem['height'] ?? null;
+            if ($length && $width && $height && $cbm <= 0) {
+                $cbm = otmain_calc_cbm_mm($length, $width, $height, $qtyPack);
+            }
+
+            $dims = $pItem['dimensions'] ?? '';
+            if ($length && $width && $height) {
+                $dims = otmain_format_packing_dimensions_string($qtyPack, $pItem['unit_type'] ?? 'box', $pItem['unit_label'] ?? '', $length, $width, $height);
+            }
 
             $totalGw  += $gw;
             $totalNw  += $nw;
             $totalCbm += $cbm;
 
             $qtyPackDisplay = (fmod($qtyPack, 1.0) === 0.0) ? (string) (int) $qtyPack : app_format_number($qtyPack);
+            $qtyPackDisplay .= ' ' . e($unitDisp);
 
             $dimHtml = e($dims);
             if ($cbm > 0) {
@@ -1779,10 +1985,45 @@ function otmain_pdf_packing_list_html($packing)
         . '<th width="25%">&nbsp;</th>'
         . '</tr>';
 
+    $totalCbmFooter = 0;
     foreach ($packing->items as $item) {
+        $packQty = (float) ($item['packing_qty'] ?? $item['qty'] ?? 1);
+        $unitDisp = otmain_packing_unit_display($item['unit_type'] ?? 'box', $item['unit_label'] ?? '');
+        $qtyDisplay = (fmod($packQty, 1.0) === 0.0) ? (string) (int) $packQty : app_format_number($packQty);
+        $qtyDisplay .= ' ' . e($unitDisp);
+
+        $length = $item['length'] ?? null;
+        $width  = $item['width'] ?? null;
+        $height = $item['height'] ?? null;
+        $dims   = $item['packing_detail'] ?? '';
+        $cbm    = 0.0;
+
+        if ($length && $width && $height) {
+            $cbm  = otmain_calc_cbm_mm($length, $width, $height, $packQty);
+            $dims = otmain_format_packing_dimensions_string(
+                $packQty,
+                $item['unit_type'] ?? 'box',
+                $item['unit_label'] ?? '',
+                $length,
+                $width,
+                $height
+            );
+        } elseif (!empty($item['volume']) && preg_match('/([\d.]+)/', $item['volume'], $vm)) {
+            $cbm = (float) $vm[1];
+        } elseif ($dims !== '') {
+            $cbm = otmain_cbm_from_dimensions_text($dims, $packQty);
+        }
+
+        $totalCbmFooter += $cbm;
+
+        $dimHtml = e($dims);
+        if ($cbm > 0) {
+            $dimHtml .= '<br /><span style="font-size:9px;">Volume: ' . app_format_number($cbm) . ' CBM</span>';
+        }
+
         $html .= '<tr>'
-            . '<td align="center">' . app_format_number($item['qty']) . '</td>'
-            . '<td>' . e($item['packing_detail'] ?? '') . '</td>'
+            . '<td align="center">' . $qtyDisplay . '</td>'
+            . '<td>' . $dimHtml . '</td>'
             . '<td align="right">' . ($item['gross_weight'] !== null && $item['gross_weight'] !== '' ? app_format_number($item['gross_weight']) : '-') . '</td>'
             . '<td align="right">' . ($item['net_weight'] !== null && $item['net_weight'] !== '' ? app_format_number($item['net_weight']) : '-') . '</td>'
             . '<td align="right">&nbsp;</td>'
@@ -1796,11 +2037,21 @@ function otmain_pdf_packing_list_html($packing)
         $totalGwFooter += (float) ($item['gross_weight'] ?? 0);
         $totalNwFooter += (float) ($item['net_weight'] ?? 0);
     }
+    if (isset($packing->total_cbm) && (float) $packing->total_cbm > 0) {
+        $totalCbmFooter = (float) $packing->total_cbm;
+    }
     $html .= '<tr style="font-weight:bold;background-color:#f5f5f5;">'
         . '<td align="center">&nbsp;</td>'
         . '<td>Total Weight</td>'
         . '<td align="right">' . app_format_number($totalGwFooter) . '</td>'
         . '<td align="right">' . app_format_number($totalNwFooter) . '</td>'
+        . '<td align="right">&nbsp;</td>'
+        . '</tr>';
+    $html .= '<tr style="font-weight:bold;background-color:#f5f5f5;">'
+        . '<td align="center">&nbsp;</td>'
+        . '<td>Total CBM: ' . app_format_number($totalCbmFooter) . '</td>'
+        . '<td align="right">&nbsp;</td>'
+        . '<td align="right">&nbsp;</td>'
         . '<td align="right">&nbsp;</td>'
         . '</tr>';
 

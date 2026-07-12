@@ -70,7 +70,9 @@ $isEdit = !empty($pl);
                                             <th class="text-right"><?php echo _l('invoice_table_quantity_heading'); ?></th>
                                             <th class="text-right"><?php echo _l('invoice_table_rate_heading'); ?></th>
                                             <th class="text-right">VAT %</th>
-                                            <th><?php echo _l('otmain_packing_detail'); ?></th>
+                                            <th><?php echo _l('otmain_unit_type'); ?></th>
+                                            <th class="text-right"><?php echo _l('otmain_packing_qty'); ?></th>
+                                            <th><?php echo _l('otmain_dimensions'); ?></th>
                                             <th class="text-right"><?php echo _l('otmain_gross_weight'); ?></th>
                                             <th class="text-right"><?php echo _l('otmain_net_weight'); ?></th>
                                             <th><?php echo _l('otmain_volume'); ?></th>
@@ -78,14 +80,25 @@ $isEdit = !empty($pl);
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        <?php foreach ($pl->items as $item) { ?>
+                                        <?php foreach ($pl->items as $item) {
+                                            $unitDisp = otmain_packing_unit_display($item['unit_type'] ?? 'box', $item['unit_label'] ?? '');
+                                            $packQty = $item['packing_qty'] ?? $item['qty'];
+                                            $dimParts = [];
+                                            if (!empty($item['length']) || !empty($item['width']) || !empty($item['height'])) {
+                                                $dimParts[] = 'L' . ($item['length'] ?? '-') . ' x W' . ($item['width'] ?? '-') . ' x H' . ($item['height'] ?? '-') . 'mm';
+                                            } elseif (!empty($item['packing_detail'])) {
+                                                $dimParts[] = $item['packing_detail'];
+                                            }
+                                        ?>
                                         <tr>
                                             <td><?php echo e($item['description']); ?></td>
                                             <td><?php echo e($item['hs_code']); ?></td>
                                             <td class="text-right"><?php echo e($item['qty']); ?></td>
                                             <td class="text-right"><?php echo app_format_number($item['unit_price']); ?></td>
                                             <td class="text-right"><?php echo e($item['taxrate'] ?? 0); ?></td>
-                                            <td><?php echo e($item['packing_detail']); ?></td>
+                                            <td><?php echo e($unitDisp); ?></td>
+                                            <td class="text-right"><?php echo e($packQty); ?></td>
+                                            <td><?php echo e(implode(' ', $dimParts)); ?></td>
                                             <td class="text-right"><?php echo e($item['gross_weight']); ?></td>
                                             <td class="text-right"><?php echo e($item['net_weight']); ?></td>
                                             <td><?php echo e($item['volume']); ?></td>
@@ -105,6 +118,8 @@ $isEdit = !empty($pl);
                             <div class="row mtop15">
                                 <div class="col-md-6 col-md-offset-6">
                                     <table class="table text-right">
+                                        <tr><td><strong><?php echo _l('otmain_total_weight'); ?></strong></td><td><?php echo isset($pl->total_weight) ? app_format_number($pl->total_weight) . ' KGS' : '-'; ?></td></tr>
+                                        <tr><td><strong><?php echo _l('otmain_total_cbm'); ?></strong></td><td><?php echo isset($pl->total_cbm) ? app_format_number($pl->total_cbm) : '0.00'; ?></td></tr>
                                         <tr><td><strong><?php echo _l('otmain_subtotal'); ?> <?php echo e($plCurrencyLabel); ?></strong></td><td><?php echo app_format_money($plSummary['subtotal'], $plCurrencyObj); ?></td></tr>
                                         <?php foreach (($plSummary['by_rate'] ?? []) as $rate => $amount) { ?>
                                         <tr><td><strong>VAT <?php echo e((string) $rate); ?>%</strong></td><td><?php echo app_format_money($amount, $plCurrencyObj); ?></td></tr>

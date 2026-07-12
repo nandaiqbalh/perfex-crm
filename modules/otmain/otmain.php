@@ -224,7 +224,7 @@ function otmain_admin_footer_assets()
         || strpos($uri, 'otmain/purchase_order') !== false
     ) {
         echo '<link rel="stylesheet" href="' . module_dir_url(OTMAIN_MODULE_NAME, 'assets/css/otmain-forms.css') . '?v=1.0.2" />';
-        echo '<script src="' . module_dir_url(OTMAIN_MODULE_NAME, 'assets/js/otmain.js') . '?v=1.1.1"></script>';
+        echo '<script src="' . module_dir_url(OTMAIN_MODULE_NAME, 'assets/js/otmain.js') . '?v=1.2.0"></script>';
     }
 }
 
@@ -370,31 +370,15 @@ function otmain_before_invoice_save($hookData)
         $totalCbm = 0;
         $packing  = [];
 
-        foreach ($data['packing_items'] as $i => $pItem) {
-            $qty  = (float) ($pItem['qty'] ?? 1);
-            $gw   = (float) ($pItem['gw'] ?? 0);
-            $nw   = (float) ($pItem['nw'] ?? 0);
-            $dims = trim($pItem['dimensions'] ?? '');
-
-            // Calculate CBM from dimensions (format: LxWxH or L x W x H)
-            $cbm = 0;
-            if (preg_match('/([\d.]+)\s*[xX*]\s*([\d.]+)\s*[xX*]\s*([\d.]+)/', $dims, $m)) {
-                $cbm = ((float) $m[1] * (float) $m[2] * (float) $m[3]) / 1000000; // cm to CBM
-            } elseif (!empty($pItem['cbm'])) {
-                $cbm = (float) $pItem['cbm'];
+        foreach ($data['packing_items'] as $pItem) {
+            if (!is_array($pItem)) {
+                continue;
             }
-
-            $totalGw  += $gw;
-            $totalNw  += $nw;
-            $totalCbm += $cbm;
-
-            $packing[] = [
-                'qty'        => $qty,
-                'dimensions' => $dims,
-                'gw'         => $gw,
-                'nw'         => $nw,
-                'cbm'        => $cbm,
-            ];
+            $normalized = otmain_normalize_invoice_packing_item($pItem);
+            $totalGw  += $normalized['gw'];
+            $totalNw  += $normalized['nw'];
+            $totalCbm += $normalized['cbm'];
+            $packing[] = $normalized;
         }
 
         $data['packing_items'] = json_encode($packing);

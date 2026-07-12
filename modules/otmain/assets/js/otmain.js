@@ -12,6 +12,55 @@
         return String(parseFloat(rate.toFixed(4)));
     }
 
+    /** CBM from L×W×H in mm × qty → m³ */
+    function otmainCalcCbmMm(length, width, height, qty) {
+        length = parseFloat(length) || 0;
+        width = parseFloat(width) || 0;
+        height = parseFloat(height) || 0;
+        qty = parseFloat(qty) || 0;
+        if (length <= 0 || width <= 0 || height <= 0 || qty <= 0) {
+            return 0;
+        }
+        return (length * width * height * qty) / 1000000000;
+    }
+
+    function otmainPackingUnitOptionsHtml(selected) {
+        selected = (selected || 'box').toString().toLowerCase();
+        var opts = [
+            { v: 'box', t: 'Box' },
+            { v: 'pallet', t: 'Pallet' },
+            { v: 'other', t: 'Other' }
+        ];
+        var html = '';
+        opts.forEach(function(o) {
+            html += '<option value="' + o.v + '"' + (selected === o.v ? ' selected' : '') + '>' + o.t + '</option>';
+        });
+        return html;
+    }
+
+    function otmainTogglePackingUnitLabel($row) {
+        var isOther = ($row.find('.otmain-packing-unit-type').val() || '') === 'other';
+        $row.find('.otmain-packing-unit-label').toggle(isOther);
+    }
+
+    function otmainRecalcPackingRowCbm($row) {
+        var qty = parseFloat($row.find('.otmain-packing-qty').val()) || 0;
+        // Packing list uses separate packing qty
+        var $packQty = $row.find('.otmain-packing-pack-qty');
+        if ($packQty.length) {
+            qty = parseFloat($packQty.val()) || 0;
+        }
+        var cbm = otmainCalcCbmMm(
+            $row.find('.otmain-packing-length').val(),
+            $row.find('.otmain-packing-width').val(),
+            $row.find('.otmain-packing-height').val(),
+            qty
+        );
+        $row.find('.otmain-packing-cbm-display').val(cbm > 0 ? cbm.toFixed(3) : '0.00');
+        $row.find('.otmain-packing-volume-hidden').val(cbm > 0 ? (cbm.toFixed(3) + ' CBM') : '');
+        return cbm;
+    }
+
     function otmainSyncTaxWrap($wrap) {
         if (!$wrap || !$wrap.length) {
             return null;
@@ -280,6 +329,16 @@
                 taxrate = parseFloat(parts.length > 1 ? parts[parts.length - 1] : rawTax) || 0;
             }
         }
+        var unitType = (item.unit_type || 'box').toString().toLowerCase();
+        var packingQty = item.packing_qty !== undefined && item.packing_qty !== null && item.packing_qty !== ''
+            ? item.packing_qty
+            : (item.qty || 1);
+        var length = item.length || '';
+        var width = item.width || '';
+        var height = item.height || '';
+        var cbm = otmainCalcCbmMm(length, width, height, packingQty);
+        var cbmDisplay = cbm > 0 ? cbm.toFixed(3) : '0.00';
+        var volume = cbm > 0 ? (cbm.toFixed(3) + ' CBM') : (item.volume || '');
         return '<tr class="item-row">' +
             '<td><input type="number" step="any" name="items[' + index + '][qty]" class="form-control otmain-packing-qty" value="' + (item.qty || 1) + '"></td>' +
             '<td><input type="text" name="items[' + index + '][description]" class="form-control" value="' + (item.description || '') + '"></td>' +
@@ -287,7 +346,20 @@
             '<td><input type="number" step="any" name="items[' + index + '][unit_price]" class="form-control otmain-packing-rate" value="' + (item.rate || item.unit_price || 0) + '"></td>' +
             '<td><input type="number" step="any" min="0" name="items[' + index + '][taxrate]" class="form-control otmain-packing-tax" value="' + taxrate + '"></td>' +
             '<td><input type="text" class="form-control otmain-packing-line-total" readonly value="0"></td>' +
-            '<td><input type="text" name="items[' + index + '][packing_detail]" class="form-control" value="' + (item.packing_detail || '') + '"></td>' +
+            '<td>' +
+                '<select name="items[' + index + '][unit_type]" class="form-control otmain-packing-unit-type">' +
+                    otmainPackingUnitOptionsHtml(unitType) +
+                '</select>' +
+                '<input type="text" name="items[' + index + '][unit_label]" class="form-control otmain-packing-unit-label mtop5" placeholder="Unit label" value="' + (item.unit_label || '') + '" style="' + (unitType === 'other' ? '' : 'display:none;') + '">' +
+            '</td>' +
+            '<td><input type="number" step="any" min="0" name="items[' + index + '][packing_qty]" class="form-control otmain-packing-pack-qty" value="' + packingQty + '"></td>' +
+            '<td><input type="number" step="any" min="0" name="items[' + index + '][length]" class="form-control otmain-packing-length" value="' + length + '"></td>' +
+            '<td><input type="number" step="any" min="0" name="items[' + index + '][width]" class="form-control otmain-packing-width" value="' + width + '"></td>' +
+            '<td><input type="number" step="any" min="0" name="items[' + index + '][height]" class="form-control otmain-packing-height" value="' + height + '"></td>' +
+            '<td>' +
+                '<input type="text" class="form-control otmain-packing-cbm-display" readonly value="' + cbmDisplay + '">' +
+                '<input type="hidden" name="items[' + index + '][volume]" class="otmain-packing-volume-hidden" value="' + volume + '">' +
+            '</td>' +
             '<td><input type="number" step="any" name="items[' + index + '][gross_weight]" class="form-control otmain-packing-gross-weight" value="' + (item.gross_weight || '') + '"></td>' +
             '<td><input type="number" step="any" name="items[' + index + '][net_weight]" class="form-control" value="' + (item.net_weight || '') + '"></td>' +
             '<td><button type="button" class="btn btn-danger btn-sm otmain-remove-row"><i class="fa fa-times"></i></button></td>' +
@@ -333,6 +405,7 @@
         var subtotal = 0;
         var totalTax = 0;
         var totalWeight = 0;
+        var totalCbm = 0;
         var byRate = {};
 
         $('#otmain-packing-list-form #otmain-packing-items tbody tr.item-row').each(function() {
@@ -346,6 +419,7 @@
             subtotal += line;
             totalTax += taxAmount;
             totalWeight += parseFloat($(this).find('.otmain-packing-gross-weight').val()) || 0;
+            totalCbm += otmainRecalcPackingRowCbm($(this));
             var key = String(tax);
             if (!byRate[key]) {
                 byRate[key] = 0;
@@ -376,6 +450,7 @@
         $('#otmain-packing-usd-row').toggle(showUsd || subtotalUsd > 0);
         $('#otmain-packing-total').html('<strong>' + (subtotal + totalTax).toFixed(2) + '</strong>');
         $('#otmain-packing-total-weight').text(totalWeight > 0 ? totalWeight.toFixed(2) + ' KGS' : '-');
+        $('#otmain-packing-total-cbm').text(totalCbm > 0 ? totalCbm.toFixed(3) : '0.00');
     }
 
     function otmainAppendPackingItems(items) {
@@ -533,16 +608,48 @@
 
             // Packing details handlers for invoice form
             function otmainRecalcInvoicePacking() {
-                var totalGw = 0, totalNw = 0;
-                $('#otmain-packing-items tbody tr.item-row').each(function() {
-                    totalGw += parseFloat($(this).find('.otmain-packing-gw').val()) || 0;
-                    totalNw += parseFloat($(this).find('.otmain-packing-nw').val()) || 0;
+                var totalGw = 0, totalNw = 0, totalCbm = 0;
+                $('#otmain-packing-details-panel #otmain-packing-items tbody tr.item-row').each(function() {
+                    var $row = $(this);
+                    totalGw += parseFloat($row.find('.otmain-packing-gw').val()) || 0;
+                    totalNw += parseFloat($row.find('.otmain-packing-nw').val()) || 0;
+                    totalCbm += otmainRecalcPackingRowCbm($row);
                 });
                 $('#otmain-total-gw').text(totalGw.toFixed(2));
                 $('#otmain-total-nw').text(totalNw.toFixed(2));
+                $('#otmain-total-cbm').text(totalCbm.toFixed(3));
             }
 
-            $(document).on('input change', '#otmain-packing-items .otmain-packing-gw, #otmain-packing-items .otmain-packing-nw', otmainRecalcInvoicePacking);
+            function otmainBuildInvoicePackingRow(i) {
+                return '<tr class="item-row">' +
+                    '<td>' +
+                        '<select name="packing_items[' + i + '][unit_type]" class="form-control otmain-packing-unit-type">' +
+                            otmainPackingUnitOptionsHtml('box') +
+                        '</select>' +
+                        '<input type="text" name="packing_items[' + i + '][unit_label]" class="form-control otmain-packing-unit-label mtop5" placeholder="Unit label" style="display:none;">' +
+                    '</td>' +
+                    '<td><input type="number" step="any" min="0" name="packing_items[' + i + '][qty]" class="form-control otmain-packing-qty" value="1"></td>' +
+                    '<td><input type="number" step="any" min="0" name="packing_items[' + i + '][length]" class="form-control otmain-packing-length" value=""></td>' +
+                    '<td><input type="number" step="any" min="0" name="packing_items[' + i + '][width]" class="form-control otmain-packing-width" value=""></td>' +
+                    '<td><input type="number" step="any" min="0" name="packing_items[' + i + '][height]" class="form-control otmain-packing-height" value=""></td>' +
+                    '<td>' +
+                        '<input type="text" class="form-control otmain-packing-cbm-display" readonly value="0.00">' +
+                        '<input type="hidden" name="packing_items[' + i + '][dimensions]" value="">' +
+                    '</td>' +
+                    '<td><input type="number" step="any" name="packing_items[' + i + '][gw]" class="form-control otmain-packing-gw" value="0"></td>' +
+                    '<td><input type="number" step="any" name="packing_items[' + i + '][nw]" class="form-control otmain-packing-nw" value="0"></td>' +
+                    '<td><button type="button" class="btn btn-danger btn-sm otmain-remove-packing-row"><i class="fa fa-times"></i></button></td>' +
+                    '</tr>';
+            }
+
+            $(document).on(
+                'input change',
+                '#otmain-packing-details-panel .otmain-packing-gw, #otmain-packing-details-panel .otmain-packing-nw, #otmain-packing-details-panel .otmain-packing-qty, #otmain-packing-details-panel .otmain-packing-length, #otmain-packing-details-panel .otmain-packing-width, #otmain-packing-details-panel .otmain-packing-height',
+                otmainRecalcInvoicePacking
+            );
+            $(document).on('change', '#otmain-packing-details-panel .otmain-packing-unit-type', function() {
+                otmainTogglePackingUnitLabel($(this).closest('tr'));
+            });
             $(document).on('click', '#otmain-packing-details-panel .otmain-remove-packing-row', function() {
                 $(this).closest('tr').remove();
                 otmainRecalcInvoicePacking();
@@ -550,16 +657,10 @@
             $(document).on('click', '#otmain-packing-details-panel #otmain-add-packing-row', function() {
                 var $tbody = $('#otmain-packing-details-panel #otmain-packing-items tbody');
                 var i = $tbody.find('tr.item-row').length;
-                var row = '<tr class="item-row">' +
-                    '<td><input type="number" step="any" name="packing_items[' + i + '][qty]" class="form-control otmain-packing-qty" value="1"></td>' +
-                    '<td><textarea name="packing_items[' + i + '][dimensions]" class="form-control otmain-packing-dims" rows="2"></textarea></td>' +
-                    '<td><input type="number" step="any" name="packing_items[' + i + '][gw]" class="form-control otmain-packing-gw" value="0"></td>' +
-                    '<td><input type="number" step="any" name="packing_items[' + i + '][nw]" class="form-control otmain-packing-nw" value="0"></td>' +
-                    '<td><button type="button" class="btn btn-danger btn-sm otmain-remove-packing-row"><i class="fa fa-times"></i></button></td>' +
-                    '</tr>';
-                $tbody.append(row);
+                $tbody.append(otmainBuildInvoicePackingRow(i));
                 otmainRecalcInvoicePacking();
             });
+            otmainRecalcInvoicePacking();
         }
 
         if ($('#otmain-packing-list-form').length) {
@@ -630,7 +731,14 @@
                 });
             });
 
-            $('body').on('input change', '.otmain-packing-qty, .otmain-packing-rate, .otmain-packing-tax, .otmain-packing-gross-weight', otmainRecalculatePackingTotals);
+            $('body').on(
+                'input change',
+                '#otmain-packing-list-form .otmain-packing-qty, #otmain-packing-list-form .otmain-packing-pack-qty, #otmain-packing-list-form .otmain-packing-rate, #otmain-packing-list-form .otmain-packing-tax, #otmain-packing-list-form .otmain-packing-gross-weight, #otmain-packing-list-form .otmain-packing-length, #otmain-packing-list-form .otmain-packing-width, #otmain-packing-list-form .otmain-packing-height',
+                otmainRecalculatePackingTotals
+            );
+            $('body').on('change', '#otmain-packing-list-form .otmain-packing-unit-type', function() {
+                otmainTogglePackingUnitLabel($(this).closest('tr'));
+            });
             $('#otmain-packing-list-form select[name="currency"]').on('change', otmainRecalculatePackingTotals);
 
             otmainRecalculatePackingTotals();

@@ -137,16 +137,34 @@ if (!empty($pl) && !empty($pl->quote_ref_ids)) {
                         <th><?php echo _l('invoice_table_item_heading'); ?></th>
                         <th><?php echo _l('otmain_hs_code'); ?></th>
                         <th><?php echo _l('invoice_table_rate_heading'); ?></th>
-                        <th width="10%">VAT %</th>
+                        <th width="8%">VAT %</th>
                         <th><?php echo _l('total'); ?></th>
-                        <th><?php echo _l('otmain_dimensions'); ?></th>
+                        <th><?php echo _l('otmain_unit_type'); ?></th>
+                        <th><?php echo _l('otmain_packing_qty'); ?></th>
+                        <th><?php echo _l('otmain_length_short'); ?></th>
+                        <th><?php echo _l('otmain_width_short'); ?></th>
+                        <th><?php echo _l('otmain_height_short'); ?></th>
+                        <th><?php echo _l('otmain_cbm'); ?></th>
                         <th><?php echo _l('otmain_gross_weight'); ?></th>
                         <th><?php echo _l('otmain_net_weight'); ?></th>
                         <th></th>
                     </tr>
                 </thead>
                 <tbody>
-                    <?php if (!empty($pl->items)) { foreach ($pl->items as $i => $item) { ?>
+                    <?php if (!empty($pl) && !empty($pl->items)) { foreach ($pl->items as $i => $item) {
+                        $unitType = $item['unit_type'] ?? 'box';
+                        $unitLabel = $item['unit_label'] ?? '';
+                        $packingQty = $item['packing_qty'] ?? $item['qty'];
+                        $length = $item['length'] ?? '';
+                        $width = $item['width'] ?? '';
+                        $height = $item['height'] ?? '';
+                        $cbmDisplay = '';
+                        if ($length !== '' && $length !== null && $width !== '' && $width !== null && $height !== '' && $height !== null) {
+                            $cbmDisplay = number_format(otmain_calc_cbm_mm($length, $width, $height, $packingQty), 3, '.', '');
+                        } elseif (!empty($item['volume'])) {
+                            $cbmDisplay = preg_replace('/\s*CBM\s*/i', '', $item['volume']);
+                        }
+                    ?>
                     <tr class="item-row">
                         <td><input type="number" step="any" name="items[<?php echo $i; ?>][qty]" class="form-control otmain-packing-qty" value="<?php echo e($item['qty']); ?>"></td>
                         <td><input type="text" name="items[<?php echo $i; ?>][description]" class="form-control" value="<?php echo e($item['description']); ?>"></td>
@@ -154,7 +172,21 @@ if (!empty($pl) && !empty($pl->quote_ref_ids)) {
                         <td><input type="number" step="any" name="items[<?php echo $i; ?>][unit_price]" class="form-control otmain-packing-rate" value="<?php echo e($item['unit_price']); ?>"></td>
                         <td><input type="number" step="any" min="0" name="items[<?php echo $i; ?>][taxrate]" class="form-control otmain-packing-tax" value="<?php echo e($item['taxrate'] ?? 0); ?>"></td>
                         <td><input type="text" class="form-control otmain-packing-line-total" readonly value="<?php echo e(app_format_number($item['total'])); ?>"></td>
-                        <td><input type="text" name="items[<?php echo $i; ?>][packing_detail]" class="form-control" value="<?php echo e($item['packing_detail']); ?>"></td>
+                        <td>
+                            <?php echo otmain_packing_unit_select_html($unitType, 'items[' . $i . '][unit_type]'); ?>
+                            <input type="text" name="items[<?php echo $i; ?>][unit_label]" class="form-control otmain-packing-unit-label mtop5" placeholder="<?php echo e(_l('otmain_unit_label')); ?>" value="<?php echo e($unitLabel); ?>" style="<?php echo $unitType === 'other' ? '' : 'display:none;'; ?>">
+                            <?php if (empty($length) && empty($width) && empty($height) && !empty($item['packing_detail'])) { ?>
+                            <input type="hidden" name="items[<?php echo $i; ?>][packing_detail]" value="<?php echo e($item['packing_detail']); ?>">
+                            <?php } ?>
+                        </td>
+                        <td><input type="number" step="any" min="0" name="items[<?php echo $i; ?>][packing_qty]" class="form-control otmain-packing-pack-qty" value="<?php echo e($packingQty); ?>"></td>
+                        <td><input type="number" step="any" min="0" name="items[<?php echo $i; ?>][length]" class="form-control otmain-packing-length" value="<?php echo e($length !== null ? $length : ''); ?>"></td>
+                        <td><input type="number" step="any" min="0" name="items[<?php echo $i; ?>][width]" class="form-control otmain-packing-width" value="<?php echo e($width !== null ? $width : ''); ?>"></td>
+                        <td><input type="number" step="any" min="0" name="items[<?php echo $i; ?>][height]" class="form-control otmain-packing-height" value="<?php echo e($height !== null ? $height : ''); ?>"></td>
+                        <td>
+                            <input type="text" class="form-control otmain-packing-cbm-display" readonly value="<?php echo e($cbmDisplay !== '' ? $cbmDisplay : '0.00'); ?>">
+                            <input type="hidden" name="items[<?php echo $i; ?>][volume]" class="otmain-packing-volume-hidden" value="<?php echo e($item['volume'] ?? ''); ?>">
+                        </td>
                         <td><input type="number" step="any" name="items[<?php echo $i; ?>][gross_weight]" class="form-control otmain-packing-gross-weight" value="<?php echo e($item['gross_weight']); ?>"></td>
                         <td><input type="number" step="any" name="items[<?php echo $i; ?>][net_weight]" class="form-control" value="<?php echo e($item['net_weight']); ?>"></td>
                         <td><button type="button" class="btn btn-danger btn-sm otmain-remove-row"><i class="fa fa-times"></i></button></td>
@@ -175,6 +207,10 @@ if (!empty($pl) && !empty($pl->quote_ref_ids)) {
                     <tr>
                         <td><strong><?php echo _l('otmain_total_weight'); ?></strong></td>
                         <td id="otmain-packing-total-weight">0</td>
+                    </tr>
+                    <tr>
+                        <td><strong><?php echo _l('otmain_total_cbm'); ?></strong></td>
+                        <td id="otmain-packing-total-cbm"><?php echo (!empty($pl) && isset($pl->total_cbm)) ? app_format_number($pl->total_cbm) : '0.00'; ?></td>
                     </tr>
                     <tr id="otmain-packing-subtotal-row">
                         <td><strong id="otmain-packing-subtotal-label"><?php echo _l('otmain_subtotal'); ?></strong></td>

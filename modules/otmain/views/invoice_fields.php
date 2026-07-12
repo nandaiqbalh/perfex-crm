@@ -125,11 +125,15 @@ $invoice = $invoice ?? null;
                     <table class="table table-bordered" id="otmain-packing-items">
                         <thead>
                             <tr>
-                                <th width="10%"><?php echo _l('otmain_qty'); ?></th>
-                                <th width="50%"><?php echo _l('otmain_dimensions'); ?></th>
-                                <th width="15%"><?php echo _l('otmain_gw'); ?></th>
-                                <th width="15%"><?php echo _l('otmain_nw'); ?></th>
-                                <th width="10%"><?php echo _l('otmain_action'); ?></th>
+                                <th width="10%"><?php echo _l('otmain_unit_type'); ?></th>
+                                <th width="8%"><?php echo _l('otmain_packing_qty'); ?></th>
+                                <th width="10%"><?php echo _l('otmain_length_short'); ?></th>
+                                <th width="10%"><?php echo _l('otmain_width_short'); ?></th>
+                                <th width="10%"><?php echo _l('otmain_height_short'); ?></th>
+                                <th width="10%"><?php echo _l('otmain_cbm'); ?></th>
+                                <th width="12%"><?php echo _l('otmain_gw'); ?></th>
+                                <th width="12%"><?php echo _l('otmain_nw'); ?></th>
+                                <th width="8%"><?php echo _l('otmain_action'); ?></th>
                             </tr>
                         </thead>
                         <tbody>
@@ -139,14 +143,31 @@ $invoice = $invoice ?? null;
                                 foreach ($packingItems as $i => $pItem) {
                                     $qtyP = (float) ($pItem['qty'] ?? 1);
                                     $qtyPDisplay = (fmod($qtyP, 1.0) === 0.0) ? (string) (int) $qtyP : $qtyP;
+                                    $unitType = $pItem['unit_type'] ?? 'box';
+                                    $unitLabel = $pItem['unit_label'] ?? '';
+                                    $length = $pItem['length'] ?? '';
+                                    $width  = $pItem['width'] ?? '';
+                                    $height = $pItem['height'] ?? '';
+                                    $hasStructured = ($length !== '' && $length !== null) || ($width !== '' && $width !== null) || ($height !== '' && $height !== null);
+                                    $legacyDims = !$hasStructured ? ($pItem['dimensions'] ?? '') : '';
+                                    $cbmVal = (float) ($pItem['cbm'] ?? 0);
                                     ?>
                             <tr class="item-row">
-                                <td><input type="number" step="any" name="packing_items[<?php echo $i; ?>][qty]" class="form-control otmain-packing-qty" value="<?php echo $qtyPDisplay; ?>"></td>
                                 <td>
-                                    <textarea name="packing_items[<?php echo $i; ?>][dimensions]" class="form-control otmain-packing-dims" rows="2"><?php echo e($pItem['dimensions'] ?? ''); ?></textarea>
-                                    <?php if (!empty($pItem['cbm'])): ?>
-                                    <small class="text-muted otmain-cbm-display">CBM: <?php echo app_format_number((float) $pItem['cbm']); ?></small>
-                                    <?php endif; ?>
+                                    <?php echo otmain_packing_unit_select_html($unitType, 'packing_items[' . $i . '][unit_type]'); ?>
+                                    <input type="text" name="packing_items[<?php echo $i; ?>][unit_label]" class="form-control otmain-packing-unit-label mtop5" placeholder="<?php echo e(_l('otmain_unit_label')); ?>" value="<?php echo e($unitLabel); ?>" style="<?php echo $unitType === 'other' ? '' : 'display:none;'; ?>">
+                                </td>
+                                <td><input type="number" step="any" min="0" name="packing_items[<?php echo $i; ?>][qty]" class="form-control otmain-packing-qty" value="<?php echo e($qtyPDisplay); ?>"></td>
+                                <td><input type="number" step="any" min="0" name="packing_items[<?php echo $i; ?>][length]" class="form-control otmain-packing-length" value="<?php echo e($length !== null && $length !== '' ? $length : ''); ?>"></td>
+                                <td><input type="number" step="any" min="0" name="packing_items[<?php echo $i; ?>][width]" class="form-control otmain-packing-width" value="<?php echo e($width !== null && $width !== '' ? $width : ''); ?>"></td>
+                                <td><input type="number" step="any" min="0" name="packing_items[<?php echo $i; ?>][height]" class="form-control otmain-packing-height" value="<?php echo e($height !== null && $height !== '' ? $height : ''); ?>"></td>
+                                <td>
+                                    <input type="text" class="form-control otmain-packing-cbm-display" readonly value="<?php echo $cbmVal > 0 ? app_format_number($cbmVal) : '0.00'; ?>">
+                                    <?php if ($legacyDims !== '') { ?>
+                                    <textarea name="packing_items[<?php echo $i; ?>][dimensions]" class="form-control otmain-packing-dims mtop5" rows="2" placeholder="<?php echo e(_l('otmain_legacy_dimensions')); ?>"><?php echo e($legacyDims); ?></textarea>
+                                    <?php } else { ?>
+                                    <input type="hidden" name="packing_items[<?php echo $i; ?>][dimensions]" value="">
+                                    <?php } ?>
                                 </td>
                                 <td><input type="number" step="any" name="packing_items[<?php echo $i; ?>][gw]" class="form-control otmain-packing-gw" value="<?php echo (float) ($pItem['gw'] ?? 0); ?>"></td>
                                 <td><input type="number" step="any" name="packing_items[<?php echo $i; ?>][nw]" class="form-control otmain-packing-nw" value="<?php echo (float) ($pItem['nw'] ?? 0); ?>"></td>

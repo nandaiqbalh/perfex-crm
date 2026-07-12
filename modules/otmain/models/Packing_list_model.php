@@ -143,6 +143,7 @@ class Packing_list_model extends App_Model
         $subtotal    = 0;
         $totalTax    = 0;
         $totalWeight = 0;
+        $totalCbm    = 0;
 
         foreach ($items as $item) {
             if (empty($item['description'])) {
@@ -157,7 +158,36 @@ class Packing_list_model extends App_Model
             $totalTax += $total * ($taxrate / 100);
             $totalWeight += (float) ($item['gross_weight'] ?? 0);
 
-            $this->db->insert(db_prefix() . 'otmain_packing_list_items', [
+            $packingQty = isset($item['packing_qty']) && $item['packing_qty'] !== ''
+                ? (float) $item['packing_qty']
+                : $qty;
+            $unitType = strtolower(trim((string) ($item['unit_type'] ?? 'box')));
+            if (!in_array($unitType, ['box', 'pallet', 'other'], true)) {
+                $unitType = 'box';
+            }
+            $unitLabel = trim((string) ($item['unit_label'] ?? ''));
+            $length = isset($item['length']) && $item['length'] !== '' ? (float) $item['length'] : null;
+            $width  = isset($item['width']) && $item['width'] !== '' ? (float) $item['width'] : null;
+            $height = isset($item['height']) && $item['height'] !== '' ? (float) $item['height'] : null;
+
+            $cbm = 0.0;
+            $packingDetail = trim((string) ($item['packing_detail'] ?? ''));
+            $volume = trim((string) ($item['volume'] ?? ''));
+
+            if ($length !== null && $width !== null && $height !== null && $length > 0 && $width > 0 && $height > 0) {
+                $cbm = otmain_calc_cbm_mm($length, $width, $height, $packingQty);
+                $packingDetail = otmain_format_packing_dimensions_string($packingQty, $unitType, $unitLabel, $length, $width, $height);
+                $volume = $cbm > 0 ? number_format($cbm, 3, '.', '') . ' CBM' : '';
+            } elseif ($packingDetail !== '') {
+                $cbm = otmain_cbm_from_dimensions_text($packingDetail, $packingQty);
+                if ($cbm > 0 && $volume === '') {
+                    $volume = number_format($cbm, 3, '.', '') . ' CBM';
+                }
+            }
+
+            $totalCbm += $cbm;
+
+            $row = [
                 'packing_list_id' => $id,
                 'description'     => $item['description'],
                 'hs_code'         => $item['hs_code'] ?? '',
@@ -165,12 +195,34 @@ class Packing_list_model extends App_Model
                 'unit_price'      => $rate,
                 'taxrate'         => $taxrate,
                 'total'           => $total,
-                'packing_detail'  => $item['packing_detail'] ?? '',
+                'packing_detail'  => $packingDetail,
                 'gross_weight'    => $item['gross_weight'] !== '' ? $item['gross_weight'] : null,
                 'net_weight'      => $item['net_weight'] !== '' ? $item['net_weight'] : null,
-                'volume'          => $item['volume'] ?? '',
+                'volume'          => $volume,
                 'item_order'      => $order++,
-            ]);
+            ];
+
+            $table = db_prefix() . 'otmain_packing_list_items';
+            if ($this->db->field_exists('packing_qty', $table)) {
+                $row['packing_qty'] = $packingQty;
+            }
+            if ($this->db->field_exists('unit_type', $table)) {
+                $row['unit_type'] = $unitType;
+            }
+            if ($this->db->field_exists('unit_label', $table)) {
+                $row['unit_label'] = $unitType === 'other' ? $unitLabel : null;
+            }
+            if ($this->db->field_exists('length', $table)) {
+                $row['length'] = $length;
+            }
+            if ($this->db->field_exists('width', $table)) {
+                $row['width'] = $width;
+            }
+            if ($this->db->field_exists('height', $table)) {
+                $row['height'] = $height;
+            }
+
+            $this->db->insert($table, $row);
         }
 
         $rate = (float) str_replace(',', '.', (string) get_option('otmain_eur_to_usd_rate'));
@@ -199,6 +251,9 @@ class Packing_list_model extends App_Model
         }
         if ($this->db->field_exists('total', db_prefix() . 'otmain_packing_lists')) {
             $update['total'] = $subtotal + $totalTax;
+        }
+        if ($this->db->field_exists('total_cbm', db_prefix() . 'otmain_packing_lists')) {
+            $update['total_cbm'] = $totalCbm;
         }
 
         $this->db->where('id', $id);

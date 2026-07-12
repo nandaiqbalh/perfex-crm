@@ -133,6 +133,12 @@ if (!$CI->db->table_exists(db_prefix() . 'otmain_packing_list_items')) {
         `unit_price` decimal(15,2) NOT NULL DEFAULT 0.00,
         `taxrate` decimal(15,2) NOT NULL DEFAULT 0.00,
         `total` decimal(15,2) NOT NULL DEFAULT 0.00,
+        `packing_qty` decimal(15,2) NOT NULL DEFAULT 1.00,
+        `unit_type` varchar(20) NOT NULL DEFAULT 'box',
+        `unit_label` varchar(100) DEFAULT NULL,
+        `length` decimal(15,2) DEFAULT NULL,
+        `width` decimal(15,2) DEFAULT NULL,
+        `height` decimal(15,2) DEFAULT NULL,
         `packing_detail` text,
         `gross_weight` decimal(15,2) DEFAULT NULL,
         `net_weight` decimal(15,2) DEFAULT NULL,
@@ -144,7 +150,13 @@ if (!$CI->db->table_exists(db_prefix() . 'otmain_packing_list_items')) {
 }
 
 $packingItemColumns = [
-    'taxrate' => 'DECIMAL(15,2) NOT NULL DEFAULT 0.00',
+    'taxrate'      => 'DECIMAL(15,2) NOT NULL DEFAULT 0.00',
+    'packing_qty'  => 'DECIMAL(15,2) NOT NULL DEFAULT 1.00',
+    'unit_type'    => "VARCHAR(20) NOT NULL DEFAULT 'box'",
+    'unit_label'   => 'VARCHAR(100) NULL DEFAULT NULL',
+    'length'       => 'DECIMAL(15,2) NULL DEFAULT NULL',
+    'width'        => 'DECIMAL(15,2) NULL DEFAULT NULL',
+    'height'       => 'DECIMAL(15,2) NULL DEFAULT NULL',
 ];
 
 foreach ($packingItemColumns as $column => $definition) {
@@ -156,6 +168,7 @@ foreach ($packingItemColumns as $column => $definition) {
 $packingHeaderColumns = [
     'total_tax' => 'DECIMAL(15,2) NOT NULL DEFAULT 0.00',
     'total'     => 'DECIMAL(15,2) NOT NULL DEFAULT 0.00',
+    'total_cbm' => 'DECIMAL(15,2) NOT NULL DEFAULT 0.00',
 ];
 
 foreach ($packingHeaderColumns as $column => $definition) {
