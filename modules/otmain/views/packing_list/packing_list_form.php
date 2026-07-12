@@ -21,6 +21,28 @@ if (!empty($pl) && !empty($pl->quote_ref_ids)) {
             <div class="col-md-6 otmain-col-right">
                 <?php echo render_date_input('date', 'date', isset($pl) ? _d($pl->date) : _d(date('Y-m-d'))); ?>
                 <?php echo render_input('vessel', 'otmain_vessel', $pl->vessel ?? ''); ?>
+                <?php
+                if (empty($currencies)) {
+                    $CI = &get_instance();
+                    $CI->load->model('currencies_model');
+                    $currencies = $CI->currencies_model->get();
+                }
+                $selectedCurrency = isset($pl) && !empty($pl->currency)
+                    ? (int) $pl->currency
+                    : (get_base_currency() ? (int) get_base_currency()->id : '');
+                echo render_select(
+                    'currency',
+                    $currencies,
+                    ['id', 'name', 'symbol'],
+                    'currency',
+                    $selectedCurrency,
+                    ['data-show-subtext' => true],
+                    [],
+                    '',
+                    '',
+                    false
+                );
+                ?>
             </div>
         </div>
         <?php otmain_form_section_close(); ?>
@@ -153,10 +175,10 @@ if (!empty($pl) && !empty($pl->quote_ref_ids)) {
                         <td id="otmain-packing-total-weight">0</td>
                     </tr>
                     <tr>
-                        <td><strong><?php echo _l('otmain_subtotal_eur'); ?></strong></td>
+                        <td><strong id="otmain-packing-subtotal-label"><?php echo _l('otmain_subtotal'); ?></strong></td>
                         <td id="otmain-packing-subtotal-eur">0</td>
                     </tr>
-                    <tr>
+                    <tr id="otmain-packing-usd-row">
                         <td><strong><?php echo _l('otmain_subtotal_usd'); ?></strong></td>
                         <td id="otmain-packing-subtotal-usd">0</td>
                     </tr>

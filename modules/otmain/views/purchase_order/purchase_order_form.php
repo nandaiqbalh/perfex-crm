@@ -11,6 +11,28 @@ $poNumber = isset($po) ? $po->formatted_number : ($next_po_number ?? otmain_prev
         <div class="row">
             <div class="col-md-6 otmain-col-left">
                 <?php echo render_input('document_title', _l('otmain_document_title'), isset($po) ? ($po->document_title ?? $defaults['document_title']) : $defaults['document_title']); ?>
+                <?php
+                if (empty($currencies)) {
+                    $CI = &get_instance();
+                    $CI->load->model('currencies_model');
+                    $currencies = $CI->currencies_model->get();
+                }
+                $selectedPoCurrency = isset($po) && !empty($po->currency)
+                    ? (int) $po->currency
+                    : (get_base_currency() ? (int) get_base_currency()->id : '');
+                echo render_select(
+                    'currency',
+                    $currencies,
+                    ['id', 'name', 'symbol'],
+                    'currency',
+                    $selectedPoCurrency,
+                    ['data-show-subtext' => true],
+                    [],
+                    '',
+                    '',
+                    false
+                );
+                ?>
             </div>
             <div class="col-md-6 otmain-col-right">
                 <div class="form-group">
@@ -83,7 +105,6 @@ $poNumber = isset($po) ? $po->formatted_number : ($next_po_number ?? otmain_prev
                 <?php echo render_input('company_vat', 'otmain_vat_number', isset($po) ? ($po->company_vat ?? $defaults['company_vat']) : $defaults['company_vat']); ?>
                 <?php echo render_input('company_coc', 'otmain_coc_number', isset($po) ? ($po->company_coc ?? $defaults['company_coc']) : $defaults['company_coc']); ?>
                 <?php echo render_input('iban', 'otmain_iban', isset($po) ? ($po->iban ?? $defaults['iban']) : $defaults['iban']); ?>
-                <?php echo render_select('currency', $currencies, ['id', 'name', 'symbol'], 'currency', isset($po) ? ($po->currency ?? '') : ''); ?>
             </div>
         </div>
         <?php otmain_form_section_close(); ?>
@@ -126,10 +147,10 @@ $poNumber = isset($po) ? $po->formatted_number : ($next_po_number ?? otmain_prev
         <div class="row">
             <div class="col-md-6 col-md-offset-6 otmain-col-right">
                 <table class="table text-right">
-                    <tr><td><strong><?php echo _l('otmain_subtotal_eur'); ?></strong></td><td id="otmain-po-subtotal">0.00</td></tr>
+                    <tr><td><strong id="otmain-po-subtotal-label"><?php echo _l('otmain_subtotal'); ?></strong></td><td id="otmain-po-subtotal">0.00</td></tr>
                     <tr><td><strong>VAT 21%</strong></td><td id="otmain-po-vat21">0.00</td></tr>
                     <tr><td><strong>VAT 0%</strong></td><td id="otmain-po-vat0">0.00</td></tr>
-                    <tr><td><strong><?php echo _l('otmain_total_eur'); ?></strong></td><td id="otmain-po-total"><strong>0.00</strong></td></tr>
+                    <tr><td><strong id="otmain-po-total-label"><?php echo _l('otmain_total'); ?></strong></td><td id="otmain-po-total"><strong>0.00</strong></td></tr>
                 </table>
             </div>
         </div>

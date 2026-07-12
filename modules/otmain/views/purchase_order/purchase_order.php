@@ -104,10 +104,11 @@ $currency = $isEdit ? $this->currencies_model->get($po->currency) : null;
                             <div class="row mtop15">
                                 <div class="col-md-6 col-md-offset-6">
                                     <table class="table text-right">
-                                        <tr><td><strong><?php echo _l('otmain_subtotal_eur'); ?></strong></td><td><?php echo app_format_money($summary['subtotal'], $currency); ?></td></tr>
+                                        <?php $currencyLabel = $currency ? $currency->name : otmain_po_currency_name($po); ?>
+                                        <tr><td><strong><?php echo _l('otmain_subtotal'); ?> <?php echo e($currencyLabel); ?></strong></td><td><?php echo app_format_money($summary['subtotal'], $currency); ?></td></tr>
                                         <tr><td><strong>VAT 21%</strong></td><td><?php echo app_format_money($summary['vat21'], $currency); ?></td></tr>
                                         <tr><td><strong>VAT 0%</strong></td><td><?php echo app_format_money($summary['vat0'], $currency); ?></td></tr>
-                                        <tr><td><strong><?php echo _l('otmain_total_eur'); ?></strong></td><td><strong><?php echo app_format_money($summary['total'], $currency); ?></strong></td></tr>
+                                        <tr><td><strong><?php echo _l('otmain_total'); ?> <?php echo e($currencyLabel); ?></strong></td><td><strong><?php echo app_format_money($summary['total'], $currency); ?></strong></td></tr>
                                     </table>
                                 </div>
                             </div>

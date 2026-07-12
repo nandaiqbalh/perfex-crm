@@ -127,18 +127,51 @@
         $row.find('.otmain-packing-line-total').val((qty * rate).toFixed(2));
     }
 
+    function otmainSelectedCurrencyName($formSelector) {
+        var $select = $(formSelector).find('select[name="currency"]');
+        if (!$select.length) {
+            return '';
+        }
+        var $opt = $select.find('option:selected');
+        var name = ($opt.data('subtext') || $opt.text() || '').toString().trim();
+        // Prefer currency code from option text like "USD" or "Euro"
+        var raw = ($opt.text() || '').toString().trim();
+        if (raw) {
+            // Perfex options usually: name in text, symbol in subtext
+            name = raw.split(/\s|\(/)[0];
+        }
+        return name.toUpperCase();
+    }
+
+    function otmainUpdateCurrencyLabels($form, subtotalLabelId, totalLabelId) {
+        var currencyName = otmainSelectedCurrencyName('#' + $form.attr('id'));
+        if (!currencyName) {
+            return;
+        }
+        if (subtotalLabelId) {
+            $(subtotalLabelId).text('Subtotal ' + currencyName);
+        }
+        if (totalLabelId) {
+            $(totalLabelId).text('TOTAL ' + currencyName);
+        }
+    }
+
     function otmainRecalculatePackingTotals() {
         var subtotal = 0;
         var totalWeight = 0;
-        $('#otmain-packing-items tbody tr.item-row').each(function() {
+        $('#otmain-packing-list-form #otmain-packing-items tbody tr.item-row').each(function() {
             otmainRecalculatePackingRow($(this));
             subtotal += parseFloat($(this).find('.otmain-packing-line-total').val()) || 0;
             totalWeight += parseFloat($(this).find('.otmain-packing-gross-weight').val()) || 0;
         });
+        var currencyName = otmainSelectedCurrencyName('#otmain-packing-list-form');
         var rate = parseFloat($('#otmain-eur-usd-rate').val());
-        var subtotalUsd = !isNaN(rate) && rate > 0 ? subtotal * rate : 0;
+        var showUsd = (!currencyName || currencyName === 'EUR') && !isNaN(rate) && rate > 0;
+        var subtotalUsd = showUsd ? subtotal * rate : 0;
+        $('#otmain-packing-subtotal-label').text(currencyName ? ('Subtotal ' + currencyName) : 'Subtotal');
         $('#otmain-packing-subtotal-eur').text(subtotal.toFixed(2));
         $('#otmain-packing-subtotal-usd').text(subtotalUsd > 0 ? subtotalUsd.toFixed(2) : '-');
+        $('#otmain-packing-usd-row').toggle(showUsd || subtotalUsd > 0);
         $('#otmain-packing-total-weight').text(totalWeight > 0 ? totalWeight.toFixed(2) + ' KGS' : '-');
     }
 
@@ -163,7 +196,25 @@
         otmainRecalculatePackingTotals();
     }
 
+    function otmainEnsureCurrencySelectable() {
+        var $currency = $('select[name="currency"]');
+        if (!$currency.length) {
+            return;
+        }
+        $currency.prop('disabled', false);
+        if ($currency.hasClass('selectpicker') || $currency.parent().hasClass('bootstrap-select')) {
+            $currency.selectpicker('refresh');
+        }
+    }
+
     $(function() {
+        otmainEnsureCurrencySelectable();
+
+        // Client change may refresh currency selectpicker; keep it editable.
+        $('body').on('changed.bs.select change', '.f_client_id select[name="clientid"], #clientid, #rel_type, #rel_id', function() {
+            setTimeout(otmainEnsureCurrencySelectable, 50);
+        });
+
         if ($('body').find('.estimate-form').length) {
             $('#expiry_days, input[name="date"]').on('change keyup', function() {
                 otmainCalculateExpiryDate('input[name="date"]', '#expiry_days', 'input[name="expirydate"]');
@@ -377,6 +428,7 @@
             });
 
             $('body').on('input change', '.otmain-packing-qty, .otmain-packing-rate, .otmain-packing-gross-weight', otmainRecalculatePackingTotals);
+            $('#otmain-packing-list-form select[name="currency"]').on('change', otmainRecalculatePackingTotals);
 
             otmainRecalculatePackingTotals();
         }
@@ -459,6 +511,7 @@
         $('#otmain-po-vat21').text(vat21.toFixed(2));
         $('#otmain-po-vat0').text(vat0.toFixed(2));
         $('#otmain-po-total').html('<strong>' + (subtotal + vat21 + vat0).toFixed(2) + '</strong>');
+        otmainUpdateCurrencyLabels($('#otmain-purchase-order-form'), '#otmain-po-subtotal-label', '#otmain-po-total-label');
     }
 
     if ($('#otmain-purchase-order-form').length) {
@@ -482,6 +535,7 @@
         });
 
         $('body').on('input change', '.otmain-po-qty, .otmain-po-rate, .otmain-po-tax', otmainRecalcPoTotals);
+        $('#otmain-purchase-order-form select[name="currency"]').on('change', otmainRecalcPoTotals);
 
         $('#otmain-add-po-row').on('click', function() {
             var i = $('#otmain-po-items tbody tr').length;

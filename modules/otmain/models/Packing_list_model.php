@@ -98,13 +98,43 @@ class Packing_list_model extends App_Model
             $data['otmain_contact_id'] = null;
         }
 
+        if (empty($data['currency'])) {
+            $base = get_base_currency();
+            $data['currency'] = $base ? (int) $base->id : 0;
+        } else {
+            $data['currency'] = (int) $data['currency'];
+        }
+
         foreach (['consignee_address', 'purchaser_address', 'quote_ref', 'adminnote'] as $field) {
             if (isset($data[$field])) {
                 $data[$field] = nl2br_save_html($data[$field]);
             }
         }
 
-        return $data;
+        $allowed = [
+            'document_title',
+            'clientid',
+            'quote_ref',
+            'quote_ref_ids',
+            'consignee_name',
+            'consignee_address',
+            'consignee_phone',
+            'consignee_email',
+            'purchaser_name',
+            'purchaser_address',
+            'purchaser_phone',
+            'purchaser_email',
+            'vessel',
+            'currency',
+            'otmain_contact_id',
+            'contact_person_name',
+            'contact_person_email',
+            'contact_person_phone',
+            'adminnote',
+            'date',
+        ];
+
+        return array_intersect_key($data, array_flip($allowed));
     }
 
     private function save_items($id, $items)
@@ -140,7 +170,19 @@ class Packing_list_model extends App_Model
         }
 
         $rate = (float) str_replace(',', '.', (string) get_option('otmain_eur_to_usd_rate'));
-        $subtotalUsd = $rate > 0 ? $subtotal * $rate : 0;
+        $subtotalUsd = 0;
+        $currencyName = '';
+        if (!empty($id)) {
+            $row = $this->db->select('currency')->where('id', $id)->get(db_prefix() . 'otmain_packing_lists')->row();
+            if ($row && !empty($row->currency)) {
+                $this->load->model('currencies_model');
+                $currency = $this->currencies_model->get($row->currency);
+                $currencyName = $currency ? strtoupper($currency->name) : '';
+            }
+        }
+        if ($rate > 0 && ($currencyName === '' || $currencyName === 'EUR')) {
+            $subtotalUsd = $subtotal * $rate;
+        }
 
         $this->db->where('id', $id);
         $this->db->update(db_prefix() . 'otmain_packing_lists', [

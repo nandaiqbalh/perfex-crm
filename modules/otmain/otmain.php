@@ -19,6 +19,7 @@ register_language_files(OTMAIN_MODULE_NAME, [OTMAIN_MODULE_NAME]);
 
 hooks()->add_action('admin_init', 'otmain_permissions');
 hooks()->add_action('admin_init', 'otmain_init_menu');
+hooks()->add_action('app_admin_head', 'otmain_admin_head_css');
 hooks()->add_action('app_admin_footer', 'otmain_admin_footer_assets');
 hooks()->add_action('otmain_invoice_form_fields', 'otmain_render_invoice_fields');
 hooks()->add_action('otmain_estimate_form_fields', 'otmain_render_estimate_fields');
@@ -36,11 +37,42 @@ hooks()->add_filter('before_update_invoice', 'otmain_before_invoice_save');
 hooks()->add_filter('before_create_proposal', 'otmain_before_proposal_save');
 hooks()->add_filter('before_proposal_updated', 'otmain_before_proposal_update', 10, 2);
 hooks()->add_filter('pdf_logo_url', 'otmain_filter_pdf_logo_url');
-hooks()->add_filter('process_pdf_signature_on_close', 'otmain_disable_invoice_pdf_signature');
+hooks()->add_filter('process_pdf_signature_on_close', 'otmain_disable_sales_pdf_signature');
 
-function otmain_disable_invoice_pdf_signature($process)
+// Allow free currency selection on sales documents (EUR/USD/IDR/etc from Settings → Currencies).
+hooks()->add_filter('invoice_currency_attributes', 'otmain_enable_currency_select');
+hooks()->add_filter('estimate_currency_attributes', 'otmain_enable_currency_select');
+hooks()->add_filter('proposal_currency_attributes', 'otmain_enable_currency_select');
+hooks()->add_filter('credit_note_currency_attributes', 'otmain_enable_currency_select');
+
+/**
+ * Remove the core "disabled" lock so staff can pick any configured currency.
+ *
+ * @param array $attrs
+ * @return array
+ */
+function otmain_enable_currency_select($attrs)
 {
-    if (isset($GLOBALS['invoice_pdf'])) {
+    if (!is_array($attrs)) {
+        $attrs = [];
+    }
+
+    unset($attrs['disabled']);
+    $attrs['data-show-subtext'] = true;
+
+    return $attrs;
+}
+
+function otmain_disable_sales_pdf_signature($process)
+{
+    // Hide core "Authorized Signature" block on OT-Main sales PDFs
+    // (custom document layouts do not use this default footer signature).
+    if (
+        isset($GLOBALS['invoice_pdf'])
+        || isset($GLOBALS['proposal_pdf'])
+        || isset($GLOBALS['estimate_pdf'])
+        || isset($GLOBALS['credit_note_pdf'])
+    ) {
         return false;
     }
 
@@ -146,12 +178,30 @@ function otmain_admin_footer_assets()
         strpos($uri, 'estimates/estimate') !== false
         || strpos($uri, 'invoices/invoice') !== false
         || strpos($uri, 'proposals/proposal') !== false
+        || strpos($uri, 'credit_notes/credit_note') !== false
         || strpos($uri, 'otmain/packing_list') !== false
         || strpos($uri, 'otmain/purchase_order') !== false
     ) {
         echo '<link rel="stylesheet" href="' . module_dir_url(OTMAIN_MODULE_NAME, 'assets/css/otmain-forms.css') . '?v=1.0.1" />';
-        echo '<script src="' . module_dir_url(OTMAIN_MODULE_NAME, 'assets/js/otmain.js') . '?v=1.0.7"></script>';
+        echo '<script src="' . module_dir_url(OTMAIN_MODULE_NAME, 'assets/js/otmain.js') . '?v=1.0.9"></script>';
     }
+}
+
+/**
+ * Always show action buttons (view/edit/delete) in listing tables
+ * instead of hiding them until hover.
+ */
+function otmain_admin_head_css()
+{
+    echo '<style>
+.table-proposals .row-options,
+.table-invoices .row-options,
+.table-otmain-packing-lists .row-options,
+.table-otmain-purchase-orders .row-options {
+    position: static !important;
+    left: auto !important;
+}
+</style>';
 }
 
 function otmain_render_estimate_fields($estimate = null)

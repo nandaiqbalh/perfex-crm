@@ -49,6 +49,7 @@ $isEdit = !empty($pl);
                                     <p class="bold"><?php echo _l('otmain_packing_list'); ?> #<?php echo e($pl->formatted_number); ?></p>
                                     <p><strong><?php echo _l('date'); ?>:</strong> <?php echo _d($pl->date); ?></p>
                                     <p><strong><?php echo _l('client'); ?>:</strong> <?php echo e(get_company_name($pl->clientid)); ?></p>
+                                    <p><strong><?php echo _l('currency'); ?>:</strong> <?php echo e(otmain_packing_currency_name($pl)); ?></p>
                                     <p><strong><?php echo _l('otmain_vessel'); ?>:</strong> <?php echo e($pl->vessel); ?></p>
                                     <p><strong><?php echo _l('otmain_quote_reference'); ?>:</strong> <?php echo e($pl->quote_ref); ?></p>
                                 </div>
@@ -97,12 +98,12 @@ $isEdit = !empty($pl);
                 </div>
                 <?php if (staff_can('edit', 'otmain_packing_list')) { ?>
                 <div role="tabpanel" class="tab-pane" id="tab_edit">
-                    <?php $this->load->view('packing_list/packing_list_form', ['pl' => $pl]); ?>
+                    <?php $this->load->view('packing_list/packing_list_form', ['pl' => $pl, 'currencies' => $currencies ?? []]); ?>
                 </div>
                 <?php } ?>
             </div>
             <?php } else { ?>
-            <?php $this->load->view('packing_list/packing_list_form', ['pl' => null]); ?>
+            <?php $this->load->view('packing_list/packing_list_form', ['pl' => null, 'currencies' => $currencies ?? []]); ?>
             <?php } ?>
         </div>
     </div>

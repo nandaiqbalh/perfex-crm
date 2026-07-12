@@ -68,6 +68,8 @@ class Packing_list extends AdminController
             $data['title'] = _l('otmain_new_packing_list');
         }
 
+        $this->load->model('currencies_model');
+        $data['currencies'] = $this->currencies_model->get();
         $this->load->view('packing_list/packing_list', $data);
     }
 
