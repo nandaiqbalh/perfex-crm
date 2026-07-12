@@ -47,6 +47,7 @@ $invoiceColumns = [
     'total_cbm'              => "DECIMAL(15,2) DEFAULT 0.00",
     'conversion_rate'        => "DECIMAL(15,6) NULL DEFAULT NULL",
     'conversion_currency'    => "INT(11) NULL DEFAULT NULL",
+    'bank_account'           => "VARCHAR(10) NULL DEFAULT NULL",
 ];
 
 foreach ($invoiceColumns as $column => $definition) {
@@ -179,6 +180,11 @@ foreach ($packingHeaderColumns as $column => $definition) {
     if ($CI->db->table_exists(db_prefix() . 'otmain_packing_lists') && !$CI->db->field_exists($column, db_prefix() . 'otmain_packing_lists')) {
         $CI->db->query('ALTER TABLE `' . db_prefix() . 'otmain_packing_lists` ADD `' . $column . '` ' . $definition);
     }
+}
+
+// Proposal (and shared sales) line-item profit % — admin-only UI on proposals
+if ($CI->db->table_exists(db_prefix() . 'itemable') && !$CI->db->field_exists('profit_percent', db_prefix() . 'itemable')) {
+    $CI->db->query('ALTER TABLE `' . db_prefix() . 'itemable` ADD `profit_percent` DECIMAL(15,2) NULL DEFAULT NULL');
 }
 
 if (!$CI->db->table_exists(db_prefix() . 'otmain_purchase_orders')) {

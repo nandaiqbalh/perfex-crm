@@ -231,15 +231,17 @@ if ($this->input->get('estimate_request_id')) {
                                     <div class="col-md-6">
                                         <div class="form-group select-placeholder">
                                             <label for="discount_type" class="control-label"><?= _l('discount_type'); ?></label>
+                                            <?php
+                                            $discountTypeSource = isset($proposal) ? $proposal : (isset($estimate) ? $estimate : null);
+                                            $discountTypeValue  = ($discountTypeSource && !empty($discountTypeSource->discount_type))
+                                                ? $discountTypeSource->discount_type
+                                                : '';
+                                            ?>
                                             <select name="discount_type" class="selectpicker" data-width="100%"
                                                 data-none-selected-text="<?= _l('dropdown_non_selected_tex'); ?>">
-                                                <option value="" selected><?= _l('no_discount'); ?></option>
-                                                <option value="before_tax" <?php if (isset($estimate) && $estimate->discount_type == 'before_tax') {
-                                                    echo 'selected';
-                                                } ?>><?= _l('discount_type_before_tax'); ?></option>
-                                                <option value="after_tax" <?php if (isset($estimate) && $estimate->discount_type == 'after_tax') {
-                                                    echo 'selected';
-                                                } ?>><?= _l('discount_type_after_tax'); ?></option>
+                                                <option value="" <?= $discountTypeValue === '' ? 'selected' : ''; ?>><?= _l('no_discount'); ?></option>
+                                                <option value="before_tax" <?= $discountTypeValue === 'before_tax' ? 'selected' : ''; ?>><?= _l('discount_type_before_tax'); ?></option>
+                                                <option value="after_tax" <?= $discountTypeValue === 'after_tax' ? 'selected' : ''; ?>><?= _l('discount_type_after_tax'); ?></option>
                                             </select>
                                         </div>
                                     </div>

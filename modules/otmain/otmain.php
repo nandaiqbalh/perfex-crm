@@ -224,7 +224,7 @@ function otmain_admin_footer_assets()
         || strpos($uri, 'otmain/purchase_order') !== false
     ) {
         echo '<link rel="stylesheet" href="' . module_dir_url(OTMAIN_MODULE_NAME, 'assets/css/otmain-forms.css') . '?v=1.0.2" />';
-        echo '<script src="' . module_dir_url(OTMAIN_MODULE_NAME, 'assets/js/otmain.js') . '?v=1.2.5"></script>';
+        echo '<script src="' . module_dir_url(OTMAIN_MODULE_NAME, 'assets/js/otmain.js') . '?v=1.2.6"></script>';
     }
 
     // Keep customer default currency freely editable (any currency from Settings → Currencies).
@@ -393,30 +393,14 @@ function otmain_before_invoice_save($hookData)
         $data['conversion_currency'] = $cid > 0 ? $cid : null;
     }
 
-    // Serialize packing items to JSON
-    if (isset($data['packing_items']) && is_array($data['packing_items'])) {
-        $totalGw  = 0;
-        $totalNw  = 0;
-        $totalCbm = 0;
-        $packing  = [];
-
-        foreach ($data['packing_items'] as $pItem) {
-            if (!is_array($pItem)) {
-                continue;
-            }
-            $normalized = otmain_normalize_invoice_packing_item($pItem);
-            $totalGw  += $normalized['gw'];
-            $totalNw  += $normalized['nw'];
-            $totalCbm += $normalized['cbm'];
-            $packing[] = $normalized;
-        }
-
-        $data['packing_items'] = json_encode($packing);
-        $data['total_gw']      = $totalGw;
-        $data['total_nw']      = $totalNw;
-        $data['total_cbm']     = $totalCbm;
-    } elseif (isset($data['packing_items'])) {
+    // Packing details belong on Packing List — ignore if posted from invoice form.
+    if (isset($data['packing_items'])) {
         unset($data['packing_items']);
+    }
+
+    if (array_key_exists('bank_account', $data)) {
+        $bank = strtoupper(trim((string) $data['bank_account']));
+        $data['bank_account'] = ($bank === 'USD' || $bank === 'EUR') ? $bank : null;
     }
 
     $hookData['data'] = $data;

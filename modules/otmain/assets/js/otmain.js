@@ -259,11 +259,20 @@
     }
 
     function otmainLoadBankDetails() {
-        var currencyId = $('select[name="currency"]').val();
-        if (!currencyId || !$('#otmain-bank-details-preview').length) {
+        var bankAccount = ($('#otmain_bank_account').val() || '').toString().toUpperCase();
+        if (!$('#otmain-bank-details-preview').length) {
             return;
         }
-        $.get(admin_url + 'otmain/get_bank_details', { currency_id: currencyId }, function(response) {
+        if (bankAccount !== 'EUR' && bankAccount !== 'USD') {
+            bankAccount = '';
+        }
+        var params = {};
+        if (bankAccount) {
+            params.bank_account = bankAccount;
+        } else {
+            params.currency_id = $('select[name="currency"]').val();
+        }
+        $.get(admin_url + 'otmain/get_bank_details', params, function(response) {
             $('#otmain-bank-details-preview').html(response.html || '');
         }, 'json');
     }
@@ -649,7 +658,7 @@
                 }, 'json');
             });
 
-            $('select[name="currency"]').on('change', otmainLoadBankDetails);
+            $('#otmain_bank_account').on('changed.bs.select change', otmainLoadBankDetails);
             otmainLoadBankDetails();
 
             $('.f_client_id #clientid').on('change', function() {
@@ -675,62 +684,6 @@
                     $('input[name="contact_person_phone"]').val(phone);
                 }
             });
-
-            // Packing details handlers for invoice form
-            function otmainRecalcInvoicePacking() {
-                var totalGw = 0, totalNw = 0, totalCbm = 0;
-                $('#otmain-packing-details-panel #otmain-packing-items tbody tr.item-row').each(function() {
-                    var $row = $(this);
-                    totalGw += parseFloat($row.find('.otmain-packing-gw').val()) || 0;
-                    totalNw += parseFloat($row.find('.otmain-packing-nw').val()) || 0;
-                    totalCbm += otmainRecalcPackingRowCbm($row);
-                });
-                $('#otmain-total-gw').text(totalGw.toFixed(2));
-                $('#otmain-total-nw').text(totalNw.toFixed(2));
-                $('#otmain-total-cbm').text(totalCbm.toFixed(3));
-            }
-
-            function otmainBuildInvoicePackingRow(i) {
-                return '<tr class="item-row">' +
-                    '<td>' +
-                        '<select name="packing_items[' + i + '][unit_type]" class="form-control otmain-packing-unit-type">' +
-                            otmainPackingUnitOptionsHtml('box') +
-                        '</select>' +
-                        '<input type="text" name="packing_items[' + i + '][unit_label]" class="form-control otmain-packing-unit-label mtop5" placeholder="Unit label" style="display:none;">' +
-                    '</td>' +
-                    '<td><input type="number" step="any" min="0" name="packing_items[' + i + '][qty]" class="form-control otmain-packing-qty" value="1"></td>' +
-                    '<td><input type="number" step="any" min="0" name="packing_items[' + i + '][length]" class="form-control otmain-packing-length" value=""></td>' +
-                    '<td><input type="number" step="any" min="0" name="packing_items[' + i + '][width]" class="form-control otmain-packing-width" value=""></td>' +
-                    '<td><input type="number" step="any" min="0" name="packing_items[' + i + '][height]" class="form-control otmain-packing-height" value=""></td>' +
-                    '<td>' +
-                        '<input type="text" class="form-control otmain-packing-cbm-display" readonly value="0.00">' +
-                        '<input type="hidden" name="packing_items[' + i + '][dimensions]" value="">' +
-                    '</td>' +
-                    '<td><input type="number" step="any" name="packing_items[' + i + '][gw]" class="form-control otmain-packing-gw" value="0"></td>' +
-                    '<td><input type="number" step="any" name="packing_items[' + i + '][nw]" class="form-control otmain-packing-nw" value="0"></td>' +
-                    '<td><button type="button" class="btn btn-danger btn-sm otmain-remove-packing-row"><i class="fa fa-times"></i></button></td>' +
-                    '</tr>';
-            }
-
-            $(document).on(
-                'input change',
-                '#otmain-packing-details-panel .otmain-packing-gw, #otmain-packing-details-panel .otmain-packing-nw, #otmain-packing-details-panel .otmain-packing-qty, #otmain-packing-details-panel .otmain-packing-length, #otmain-packing-details-panel .otmain-packing-width, #otmain-packing-details-panel .otmain-packing-height',
-                otmainRecalcInvoicePacking
-            );
-            $(document).on('change', '#otmain-packing-details-panel .otmain-packing-unit-type', function() {
-                otmainTogglePackingUnitLabel($(this).closest('tr'));
-            });
-            $(document).on('click', '#otmain-packing-details-panel .otmain-remove-packing-row', function() {
-                $(this).closest('tr').remove();
-                otmainRecalcInvoicePacking();
-            });
-            $(document).on('click', '#otmain-packing-details-panel #otmain-add-packing-row', function() {
-                var $tbody = $('#otmain-packing-details-panel #otmain-packing-items tbody');
-                var i = $tbody.find('tr.item-row').length;
-                $tbody.append(otmainBuildInvoicePackingRow(i));
-                otmainRecalcInvoicePacking();
-            });
-            otmainRecalcInvoicePacking();
         }
 
         if ($('#otmain-packing-list-form').length) {

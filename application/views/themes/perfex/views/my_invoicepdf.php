@@ -14,4 +14,4 @@ $pdf->writeHTML(otmain_pdf_items_table_html($invoice->items, 'invoice', $invoice
 $pdf->Ln(4);
 $pdf->writeHTML(otmain_pdf_invoice_footer_html($invoice, $itemsTable, $invoice->currency_name), true, false, false, false, '');
 
-otmain_pdf_append_invoice_terms($pdf, $font_name, $font_size, $invoice->currency_name);
+otmain_pdf_append_invoice_terms($pdf, $font_name, $font_size, $invoice->currency_name, $invoice);

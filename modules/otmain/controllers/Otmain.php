@@ -70,10 +70,15 @@ class Otmain extends AdminController
 
     public function get_bank_details()
     {
-        $currencyId = $this->input->get('currency_id');
-        $this->load->model('currencies_model');
-        $currency = $this->currencies_model->get($currencyId);
-        $name     = $currency ? $currency->name : 'EUR';
+        $bankAccount = strtoupper(trim((string) $this->input->get('bank_account')));
+        if ($bankAccount === 'EUR' || $bankAccount === 'USD') {
+            $name = $bankAccount;
+        } else {
+            $currencyId = $this->input->get('currency_id');
+            $this->load->model('currencies_model');
+            $currency = $this->currencies_model->get($currencyId);
+            $name     = $currency ? $currency->name : 'EUR';
+        }
 
         echo json_encode([
             'html' => otmain_format_bank_details_html($name),

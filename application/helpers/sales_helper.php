@@ -744,7 +744,7 @@ function add_new_sales_item_post($item, $rel_id, $rel_type)
     $CI         = &get_instance();
     $isOptional = $item['is_optional'] ?? false;
 
-    $CI->db->insert(db_prefix() . 'itemable', [
+    $insert = [
         'description'      => $item['description'],
         'long_description' => nl2br($item['long_description']),
         'qty'              => $item['qty'],
@@ -755,7 +755,14 @@ function add_new_sales_item_post($item, $rel_id, $rel_type)
         'unit'             => $item['unit'],
         'is_optional'      => $isOptional ? 1 : 0,
         'is_selected'      => $isOptional ? ($item['is_selected'] ?? 0) : 1,
-    ]);
+    ];
+
+    if ($CI->db->field_exists('profit_percent', db_prefix() . 'itemable') && array_key_exists('profit_percent', $item)) {
+        $pp = trim((string) $item['profit_percent']);
+        $insert['profit_percent'] = ($pp === '') ? null : (float) str_replace(',', '.', $pp);
+    }
+
+    $CI->db->insert(db_prefix() . 'itemable', $insert);
 
     $id = $CI->db->insert_id();
 
@@ -777,6 +784,7 @@ function add_new_sales_item_post($item, $rel_id, $rel_type)
  */
 function update_sales_item_post($item_id, $data, $field = '')
 {
+    $CI     = &get_instance();
     $update = [];
 
     if ($field !== '') {
@@ -808,9 +816,13 @@ function update_sales_item_post($item_id, $data, $field = '')
             'is_optional'      => $isOptional ? 1 : 0,
             'is_selected'      => $isOptional ? ($data['is_selected'] ?? 0) : 1,
         ];
+
+        if ($CI->db->field_exists('profit_percent', db_prefix() . 'itemable') && array_key_exists('profit_percent', $data)) {
+            $pp = trim((string) $data['profit_percent']);
+            $update['profit_percent'] = ($pp === '') ? null : (float) str_replace(',', '.', $pp);
+        }
     }
 
-    $CI = &get_instance();
     $CI->db->where('id', $item_id);
     $CI->db->update(db_prefix() . 'itemable', $update);
 

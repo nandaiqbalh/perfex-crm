@@ -112,86 +112,6 @@ $invoice = $invoice ?? null;
         echo render_textarea('delivery_address', _l('otmain_delivery_address'), $value, ['rows' => 2]);
         ?>
     </div>
-    <div class="col-md-12">
-        <div class="panel panel-default" id="otmain-packing-details-panel">
-            <div class="panel-heading">
-                <?php echo _l('otmain_packing_details'); ?>
-                <button type="button" class="btn btn-primary btn-xs pull-right" id="otmain-add-packing-row">
-                    <i class="fa fa-plus"></i> <?php echo _l('otmain_add_row'); ?>
-                </button>
-            </div>
-            <div class="panel-body">
-                <div class="table-responsive">
-                    <table class="table table-bordered" id="otmain-packing-items">
-                        <thead>
-                            <tr>
-                                <th width="10%"><?php echo _l('otmain_unit_type'); ?></th>
-                                <th width="8%"><?php echo _l('otmain_packing_qty'); ?></th>
-                                <th width="10%"><?php echo _l('otmain_length_short'); ?></th>
-                                <th width="10%"><?php echo _l('otmain_width_short'); ?></th>
-                                <th width="10%"><?php echo _l('otmain_height_short'); ?></th>
-                                <th width="10%"><?php echo _l('otmain_cbm'); ?></th>
-                                <th width="12%"><?php echo _l('otmain_gw'); ?></th>
-                                <th width="12%"><?php echo _l('otmain_nw'); ?></th>
-                                <th width="8%"><?php echo _l('otmain_action'); ?></th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php
-                            $packingItems = isset($invoice) ? json_decode($invoice->packing_items ?? '[]', true) : [];
-                            if (!empty($packingItems)) {
-                                foreach ($packingItems as $i => $pItem) {
-                                    $qtyP = (float) ($pItem['qty'] ?? 1);
-                                    $qtyPDisplay = (fmod($qtyP, 1.0) === 0.0) ? (string) (int) $qtyP : $qtyP;
-                                    $unitType = $pItem['unit_type'] ?? 'box';
-                                    $unitLabel = $pItem['unit_label'] ?? '';
-                                    $length = $pItem['length'] ?? '';
-                                    $width  = $pItem['width'] ?? '';
-                                    $height = $pItem['height'] ?? '';
-                                    $hasStructured = ($length !== '' && $length !== null) || ($width !== '' && $width !== null) || ($height !== '' && $height !== null);
-                                    $legacyDims = !$hasStructured ? ($pItem['dimensions'] ?? '') : '';
-                                    $cbmVal = (float) ($pItem['cbm'] ?? 0);
-                                    ?>
-                            <tr class="item-row">
-                                <td>
-                                    <?php echo otmain_packing_unit_select_html($unitType, 'packing_items[' . $i . '][unit_type]'); ?>
-                                    <input type="text" name="packing_items[<?php echo $i; ?>][unit_label]" class="form-control otmain-packing-unit-label mtop5" placeholder="<?php echo e(_l('otmain_unit_label')); ?>" value="<?php echo e($unitLabel); ?>" style="<?php echo $unitType === 'other' ? '' : 'display:none;'; ?>">
-                                </td>
-                                <td><input type="number" step="any" min="0" name="packing_items[<?php echo $i; ?>][qty]" class="form-control otmain-packing-qty" value="<?php echo e($qtyPDisplay); ?>"></td>
-                                <td><input type="number" step="any" min="0" name="packing_items[<?php echo $i; ?>][length]" class="form-control otmain-packing-length" value="<?php echo e($length !== null && $length !== '' ? $length : ''); ?>"></td>
-                                <td><input type="number" step="any" min="0" name="packing_items[<?php echo $i; ?>][width]" class="form-control otmain-packing-width" value="<?php echo e($width !== null && $width !== '' ? $width : ''); ?>"></td>
-                                <td><input type="number" step="any" min="0" name="packing_items[<?php echo $i; ?>][height]" class="form-control otmain-packing-height" value="<?php echo e($height !== null && $height !== '' ? $height : ''); ?>"></td>
-                                <td>
-                                    <input type="text" class="form-control otmain-packing-cbm-display" readonly value="<?php echo $cbmVal > 0 ? app_format_number($cbmVal) : '0.00'; ?>">
-                                    <?php if ($legacyDims !== '') { ?>
-                                    <textarea name="packing_items[<?php echo $i; ?>][dimensions]" class="form-control otmain-packing-dims mtop5" rows="2" placeholder="<?php echo e(_l('otmain_legacy_dimensions')); ?>"><?php echo e($legacyDims); ?></textarea>
-                                    <?php } else { ?>
-                                    <input type="hidden" name="packing_items[<?php echo $i; ?>][dimensions]" value="">
-                                    <?php } ?>
-                                </td>
-                                <td><input type="number" step="any" name="packing_items[<?php echo $i; ?>][gw]" class="form-control otmain-packing-gw" value="<?php echo (float) ($pItem['gw'] ?? 0); ?>"></td>
-                                <td><input type="number" step="any" name="packing_items[<?php echo $i; ?>][nw]" class="form-control otmain-packing-nw" value="<?php echo (float) ($pItem['nw'] ?? 0); ?>"></td>
-                                <td><button type="button" class="btn btn-danger btn-sm otmain-remove-packing-row"><i class="fa fa-times"></i></button></td>
-                            </tr>
-                            <?php
-                                }
-                            }
-                            ?>
-                        </tbody>
-                    </table>
-                </div>
-                <div class="row">
-                    <div class="col-md-12">
-                        <strong><?php echo _l('otmain_total_gw'); ?>: </strong><span id="otmain-total-gw"><?php echo isset($invoice) ? app_format_number($invoice->total_gw ?? 0) : '0.00'; ?></span>
-                        &nbsp;&nbsp;
-                        <strong><?php echo _l('otmain_total_nw'); ?>: </strong><span id="otmain-total-nw"><?php echo isset($invoice) ? app_format_number($invoice->total_nw ?? 0) : '0.00'; ?></span>
-                        &nbsp;&nbsp;
-                        <strong><?php echo _l('otmain_total_cbm'); ?>: </strong><span id="otmain-total-cbm"><?php echo isset($invoice) ? app_format_number($invoice->total_cbm ?? 0) : '0.00'; ?></span>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
 </div>
 <?php } elseif ($section === 'extras') { ?>
 <div class="row">
@@ -203,7 +123,25 @@ $invoice = $invoice ?? null;
                     <?php echo _l('settings'); ?>
                 </a>
             </div>
-            <div class="panel-body" id="otmain-bank-details-preview"></div>
+            <div class="panel-body">
+                <?php
+                $bankAccount = isset($invoice) && !empty($invoice->bank_account)
+                    ? strtoupper(trim((string) $invoice->bank_account))
+                    : '';
+                if ($bankAccount !== 'EUR' && $bankAccount !== 'USD') {
+                    $bankAccount = isset($invoice) ? otmain_invoice_bank_account_key($invoice) : 'EUR';
+                }
+                ?>
+                <div class="form-group">
+                    <label for="otmain_bank_account" class="control-label"><?php echo _l('otmain_bank_account'); ?></label>
+                    <select name="bank_account" id="otmain_bank_account" class="selectpicker" data-width="100%" data-none-selected-text="<?php echo _l('dropdown_non_selected_tex'); ?>">
+                        <option value="EUR" <?php echo $bankAccount === 'EUR' ? 'selected' : ''; ?>><?php echo _l('otmain_bank_account_eur'); ?></option>
+                        <option value="USD" <?php echo $bankAccount === 'USD' ? 'selected' : ''; ?>><?php echo _l('otmain_bank_account_usd'); ?></option>
+                    </select>
+                    <p class="text-muted mtop5"><?php echo _l('otmain_bank_account_help'); ?></p>
+                </div>
+                <div id="otmain-bank-details-preview"></div>
+            </div>
         </div>
     </div>
     <div class="col-md-6">

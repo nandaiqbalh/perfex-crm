@@ -2743,23 +2743,14 @@ $(function () {
         $('select[name="discount_type"]').val() === "" &&
         $(this).val() != 0
       ) {
-        if ($("td[id^='tax_id_']").length === 0) {
-          return;
+        // Auto-select before_tax so % discount works (esp. proposals without tax rows)
+        var $discountType = $('select[name="discount_type"]');
+        $discountType.val("before_tax");
+        if ($discountType.hasClass("selectpicker")) {
+          $discountType.selectpicker("refresh");
         }
-        alert("You need to select discount type");
-        $("html,body").animate(
-          {
-            scrollTop: 0,
-          },
-          "slow"
-        );
-        $("#wrapper").highlight($('label[for="discount_type"]').text());
-        setTimeout(function () {
-          $("#wrapper").unhighlight();
-        }, 3000);
-        return false;
       }
-      if ($(this).valid() === true) {
+      if (typeof $(this).valid !== "function" || $(this).valid() === true) {
         calculate_total();
       }
     }
@@ -7098,6 +7089,7 @@ function clear_item_preview_values(default_taxes) {
   previewArea.find("select.tax").selectpicker("val", last_taxes_applied);
   previewArea.find('input[name="rate"]').val("");
   previewArea.find('input[name="unit"]').val("");
+  previewArea.find('input[name="profit_percent"]').val("");
   previewArea.find('#main-optional').prop("checked", false);
   previewArea.find('#main-optional').trigger('change')
   previewArea.find('#main-optional-choosen').prop("checked", true);
@@ -7303,6 +7295,19 @@ function add_item_to_table(data, itemid, merge_invoice, bill_expense) {
       '][rate]" value="' +
       data.rate +
       '" class="form-control"></td>';
+
+    if ($("body").find(".proposal-form").length) {
+      var profitPercent =
+        data.profit_percent !== undefined && data.profit_percent !== null
+          ? data.profit_percent
+          : "";
+      table_row +=
+        '<td class="otmain-profit-percent-col"><input type="number" step="any" name="newitems[' +
+        item_key +
+        '][profit_percent]" value="' +
+        profitPercent +
+        '" class="form-control" placeholder="Profit %"></td>';
+    }
 
     table_row += '<td class="taxrate">' + tax_dropdown + "</td>";
 
@@ -7522,6 +7527,7 @@ function get_item_preview_values() {
   response.taxname = $(".main select.tax").selectpicker("val");
   response.rate = $('.main input[name="rate"]').val();
   response.unit = $('.main input[name="unit"]').val();
+  response.profit_percent = $('.main input[name="profit_percent"]').val();
   response.is_optional = $('#main-optional').prop('checked') ? 1 : 0;
   response.is_selected = $('#main-optional-choosen').prop('checked') ? 1 : 0;
   return response;

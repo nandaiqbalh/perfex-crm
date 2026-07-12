@@ -167,6 +167,7 @@ class Proposals extends AdminController
         }
         if ($id == '') {
             $title = _l('add_new', _l('proposal'));
+            $data['is_proposal'] = true;
         } else {
             $data['proposal'] = $this->proposals_model->get($id);
 

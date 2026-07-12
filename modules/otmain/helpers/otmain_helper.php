@@ -468,10 +468,16 @@ function otmain_pdf_append_invoice_tc_page($pdf)
     otmain_pdf_append_customize_image_page($pdf, 'generated/Terms & Conditions – Invoices_page-0001.jpg', true);
 }
 
-function otmain_pdf_append_invoice_terms($pdf, $font_name, $font_size, $currencyName = '')
+function otmain_pdf_append_invoice_terms($pdf, $font_name, $font_size, $currencyName = '', $invoice = null)
 {
     otmain_pdf_append_invoice_tc_page($pdf);
-    otmain_pdf_append_account_detail_proof($pdf);
+    $bankAccount = '';
+    if (is_object($invoice)) {
+        $bankAccount = otmain_invoice_bank_account_key($invoice);
+    } elseif (is_string($currencyName) && $currencyName !== '') {
+        $bankAccount = otmain_invoice_bank_account_key($currencyName);
+    }
+    otmain_pdf_append_account_detail_proof($pdf, $bankAccount);
 }
 
 function otmain_customize_file_path($relativePath)
@@ -564,10 +570,46 @@ function otmain_pdf_append_customize_image_sequence($pdf, $basenameWithoutPage, 
     }
 }
 
-function otmain_pdf_append_account_detail_proof($pdf)
+function otmain_pdf_append_account_detail_proof($pdf, $bankAccount = '')
 {
+    $bankAccount = strtoupper(trim((string) $bankAccount));
+    if ($bankAccount === 'USD') {
+        otmain_pdf_append_customize_image_sequence($pdf, 'generated/account_details_proof_usd', false);
+
+        return;
+    }
+    if ($bankAccount === 'EUR') {
+        otmain_pdf_append_customize_image_sequence($pdf, 'generated/account_details_proof_eur', false);
+
+        return;
+    }
+
     otmain_pdf_append_customize_image_sequence($pdf, 'generated/account_details_proof_eur', false);
     otmain_pdf_append_customize_image_sequence($pdf, 'generated/account_details_proof_usd', false);
+}
+
+function otmain_invoice_bank_account_key($invoice)
+{
+    if (is_object($invoice) && !empty($invoice->bank_account)) {
+        $bank = strtoupper(trim((string) $invoice->bank_account));
+        if ($bank === 'EUR' || $bank === 'USD') {
+            return $bank;
+        }
+    }
+
+    $currencyName = '';
+    if (is_object($invoice) && !empty($invoice->currency_name)) {
+        $currencyName = $invoice->currency_name;
+    } elseif (is_string($invoice)) {
+        $currencyName = $invoice;
+    }
+
+    $currencyName = strtoupper(trim($currencyName));
+    if ($currencyName === 'USD' || $currencyName === 'US DOLLAR' || strpos($currencyName, 'USD') !== false) {
+        return 'USD';
+    }
+
+    return 'EUR';
 }
 
 function otmain_get_bank_details($currencyName)
@@ -1806,6 +1848,13 @@ function otmain_pdf_totals_column_html($document, $items, $currencyName)
 
     $html = '<table cellpadding="3" cellspacing="0" width="100%" style="font-size:10px;color:#424242;">';
     $html .= '<tr><td align="right" width="70%"><strong>Subtotal</strong></td><td align="right" width="30%">' . otmain_pdf_format_total_amount($document->subtotal, $currencyName) . '</td></tr>';
+    if (is_sale_discount_applied($document)) {
+        $discountLabel = _l('estimate_discount');
+        if (isset($document->discount_percent) && (float) $document->discount_percent > 0) {
+            $discountLabel .= ' (' . e(app_format_number($document->discount_percent, true)) . '%)';
+        }
+        $html .= '<tr><td align="right" width="70%"><strong>' . e($discountLabel) . '</strong></td><td align="right" width="30%">-' . otmain_pdf_format_total_amount($document->discount_total, $currencyName) . '</td></tr>';
+    }
     foreach ($byRate as $rate => $amount) {
         $html .= '<tr><td align="right" width="70%"><strong>VAT ' . e((string) $rate) . '%</strong></td><td align="right" width="30%">' . otmain_pdf_format_total_amount($amount, $currencyName) . '</td></tr>';
     }
@@ -1865,7 +1914,8 @@ function otmain_pdf_invoice_header_html($invoice, $invoiceNumber)
     $logo     = otmain_pdf_logo_url(130);
     $title    = !empty($invoice->document_title) ? $invoice->document_title : 'Commercial Invoice';
     $leftMeta = otmain_pdf_invoice_left_block_html($invoice, $invoiceNumber);
-    $rightMeta = otmain_pdf_right_column_wrap_html(otmain_pdf_invoice_right_column_html($invoice->currency_name));
+    $bankKey  = otmain_invoice_bank_account_key($invoice);
+    $rightMeta = otmain_pdf_right_column_wrap_html(otmain_pdf_invoice_right_column_html($bankKey));
 
     return '<table cellpadding="2" cellspacing="0" width="100%">'
         . '<tr>'
