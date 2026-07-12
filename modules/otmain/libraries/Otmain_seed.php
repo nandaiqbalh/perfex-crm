@@ -197,7 +197,7 @@ class Otmain_seed
             'country'          => $buyerPayload['country'],
             'client_ref'       => 'PO-REF-2026-07',
             'quote_title'      => 'Kovako M120',
-            'document_title'   => 'Draft Quotation',
+            'document_title'   => 'Quotation',
             'expiry_days'      => 24,
             'availability'     => 'Immediate availability, subject to prior sale.',
             'notes'            => 'Demo proposal notes.',

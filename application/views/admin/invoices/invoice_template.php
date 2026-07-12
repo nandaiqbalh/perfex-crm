@@ -23,115 +23,16 @@
 </div>
 <div class="panel_s invoice accounting-template">
     <div class="additional"></div>
-    <div class="panel-body">
+    <div class="panel-body otmain-edit-form">
         <?php hooks()->do_action('before_render_invoice_template', $invoice ?? null); ?>
         <?php if (isset($invoice)) {
             echo form_hidden('merge_current_invoice', $invoice->id);
         } ?>
-        <div class="row">
-            <div class="col-md-6">
-                <div class="f_client_id">
-                    <div class="form-group select-placeholder">
-                        <label for="clientid"
-                            class="control-label"><?= _l('invoice_select_customer'); ?></label>
-                        <select id="clientid" name="clientid" data-live-search="true" data-width="100%"
-                            class="ajax-search<?= isset($invoice) && empty($invoice->clientid) ? ' customer-removed' : ''; ?>"
-                            data-none-selected-text="<?= _l('dropdown_non_selected_tex'); ?>">
-                            <?php $selected = isset($invoice) ? $invoice->clientid : ($customer_id ?? ''); ?>
-                            <?php if ($selected != '') {
-                                $rel_data = get_relation_data('customer', $selected);
-                                $rel_val  = get_relation_values($rel_data, 'customer');
-                                echo '<option value="' . $rel_val['id'] . '" selected>' . $rel_val['name'] . '</option>';
-                            } ?>
-                        </select>
-                    </div>
-                </div>
-                <?php
-                                        if (! isset($invoice_from_project)) { ?>
-                <div class="form-group select-placeholder projects-wrapper<?php if ((! isset($invoice)) || (isset($invoice) && ! customer_has_projects($invoice->clientid))) {
-                    echo (isset($customer_id) && (! isset($project_id) || ! $project_id)) ? ' hide' : '';
-                } ?>">
-                    <label
-                        for="project_id"><?= _l('project'); ?></label>
-                    <div id="project_ajax_search_wrapper">
-                        <select name="project_id" id="project_id" class="projects ajax-search" data-live-search="true"
-                            data-width="100%"
-                            data-none-selected-text="<?= _l('dropdown_non_selected_tex'); ?>">
-                            <?php $project_id = isset($invoice) && $invoice->project_id ?
-                                $invoice->project_id :
-                                ($project_id ?? ''); ?>
+        <?php $invoiceObj = $invoice ?? null; ?>
 
-                            <?php if ($project_id) {
-                                echo '<option value="' . $project_id . '" selected>' . e(get_project_name_by_id($project_id)) . '</option>';
-                            } ?>
-                        </select>
-                    </div>
-                </div>
-                <?php } ?>
-                <div class="row">
-                    <div class="col-md-12">
-                        <hr class="hr-10" />
-                        <a href="#" class="edit_shipping_billing_info" data-toggle="modal"
-                            data-target="#billing_and_shipping_details"><i class="fa-regular fa-pen-to-square"></i></a>
-                        <?php include_once APPPATH . 'views/admin/invoices/billing_and_shipping_template.php'; ?>
-                    </div>
-                    <div class="col-md-6">
-                        <p class="bold">
-                            <?= _l('invoice_bill_to'); ?>
-                        </p>
-                        <address>
-                            <span class="billing_street">
-                                <?php $billing_street = (isset($invoice) ? $invoice->billing_street : '--'); ?>
-                                <?php $billing_street = ($billing_street == '' ? '--' : $billing_street); ?>
-                                <?= process_text_content_for_display($billing_street); ?></span><br>
-                            <span class="billing_city">
-                                <?php $billing_city = (isset($invoice) ? $invoice->billing_city : '--'); ?>
-                                <?php $billing_city = ($billing_city == '' ? '--' : $billing_city); ?>
-                                <?= e($billing_city); ?></span>,
-                            <span class="billing_state">
-                                <?php $billing_state = (isset($invoice) ? $invoice->billing_state : '--'); ?>
-                                <?php $billing_state = ($billing_state == '' ? '--' : $billing_state); ?>
-                                <?= e($billing_state); ?></span>
-                            <br />
-                            <span class="billing_country">
-                                <?php $billing_country = (isset($invoice) ? get_country_short_name($invoice->billing_country) : '--'); ?>
-                                <?php $billing_country = ($billing_country == '' ? '--' : $billing_country); ?>
-                                <?= e($billing_country); ?></span>,
-                            <span class="billing_zip">
-                                <?php $billing_zip = (isset($invoice) ? $invoice->billing_zip : '--'); ?>
-                                <?php $billing_zip = ($billing_zip == '' ? '--' : $billing_zip); ?>
-                                <?= e($billing_zip); ?></span>
-                        </address>
-                    </div>
-                    <div class="col-md-6">
-                        <p class="bold">
-                            <?= _l('ship_to'); ?>
-                        </p>
-                        <address>
-                            <span class="shipping_street">
-                                <?php $shipping_street = (isset($invoice) ? $invoice->shipping_street : '--'); ?>
-                                <?php $shipping_street = ($shipping_street == '' ? '--' : $shipping_street); ?>
-                                <?= process_text_content_for_display($shipping_street); ?></span><br>
-                            <span class="shipping_city">
-                                <?php $shipping_city = (isset($invoice) ? $invoice->shipping_city : '--'); ?>
-                                <?php $shipping_city = ($shipping_city == '' ? '--' : $shipping_city); ?>
-                                <?= e($shipping_city); ?></span>,
-                            <span class="shipping_state">
-                                <?php $shipping_state = (isset($invoice) ? $invoice->shipping_state : '--'); ?>
-                                <?php $shipping_state = ($shipping_state == '' ? '--' : $shipping_state); ?>
-                                <?= e($shipping_state); ?></span>
-                            <br />
-                            <span class="shipping_country">
-                                <?php $shipping_country = (isset($invoice) ? get_country_short_name($invoice->shipping_country) : '--'); ?>
-                                <?php $shipping_country = ($shipping_country == '' ? '--' : $shipping_country); ?>
-                                <?= e($shipping_country); ?></span>,
-                            <span class="shipping_zip">
-                                <?php $shipping_zip = (isset($invoice) ? $invoice->shipping_zip : '--'); ?>
-                                <?php $shipping_zip = ($shipping_zip == '' ? '--' : $shipping_zip); ?>
-                                <?= e($shipping_zip); ?></span>
-                        </address>
-                    </div>
-                </div>
+        <?php otmain_form_section_open(_l('otmain_section_document')); ?>
+        <div class="row">
+            <div class="col-md-6 otmain-col-left">
                 <?php $next_invoice_number = get_option('next_invoice_number'); ?>
                 <?php $format              = get_option('invoice_number_format'); ?>
                 <?php
@@ -257,16 +158,141 @@ $data_original_number = isset($invoice) ? $invoice->number : 'false';
                     $rel_id = $custom_fields_rel_transfer;
                 } ?>
                 <?= render_custom_fields('invoice', $rel_id); ?>
+
             </div>
-            <div class="col-md-6">
-                <div class="tw-ml-3">
-                    <div class="form-group">
-                        <label for="tags" class="control-label"><i class="fa fa-tag" aria-hidden="true"></i>
-                            <?= _l('tags'); ?></label>
-                        <input type="text" class="tagsinput" id="tags" name="tags"
-                            value="<?= isset($invoice) ? prep_tags_input(get_tags_in($invoice->id, 'invoice')) : ''; ?>"
-                            data-role="tagsinput">
+            <div class="col-md-6 otmain-col-right">
+                <?php otmain_invoice_section('document', $invoiceObj); ?>
+            </div>
+        </div>
+        <?php otmain_form_section_close(); ?>
+
+        <?php otmain_form_section_open(_l('otmain_section_party')); ?>
+        <div class="row">
+            <div class="col-md-6 otmain-col-left">
+                <div class="f_client_id">
+                    <div class="form-group select-placeholder">
+                        <label for="clientid"
+                            class="control-label"><?= _l('invoice_select_customer'); ?></label>
+                        <select id="clientid" name="clientid" data-live-search="true" data-width="100%"
+                            class="ajax-search<?= isset($invoice) && empty($invoice->clientid) ? ' customer-removed' : ''; ?>"
+                            data-none-selected-text="<?= _l('dropdown_non_selected_tex'); ?>">
+                            <?php $selected = isset($invoice) ? $invoice->clientid : ($customer_id ?? ''); ?>
+                            <?php if ($selected != '') {
+                                $rel_data = get_relation_data('customer', $selected);
+                                $rel_val  = get_relation_values($rel_data, 'customer');
+                                echo '<option value="' . $rel_val['id'] . '" selected>' . $rel_val['name'] . '</option>';
+                            } ?>
+                        </select>
                     </div>
+                </div>
+                <?php
+                                        if (! isset($invoice_from_project)) { ?>
+                <div class="form-group select-placeholder projects-wrapper<?php if ((! isset($invoice)) || (isset($invoice) && ! customer_has_projects($invoice->clientid))) {
+                    echo (isset($customer_id) && (! isset($project_id) || ! $project_id)) ? ' hide' : '';
+                } ?>">
+                    <label
+                        for="project_id"><?= _l('project'); ?></label>
+                    <div id="project_ajax_search_wrapper">
+                        <select name="project_id" id="project_id" class="projects ajax-search" data-live-search="true"
+                            data-width="100%"
+                            data-none-selected-text="<?= _l('dropdown_non_selected_tex'); ?>">
+                            <?php $project_id = isset($invoice) && $invoice->project_id ?
+                                $invoice->project_id :
+                                ($project_id ?? ''); ?>
+
+                            <?php if ($project_id) {
+                                echo '<option value="' . $project_id . '" selected>' . e(get_project_name_by_id($project_id)) . '</option>';
+                            } ?>
+                        </select>
+                    </div>
+                </div>
+                <?php } ?>
+
+            </div>
+            <div class="col-md-6 otmain-col-right">
+                <?php otmain_invoice_section('contact', $invoiceObj); ?>
+            </div>
+        </div>
+        <?php otmain_form_section_close(); ?>
+
+        <?php otmain_form_section_open(_l('otmain_section_addresses')); ?>
+        <div class="row">
+            <div class="col-md-6 otmain-col-left">
+                <div class="row">
+                    <div class="col-md-12">
+                        <hr class="hr-10" />
+                        <a href="#" class="edit_shipping_billing_info" data-toggle="modal"
+                            data-target="#billing_and_shipping_details"><i class="fa-regular fa-pen-to-square"></i></a>
+                        <?php include_once APPPATH . 'views/admin/invoices/billing_and_shipping_template.php'; ?>
+                    </div>
+                    <div class="col-md-6">
+                        <p class="bold">
+                            <?= _l('invoice_bill_to'); ?>
+                        </p>
+                        <address>
+                            <span class="billing_street">
+                                <?php $billing_street = (isset($invoice) ? $invoice->billing_street : '--'); ?>
+                                <?php $billing_street = ($billing_street == '' ? '--' : $billing_street); ?>
+                                <?= process_text_content_for_display($billing_street); ?></span><br>
+                            <span class="billing_city">
+                                <?php $billing_city = (isset($invoice) ? $invoice->billing_city : '--'); ?>
+                                <?php $billing_city = ($billing_city == '' ? '--' : $billing_city); ?>
+                                <?= e($billing_city); ?></span>,
+                            <span class="billing_state">
+                                <?php $billing_state = (isset($invoice) ? $invoice->billing_state : '--'); ?>
+                                <?php $billing_state = ($billing_state == '' ? '--' : $billing_state); ?>
+                                <?= e($billing_state); ?></span>
+                            <br />
+                            <span class="billing_country">
+                                <?php $billing_country = (isset($invoice) ? get_country_short_name($invoice->billing_country) : '--'); ?>
+                                <?php $billing_country = ($billing_country == '' ? '--' : $billing_country); ?>
+                                <?= e($billing_country); ?></span>,
+                            <span class="billing_zip">
+                                <?php $billing_zip = (isset($invoice) ? $invoice->billing_zip : '--'); ?>
+                                <?php $billing_zip = ($billing_zip == '' ? '--' : $billing_zip); ?>
+                                <?= e($billing_zip); ?></span>
+                        </address>
+                    </div>
+                    <div class="col-md-6">
+                        <p class="bold">
+                            <?= _l('ship_to'); ?>
+                        </p>
+                        <address>
+                            <span class="shipping_street">
+                                <?php $shipping_street = (isset($invoice) ? $invoice->shipping_street : '--'); ?>
+                                <?php $shipping_street = ($shipping_street == '' ? '--' : $shipping_street); ?>
+                                <?= process_text_content_for_display($shipping_street); ?></span><br>
+                            <span class="shipping_city">
+                                <?php $shipping_city = (isset($invoice) ? $invoice->shipping_city : '--'); ?>
+                                <?php $shipping_city = ($shipping_city == '' ? '--' : $shipping_city); ?>
+                                <?= e($shipping_city); ?></span>,
+                            <span class="shipping_state">
+                                <?php $shipping_state = (isset($invoice) ? $invoice->shipping_state : '--'); ?>
+                                <?php $shipping_state = ($shipping_state == '' ? '--' : $shipping_state); ?>
+                                <?= e($shipping_state); ?></span>
+                            <br />
+                            <span class="shipping_country">
+                                <?php $shipping_country = (isset($invoice) ? get_country_short_name($invoice->shipping_country) : '--'); ?>
+                                <?php $shipping_country = ($shipping_country == '' ? '--' : $shipping_country); ?>
+                                <?= e($shipping_country); ?></span>,
+                            <span class="shipping_zip">
+                                <?php $shipping_zip = (isset($invoice) ? $invoice->shipping_zip : '--'); ?>
+                                <?php $shipping_zip = ($shipping_zip == '' ? '--' : $shipping_zip); ?>
+                                <?= e($shipping_zip); ?></span>
+                        </address>
+                    </div>
+                </div>
+
+            </div>
+            <div class="col-md-6 otmain-col-right">
+                <?php otmain_invoice_section('addresses', $invoiceObj); ?>
+            </div>
+        </div>
+        <?php otmain_form_section_close(); ?>
+
+        <?php otmain_form_section_open(_l('otmain_section_terms')); ?>
+        <div class="row">
+            <div class="col-md-6 otmain-col-left">
                     <div
                         class="form-group mbot15<?= count($payment_modes) > 0 ? ' select-placeholder' : ''; ?>">
                         <label for="allowed_payment_modes"
@@ -471,12 +497,34 @@ echo render_select('sale_agent', $staff, ['staffid', ['firstname', 'lastname']],
                             </div>
                         </div>
                     </div>
+
+            </div>
+            <div class="col-md-6 otmain-col-right">
+                <?php otmain_invoice_section('terms', $invoiceObj); ?>
+            </div>
+        </div>
+        <?php otmain_form_section_close(); ?>
+
+        <?php otmain_form_section_open(_l('otmain_section_extras')); ?>
+        <div class="row">
+            <div class="col-md-6 otmain-col-left">
+                    <div class="form-group">
+                        <label for="tags" class="control-label"><i class="fa fa-tag" aria-hidden="true"></i>
+                            <?= _l('tags'); ?></label>
+                        <input type="text" class="tagsinput" id="tags" name="tags"
+                            value="<?= isset($invoice) ? prep_tags_input(get_tags_in($invoice->id, 'invoice')) : ''; ?>"
+                            data-role="tagsinput">
+                    </div>
                     <?php $value = (isset($invoice) ? $invoice->adminnote : ''); ?>
                     <?= render_textarea('adminnote', 'invoice_add_edit_admin_note', $value); ?>
 
-                </div>
+            </div>
+            <div class="col-md-6 otmain-col-right">
+                <?php otmain_invoice_section('extras', $invoiceObj); ?>
+                <?php otmain_invoice_section('notes', $invoiceObj); ?>
             </div>
         </div>
+        <?php otmain_form_section_close(); ?>
     </div>
 
     <hr class="hr-panel-separator" />

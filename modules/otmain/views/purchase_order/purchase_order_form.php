@@ -4,25 +4,27 @@ $defaults = $po_defaults ?? otmain_get_po_company_defaults();
 $poNumber = isset($po) ? $po->formatted_number : ($next_po_number ?? otmain_preview_purchase_order_number());
 ?>
 <div class="panel_s">
-    <div class="panel-body">
+    <div class="panel-body otmain-edit-form">
         <?php echo form_open($this->uri->uri_string(), ['id' => 'otmain-purchase-order-form']); ?>
+
+        <?php otmain_form_section_open(_l('otmain_section_document')); ?>
         <div class="row">
-            <div class="col-md-4">
+            <div class="col-md-6 otmain-col-left">
                 <?php echo render_input('document_title', _l('otmain_document_title'), isset($po) ? ($po->document_title ?? $defaults['document_title']) : $defaults['document_title']); ?>
             </div>
-            <div class="col-md-4">
+            <div class="col-md-6 otmain-col-right">
                 <div class="form-group">
                     <label class="control-label"><?php echo _l('otmain_po_number'); ?></label>
                     <input type="text" class="form-control" id="otmain-po-number-preview" value="<?php echo e($poNumber); ?>" readonly>
                 </div>
-            </div>
-            <div class="col-md-4">
                 <?php echo render_date_input('date', 'date', isset($po) ? _d($po->date) : _d(date('Y-m-d'))); ?>
             </div>
         </div>
+        <?php otmain_form_section_close(); ?>
 
+        <?php otmain_form_section_open(_l('otmain_section_supplier')); ?>
         <div class="row">
-            <div class="col-md-6">
+            <div class="col-md-6 otmain-col-left">
                 <div class="form-group select-placeholder">
                     <label class="control-label"><?php echo _l('otmain_po_to'); ?></label>
                     <select name="supplierid" id="supplierid" class="ajax-search" data-width="100%" data-live-search="true" data-none-selected-text="<?php echo _l('dropdown_non_selected_tex'); ?>">
@@ -31,22 +33,20 @@ $poNumber = isset($po) ? $po->formatted_number : ($next_po_number ?? otmain_prev
                         } ?>
                     </select>
                 </div>
-            </div>
-            <div class="col-md-6">
                 <?php echo render_input('supplier_quote_ref', 'otmain_supplier_quote_ref', isset($po) ? ($po->supplier_quote_ref ?? '') : ''); ?>
             </div>
-            <div class="col-md-12">
+            <div class="col-md-6 otmain-col-right">
                 <?php
                 $supplierAddress = isset($po) ? clear_textarea_breaks($po->supplier_address ?? '') : '';
-                echo render_textarea('supplier_address', 'otmain_supplier_address', $supplierAddress, ['rows' => 3]);
+                echo render_textarea('supplier_address', 'otmain_supplier_address', $supplierAddress, ['rows' => 4]);
                 ?>
             </div>
         </div>
+        <?php otmain_form_section_close(); ?>
 
-        <hr />
-        <h5 class="bold"><?php echo _l('otmain_supplier_contact'); ?></h5>
+        <?php otmain_form_section_open(_l('otmain_section_contact')); ?>
         <div class="row">
-            <div class="col-md-4">
+            <div class="col-md-6 otmain-col-left">
                 <div class="form-group">
                     <label class="control-label"><?php echo _l('otmain_contact_person_select'); ?></label>
                     <select name="otmain_contact_id" id="otmain_po_contact_id" class="selectpicker" data-width="100%" data-live-search="true" data-none-selected-text="<?php echo _l('dropdown_non_selected_tex'); ?>">
@@ -56,32 +56,39 @@ $poNumber = isset($po) ? $po->formatted_number : ($next_po_number ?? otmain_prev
                         <?php } ?>
                     </select>
                 </div>
+                <?php echo render_input('contact_person', 'otmain_contact_person', isset($po) ? ($po->contact_person ?? '') : ''); ?>
             </div>
-            <div class="col-md-4"><?php echo render_input('contact_person', 'otmain_contact_person', isset($po) ? ($po->contact_person ?? '') : ''); ?></div>
-            <div class="col-md-4"><?php echo render_input('email', 'client_email', isset($po) ? ($po->email ?? '') : ''); ?></div>
-            <div class="col-md-4"><?php echo render_input('phone', 'client_phonenumber', isset($po) ? ($po->phone ?? '') : ''); ?></div>
+            <div class="col-md-6 otmain-col-right">
+                <?php echo render_input('email', 'client_email', isset($po) ? ($po->email ?? '') : ''); ?>
+                <?php echo render_input('phone', 'client_phonenumber', isset($po) ? ($po->phone ?? '') : ''); ?>
+            </div>
         </div>
+        <?php otmain_form_section_close(); ?>
 
-        <hr />
-        <h5 class="bold"><?php echo _l('otmain_po_issuer'); ?></h5>
+        <?php otmain_form_section_open(_l('otmain_section_issuer')); ?>
         <div class="row">
-            <div class="col-md-6"><?php echo render_input('company_name', 'name', isset($po) ? ($po->company_name ?? $defaults['company_name']) : $defaults['company_name']); ?></div>
-            <div class="col-md-6"><?php echo render_input('company_address', 'address', isset($po) ? ($po->company_address ?? $defaults['company_address']) : $defaults['company_address']); ?></div>
-            <div class="col-md-3"><?php echo render_input('company_postal_code', 'zip', isset($po) ? ($po->company_postal_code ?? $defaults['company_postal_code']) : $defaults['company_postal_code']); ?></div>
-            <div class="col-md-3"><?php echo render_input('company_city', 'city', isset($po) ? ($po->company_city ?? $defaults['company_city']) : $defaults['company_city']); ?></div>
-            <div class="col-md-6"><?php echo render_input('company_country', 'country', isset($po) ? ($po->company_country ?? $defaults['company_country']) : $defaults['company_country']); ?></div>
-            <div class="col-md-4"><?php echo render_input('company_phone', 'client_phonenumber', isset($po) ? ($po->company_phone ?? $defaults['company_phone']) : $defaults['company_phone']); ?></div>
-            <div class="col-md-4"><?php echo render_input('company_email_invoices', 'otmain_email_invoices', isset($po) ? ($po->company_email_invoices ?? $defaults['company_email_invoices']) : $defaults['company_email_invoices']); ?></div>
-            <div class="col-md-4"><?php echo render_input('company_website', 'website', isset($po) ? ($po->company_website ?? $defaults['company_website']) : $defaults['company_website']); ?></div>
-            <div class="col-md-4"><?php echo render_input('company_vat', 'otmain_vat_number', isset($po) ? ($po->company_vat ?? $defaults['company_vat']) : $defaults['company_vat']); ?></div>
-            <div class="col-md-4"><?php echo render_input('company_coc', 'otmain_coc_number', isset($po) ? ($po->company_coc ?? $defaults['company_coc']) : $defaults['company_coc']); ?></div>
-            <div class="col-md-4"><?php echo render_input('iban', 'otmain_iban', isset($po) ? ($po->iban ?? $defaults['iban']) : $defaults['iban']); ?></div>
-            <div class="col-md-4">
+            <div class="col-md-6 otmain-col-left">
+                <?php echo render_input('company_name', 'name', isset($po) ? ($po->company_name ?? $defaults['company_name']) : $defaults['company_name']); ?>
+                <?php echo render_input('company_address', 'address', isset($po) ? ($po->company_address ?? $defaults['company_address']) : $defaults['company_address']); ?>
+                <div class="row">
+                    <div class="col-md-6"><?php echo render_input('company_postal_code', 'zip', isset($po) ? ($po->company_postal_code ?? $defaults['company_postal_code']) : $defaults['company_postal_code']); ?></div>
+                    <div class="col-md-6"><?php echo render_input('company_city', 'city', isset($po) ? ($po->company_city ?? $defaults['company_city']) : $defaults['company_city']); ?></div>
+                </div>
+                <?php echo render_input('company_country', 'country', isset($po) ? ($po->company_country ?? $defaults['company_country']) : $defaults['company_country']); ?>
+            </div>
+            <div class="col-md-6 otmain-col-right">
+                <?php echo render_input('company_phone', 'client_phonenumber', isset($po) ? ($po->company_phone ?? $defaults['company_phone']) : $defaults['company_phone']); ?>
+                <?php echo render_input('company_email_invoices', 'otmain_email_invoices', isset($po) ? ($po->company_email_invoices ?? $defaults['company_email_invoices']) : $defaults['company_email_invoices']); ?>
+                <?php echo render_input('company_website', 'website', isset($po) ? ($po->company_website ?? $defaults['company_website']) : $defaults['company_website']); ?>
+                <?php echo render_input('company_vat', 'otmain_vat_number', isset($po) ? ($po->company_vat ?? $defaults['company_vat']) : $defaults['company_vat']); ?>
+                <?php echo render_input('company_coc', 'otmain_coc_number', isset($po) ? ($po->company_coc ?? $defaults['company_coc']) : $defaults['company_coc']); ?>
+                <?php echo render_input('iban', 'otmain_iban', isset($po) ? ($po->iban ?? $defaults['iban']) : $defaults['iban']); ?>
                 <?php echo render_select('currency', $currencies, ['id', 'name', 'symbol'], 'currency', isset($po) ? ($po->currency ?? '') : ''); ?>
             </div>
         </div>
+        <?php otmain_form_section_close(); ?>
 
-        <hr />
+        <?php otmain_form_section_open(_l('otmain_section_items')); ?>
         <div class="table-responsive">
             <table class="table items table-main-estimate-edit has-calculations no-margin" id="otmain-po-items">
                 <thead>
@@ -113,9 +120,11 @@ $poNumber = isset($po) ? $po->formatted_number : ($next_po_number ?? otmain_prev
         <button type="button" class="btn btn-default mtop10" id="otmain-add-po-row">
             <i class="fa fa-plus tw-mr-1"></i><?php echo _l('add_item'); ?>
         </button>
+        <?php otmain_form_section_close(); ?>
 
-        <div class="row mtop20">
-            <div class="col-md-6 col-md-offset-6">
+        <?php otmain_form_section_open(_l('otmain_section_totals')); ?>
+        <div class="row">
+            <div class="col-md-6 col-md-offset-6 otmain-col-right">
                 <table class="table text-right">
                     <tr><td><strong><?php echo _l('otmain_subtotal_eur'); ?></strong></td><td id="otmain-po-subtotal">0.00</td></tr>
                     <tr><td><strong>VAT 21%</strong></td><td id="otmain-po-vat21">0.00</td></tr>
@@ -124,6 +133,7 @@ $poNumber = isset($po) ? $po->formatted_number : ($next_po_number ?? otmain_prev
                 </table>
             </div>
         </div>
+        <?php otmain_form_section_close(); ?>
 
         <div class="text-right mtop15">
             <button type="submit" class="btn btn-primary"><?php echo _l('submit'); ?></button>

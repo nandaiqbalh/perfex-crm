@@ -1,0 +1,67 @@
+/* OT-Main shared edit-form sections */
+.otmain-edit-form .otmain-form-section,
+.otmain-form-section {
+    margin-bottom: 1.25rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.otmain-form-section:last-child,
+.otmain-form-section.otmain-form-section--flush,
+.otmain-edit-form .otmain-form-section:last-of-type {
+    border-bottom: 0;
+    margin-bottom: 0;
+    padding-bottom: 0;
+}
+
+.otmain-form-section-title {
+    margin: 0 0 0.75rem;
+    padding: 0;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    color: #525252;
+}
+
+.otmain-form-section-body > .row:last-child > [class*="col-"]:last-child .form-group:last-child,
+.otmain-form-section-body > .row:last-child .form-group:last-child {
+    margin-bottom: 0;
+}
+
+.otmain-form-section .panel.panel-default {
+    margin-bottom: 0;
+}
+
+.otmain-form-section .table.items {
+    margin-bottom: 0;
+}
+
+.otmain-col-left {
+    border-right: 1px solid #e5e7eb;
+    padding-right: 20px;
+}
+
+.otmain-col-right {
+    padding-left: 20px;
+}
+
+@media (max-width: 991px) {
+    .otmain-col-left {
+        border-right: 0;
+        padding-right: 15px;
+        margin-bottom: 1rem;
+        padding-bottom: 1rem;
+        border-bottom: 1px solid #e5e7eb;
+    }
+
+    .otmain-col-right {
+        padding-left: 15px;
+    }
+}
+
+#otmain-packing-list-form .otmain-form-section:last-of-type,
+#otmain-purchase-order-form .otmain-form-section:last-of-type {
+    border-bottom: 0;
+    padding-bottom: 0;
+}

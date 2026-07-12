@@ -20,7 +20,7 @@ register_language_files(OTMAIN_MODULE_NAME, [OTMAIN_MODULE_NAME]);
 hooks()->add_action('admin_init', 'otmain_permissions');
 hooks()->add_action('admin_init', 'otmain_init_menu');
 hooks()->add_action('app_admin_footer', 'otmain_admin_footer_assets');
-hooks()->add_action('before_render_invoice_template', 'otmain_render_invoice_fields');
+hooks()->add_action('otmain_invoice_form_fields', 'otmain_render_invoice_fields');
 hooks()->add_action('otmain_estimate_form_fields', 'otmain_render_estimate_fields');
 hooks()->add_action('otmain_proposal_form_fields', 'otmain_render_proposal_fields');
 
@@ -149,7 +149,8 @@ function otmain_admin_footer_assets()
         || strpos($uri, 'otmain/packing_list') !== false
         || strpos($uri, 'otmain/purchase_order') !== false
     ) {
-        echo '<script src="' . module_dir_url(OTMAIN_MODULE_NAME, 'assets/js/otmain.js') . '?v=1.0.6"></script>';
+        echo '<link rel="stylesheet" href="' . module_dir_url(OTMAIN_MODULE_NAME, 'assets/css/otmain-forms.css') . '?v=1.0.1" />';
+        echo '<script src="' . module_dir_url(OTMAIN_MODULE_NAME, 'assets/js/otmain.js') . '?v=1.0.7"></script>';
     }
 }
 
@@ -161,14 +162,51 @@ function otmain_render_estimate_fields($estimate = null)
 
 function otmain_render_invoice_fields($invoice = null)
 {
-    $CI = &get_instance();
-    $CI->load->view('otmain/invoice_fields', ['invoice' => $invoice]);
+    otmain_invoice_section('document', $invoice);
+    otmain_invoice_section('contact', $invoice);
+    otmain_invoice_section('terms', $invoice);
+    otmain_invoice_section('addresses', $invoice);
+    otmain_invoice_section('extras', $invoice);
+    otmain_invoice_section('notes', $invoice);
 }
 
 function otmain_render_proposal_fields($proposal = null)
 {
+    otmain_proposal_section('document', $proposal);
+    otmain_proposal_section('contact', $proposal);
+    otmain_proposal_section('terms', $proposal);
+    otmain_proposal_section('extras', $proposal);
+    otmain_proposal_section('notes', $proposal);
+}
+
+/**
+ * Render a single OT-Main proposal field section into the edit form.
+ *
+ * @param string     $section  document|contact|terms|extras|notes
+ * @param object|null $proposal
+ */
+function otmain_proposal_section($section, $proposal = null)
+{
     $CI = &get_instance();
-    $CI->load->view('otmain/proposal_fields', ['proposal' => $proposal]);
+    $CI->load->view('otmain/proposal_fields', [
+        'proposal' => $proposal,
+        'section'  => $section,
+    ]);
+}
+
+/**
+ * Render a single OT-Main invoice field section into the edit form.
+ *
+ * @param string      $section document|contact|terms|addresses|extras|notes
+ * @param object|null $invoice
+ */
+function otmain_invoice_section($section, $invoice = null)
+{
+    $CI = &get_instance();
+    $CI->load->view('otmain/invoice_fields', [
+        'invoice' => $invoice,
+        'section' => $section,
+    ]);
 }
 
 function otmain_before_estimate_save($hookData)
@@ -339,7 +377,7 @@ function otmain_before_proposal_save($hookData)
     }
 
     if (empty($data['document_title'])) {
-        $data['document_title'] = 'Draft Quotation';
+        $data['document_title'] = 'Quotation';
     }
 
     $hookData['data'] = $data;

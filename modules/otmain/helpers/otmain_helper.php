@@ -2,6 +2,30 @@
 
 defined('BASEPATH') or exit('No direct script access allowed');
 
+/**
+ * Open a labeled form section used across OT-Main edit forms.
+ *
+ * @param string $title Section heading (already translated)
+ * @param string $id    Optional element id
+ */
+function otmain_form_section_open($title, $id = '')
+{
+    $CI = &get_instance();
+    $CI->load->view('otmain/partials/form_section_open', [
+        'title' => $title,
+        'id'    => $id,
+    ]);
+}
+
+/**
+ * Close a form section opened with otmain_form_section_open().
+ */
+function otmain_form_section_close()
+{
+    $CI = &get_instance();
+    $CI->load->view('otmain/partials/form_section_close');
+}
+
 function otmain_sales_number_format($number, $data)
 {
     $format         = $data['format'];
@@ -1017,7 +1041,7 @@ function otmain_pdf_quotation_header_html($estimate, $estimateNumber)
     return '<table cellpadding="2" cellspacing="0" width="100%">'
         . '<tr>'
         . '<td width="52%" valign="top">'
-        . '<span style="font-weight:bold;font-size:18px;color:#00205B;">Draft Quotation</span>'
+        . '<span style="font-weight:bold;font-size:18px;color:#00205B;">Quotation</span>'
         . '</td>'
         . '<td width="48%" valign="top" align="right">' . $logo . '</td>'
         . '</tr>'
@@ -1421,7 +1445,7 @@ function otmain_pdf_proposal_header_html($proposal, $proposalNumber)
 {
     $logo    = otmain_pdf_logo_url(130);
     $company = otmain_pdf_company_meta_block(true);
-    $title   = !empty($proposal->document_title) ? $proposal->document_title : 'Draft Quotation';
+    $title   = !empty($proposal->document_title) ? $proposal->document_title : 'Quotation';
 
     $quotationTo = otmain_pdf_recipient_address_html(
         $proposal->proposal_to ?? '',

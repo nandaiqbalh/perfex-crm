@@ -293,9 +293,8 @@
                 $(this).closest('tr').remove();
                 otmainRecalcInvoicePacking();
             });
-            $(document).on('click', '#otmain-add-packing-row', function() {
-                if (!$('#otmain-packing-details-panel').is(':visible')) return;
-                var $tbody = $('#otmain-packing-items tbody');
+            $(document).on('click', '#otmain-packing-details-panel #otmain-add-packing-row', function() {
+                var $tbody = $('#otmain-packing-details-panel #otmain-packing-items tbody');
                 var i = $tbody.find('tr.item-row').length;
                 var row = '<tr class="item-row">' +
                     '<td><input type="number" step="any" name="packing_items[' + i + '][qty]" class="form-control otmain-packing-qty" value="1"></td>' +
@@ -383,9 +382,9 @@
         }
     });
 
-    $(document).on('click', '#otmain-add-packing-row', function() {
-        var i = $('#otmain-packing-items tbody tr.item-row').length;
-        $('#otmain-packing-items tbody').append(otmainBuildPackingRow({}, i));
+    $(document).on('click', '#otmain-packing-list-form #otmain-add-packing-row', function() {
+        var i = $('#otmain-packing-list-form #otmain-packing-items tbody tr.item-row').length;
+        $('#otmain-packing-list-form #otmain-packing-items tbody').append(otmainBuildPackingRow({}, i));
         otmainRecalculatePackingTotals();
     });
 

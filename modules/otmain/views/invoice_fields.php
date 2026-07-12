@@ -1,12 +1,21 @@
-<?php defined('BASEPATH') or exit('No direct script access allowed'); ?>
+<?php defined('BASEPATH') or exit('No direct script access allowed');
+/**
+ * Renders one OT-Main invoice field group.
+ * @var string $section document|contact|terms|addresses|extras|notes
+ * @var object|null $invoice
+ */
+$section = $section ?? 'document';
+$invoice = $invoice ?? null;
+?>
+<?php if ($section === 'document') { ?>
 <div class="row">
-    <div class="col-md-6">
+    <div class="col-md-12">
         <?php
         $value = isset($invoice) ? ($invoice->document_title ?? '') : 'Commercial Invoice';
         echo render_input('document_title', _l('otmain_document_title'), $value);
         ?>
     </div>
-    <div class="col-md-6">
+    <div class="col-md-12">
         <div class="form-group select-placeholder">
             <label for="quote_ref" class="control-label"><?php echo _l('otmain_quote_reference'); ?></label>
             <select name="quote_ref" id="quote_ref" class="ajax-search" data-width="100%" data-live-search="true" data-none-selected-text="<?php echo _l('otmain_select_quote'); ?>">
@@ -23,19 +32,22 @@
             </select>
         </div>
     </div>
-    <div class="col-md-6">
+    <div class="col-md-12">
         <?php
         $value = isset($invoice) ? $invoice->invoice_title : '';
         echo render_input('invoice_title', _l('otmain_invoice_title'), $value);
         ?>
     </div>
-    <div class="col-md-4">
+    <div class="col-md-12">
         <?php
         $expiryDays = isset($invoice) && !empty($invoice->expiry_days) ? $invoice->expiry_days : get_option('invoice_due_after');
         echo render_input('expiry_days', _l('otmain_expiry_days'), $expiryDays, 'number', ['min' => 0]);
         ?>
     </div>
-    <div class="col-md-4">
+</div>
+<?php } elseif ($section === 'contact') { ?>
+<div class="row">
+    <div class="col-md-12">
         <div class="form-group">
             <label class="control-label"><?php echo _l('otmain_contact_person_select'); ?></label>
             <select name="otmain_contact_id" id="otmain_contact_id" class="selectpicker" data-width="100%" data-live-search="true" data-none-selected-text="<?php echo _l('dropdown_non_selected_tex'); ?>">
@@ -46,43 +58,34 @@
             </select>
         </div>
     </div>
-    <div class="col-md-4">
+    <div class="col-md-12">
         <?php
         $value = isset($invoice) ? ($invoice->contact_person_name ?? '') : '';
         echo render_input('contact_person_name', _l('otmain_contact_person'), $value);
         ?>
     </div>
-    <div class="col-md-4">
+    <div class="col-md-12">
         <?php
         $value = isset($invoice) ? ($invoice->contact_person_email ?? '') : '';
         echo render_input('contact_person_email', _l('otmain_contact_person_email'), $value, 'email');
         ?>
     </div>
-    <div class="col-md-4">
+    <div class="col-md-12">
         <?php
         $value = isset($invoice) ? ($invoice->contact_person_phone ?? '') : '';
         echo render_input('contact_person_phone', _l('otmain_contact_person_phone'), $value);
         ?>
     </div>
-    <div class="col-md-4">
+</div>
+<?php } elseif ($section === 'terms') { ?>
+<div class="row">
+    <div class="col-md-12">
         <?php
         $value = isset($invoice) ? ($invoice->payment_terms_text ?? '') : '';
         echo render_textarea('payment_terms_text', _l('otmain_payment_terms'), $value, ['rows' => 2]);
         ?>
     </div>
-    <div class="col-md-4">
-        <?php
-        $value = isset($invoice) ? ($invoice->lead_time ?? '') : '';
-        echo render_input('lead_time', _l('otmain_delivery_time'), $value);
-        ?>
-    </div>
-    <div class="col-md-4">
-        <?php
-        $value = isset($invoice) ? ($invoice->availability ?? '') : '';
-        echo render_input('availability', _l('otmain_availability'), $value);
-        ?>
-    </div>
-    <div class="col-md-4">
+    <div class="col-md-12">
         <?php
         $value = isset($invoice) ? ($invoice->delivery_terms ?? 'EXW (Ex Works)') : 'EXW (Ex Works)';
         echo render_input('delivery_terms', _l('otmain_shipment_terms'), $value);
@@ -90,14 +93,23 @@
     </div>
     <div class="col-md-12">
         <?php
-        $value = isset($invoice) ? ($invoice->delivery_address ?? '') : '';
-        echo render_textarea('delivery_address', _l('otmain_delivery_address'), $value, ['rows' => 2]);
+        $value = isset($invoice) ? ($invoice->lead_time ?? '') : '';
+        echo render_input('lead_time', _l('otmain_delivery_time'), $value);
         ?>
     </div>
     <div class="col-md-12">
         <?php
-        $value = isset($invoice) ? ($invoice->notes ?? '') : '';
-        echo render_textarea('notes', _l('otmain_notes'), $value, ['rows' => 2]);
+        $value = isset($invoice) ? ($invoice->availability ?? '') : '';
+        echo render_input('availability', _l('otmain_availability'), $value);
+        ?>
+    </div>
+</div>
+<?php } elseif ($section === 'addresses') { ?>
+<div class="row">
+    <div class="col-md-12">
+        <?php
+        $value = isset($invoice) ? ($invoice->delivery_address ?? '') : '';
+        echo render_textarea('delivery_address', _l('otmain_delivery_address'), $value, ['rows' => 2]);
         ?>
     </div>
     <div class="col-md-12">
@@ -125,19 +137,19 @@
                             $packingItems = isset($invoice) ? json_decode($invoice->packing_items ?? '[]', true) : [];
                             if (!empty($packingItems)) {
                                 foreach ($packingItems as $i => $pItem) {
-                                    $qtyP = (float)($pItem['qty'] ?? 1);
-                                    $qtyPDisplay = (fmod($qtyP, 1.0) === 0.0) ? (string)(int)$qtyP : $qtyP;
+                                    $qtyP = (float) ($pItem['qty'] ?? 1);
+                                    $qtyPDisplay = (fmod($qtyP, 1.0) === 0.0) ? (string) (int) $qtyP : $qtyP;
                                     ?>
                             <tr class="item-row">
                                 <td><input type="number" step="any" name="packing_items[<?php echo $i; ?>][qty]" class="form-control otmain-packing-qty" value="<?php echo $qtyPDisplay; ?>"></td>
                                 <td>
                                     <textarea name="packing_items[<?php echo $i; ?>][dimensions]" class="form-control otmain-packing-dims" rows="2"><?php echo e($pItem['dimensions'] ?? ''); ?></textarea>
                                     <?php if (!empty($pItem['cbm'])): ?>
-                                    <small class="text-muted otmain-cbm-display">CBM: <?php echo app_format_number((float)$pItem['cbm']); ?></small>
+                                    <small class="text-muted otmain-cbm-display">CBM: <?php echo app_format_number((float) $pItem['cbm']); ?></small>
                                     <?php endif; ?>
                                 </td>
-                                <td><input type="number" step="any" name="packing_items[<?php echo $i; ?>][gw]" class="form-control otmain-packing-gw" value="<?php echo (float)($pItem['gw'] ?? 0); ?>"></td>
-                                <td><input type="number" step="any" name="packing_items[<?php echo $i; ?>][nw]" class="form-control otmain-packing-nw" value="<?php echo (float)($pItem['nw'] ?? 0); ?>"></td>
+                                <td><input type="number" step="any" name="packing_items[<?php echo $i; ?>][gw]" class="form-control otmain-packing-gw" value="<?php echo (float) ($pItem['gw'] ?? 0); ?>"></td>
+                                <td><input type="number" step="any" name="packing_items[<?php echo $i; ?>][nw]" class="form-control otmain-packing-nw" value="<?php echo (float) ($pItem['nw'] ?? 0); ?>"></td>
                                 <td><button type="button" class="btn btn-danger btn-sm otmain-remove-packing-row"><i class="fa fa-times"></i></button></td>
                             </tr>
                             <?php
@@ -148,20 +160,20 @@
                     </table>
                 </div>
                 <div class="row">
-                    <div class="col-md-6">
+                    <div class="col-md-12">
                         <strong><?php echo _l('otmain_total_gw'); ?>: </strong><span id="otmain-total-gw"><?php echo isset($invoice) ? app_format_number($invoice->total_gw ?? 0) : '0.00'; ?></span>
                         &nbsp;&nbsp;
                         <strong><?php echo _l('otmain_total_nw'); ?>: </strong><span id="otmain-total-nw"><?php echo isset($invoice) ? app_format_number($invoice->total_nw ?? 0) : '0.00'; ?></span>
                         &nbsp;&nbsp;
                         <strong><?php echo _l('otmain_total_cbm'); ?>: </strong><span id="otmain-total-cbm"><?php echo isset($invoice) ? app_format_number($invoice->total_cbm ?? 0) : '0.00'; ?></span>
                     </div>
-                    <div class="col-md-6 text-right">
-
-                    </div>
                 </div>
             </div>
         </div>
     </div>
+</div>
+<?php } elseif ($section === 'extras') { ?>
+<div class="row">
     <div class="col-md-12">
         <div class="panel panel-default" id="otmain-bank-details-panel">
             <div class="panel-heading">
@@ -173,16 +185,26 @@
             <div class="panel-body" id="otmain-bank-details-preview"></div>
         </div>
     </div>
-    <div class="col-md-6">
+    <div class="col-md-12">
         <?php
         $value = isset($invoice) ? ($invoice->total_usd_display ?? '') : '';
         echo render_input('total_usd_display', _l('otmain_total_usd_display'), $value, 'text', ['placeholder' => 'e.g. $ 9,00']);
         ?>
     </div>
-    <div class="col-md-6">
+    <div class="col-md-12">
         <?php
         $value = isset($invoice) ? ($invoice->total_gold_display ?? '') : '';
         echo render_input('total_gold_display', _l('otmain_total_gold_display'), $value, 'text', ['placeholder' => 'e.g. 999.9 in GR.']);
         ?>
     </div>
 </div>
+<?php } elseif ($section === 'notes') { ?>
+<div class="row">
+    <div class="col-md-12">
+        <?php
+        $value = isset($invoice) ? ($invoice->notes ?? '') : '';
+        echo render_textarea('notes', _l('otmain_notes'), $value, ['rows' => 2]);
+        ?>
+    </div>
+</div>
+<?php } ?>
