@@ -949,7 +949,8 @@ function otmain_render_conversion_fields_html($document = null, array $options =
             ['id', 'name', 'symbol'],
             _l('otmain_conversion_currency'),
             $convCurrency,
-            ['data-show-subtext' => true, 'id' => $idPrefix . '-conversion-currency'],
+            // Do NOT pass "id" here: Perfex render_select uses select_attrs["id"] as the input NAME.
+            ['data-show-subtext' => true],
             [],
             '',
             '',
@@ -967,6 +968,7 @@ function otmain_render_conversion_fields_html($document = null, array $options =
             [
                 'step'        => 'any',
                 'min'         => '0',
+                // id is safe on render_input (does not override name)
                 'id'          => $idPrefix . '-conversion-rate',
                 'placeholder' => $defaultConvRate !== '' ? $defaultConvRate : 'e.g. 1.09',
             ]

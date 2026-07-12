@@ -499,9 +499,9 @@
             rate = parseFloat($('#otmain-conversion-rate-default').val());
         }
         var docCurrencyId = String($('#otmain-packing-list-form select[name="currency"]').val() || '');
-        var targetCurrencyId = String($('#otmain-conversion-currency').val() || '');
+        var targetCurrencyId = String($('#otmain-packing-list-form select[name="conversion_currency"]').val() || '');
         var targetName = '';
-        var $targetOpt = $('#otmain-conversion-currency option:selected');
+        var $targetOpt = $('#otmain-packing-list-form select[name="conversion_currency"] option:selected');
         if ($targetOpt.length) {
             targetName = otmainCurrencyDisplayCode(($targetOpt.text() || '').toString().trim().split(/\s|\(/)[0]);
         }
@@ -769,7 +769,7 @@
             $('body').on('change', '#otmain-packing-list-form .otmain-packing-unit-type', function() {
                 otmainTogglePackingUnitLabel($(this).closest('tr'));
             });
-            $('#otmain-packing-list-form select[name="currency"], #otmain-packing-list-form #otmain-conversion-currency').on('change', otmainRecalculatePackingTotals);
+            $('#otmain-packing-list-form select[name="currency"], #otmain-packing-list-form select[name="conversion_currency"]').on('change', otmainRecalculatePackingTotals);
             $('#otmain-packing-list-form select[name="currency"]').on('change', otmainRecalculatePackingTotals);
 
             otmainRecalculatePackingTotals();

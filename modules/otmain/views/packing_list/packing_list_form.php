@@ -254,7 +254,8 @@ if (!empty($pl) && !empty($pl->quote_ref_ids)) {
                                 ['id', 'name', 'symbol'],
                                 '',
                                 $plConvCurrency,
-                                ['data-show-subtext' => true, 'id' => 'otmain-conversion-currency'],
+                                // Do NOT pass "id": Perfex uses it as the input NAME.
+                                ['data-show-subtext' => true],
                                 [],
                                 '',
                                 '',
