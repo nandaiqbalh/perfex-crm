@@ -117,7 +117,7 @@ if (isset($estimate) && $estimate->show_quantity_as == 2) {
                     </td>
                     <?php if (!empty($is_proposal)) { ?>
                     <td class="otmain-profit-percent-col">
-                        <input type="number" step="any" name="profit_percent" class="form-control"
+                        <input type="number" step="any" class="form-control otmain-profit-percent-preview"
                             placeholder="<?= _l('otmain_profit_percent'); ?>">
                     </td>
                     <?php } ?>

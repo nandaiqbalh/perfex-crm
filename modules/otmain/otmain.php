@@ -449,6 +449,13 @@ function otmain_before_proposal_save($hookData)
 {
     $data = $hookData['data'];
 
+    // Preview-row fields must not be written to tblproposals.
+    foreach (['profit_percent', 'quantity', 'rate', 'unit', 'description', 'long_description', 'taxname', 'isedit', 'taskid', 'expense_id', 'save_and_send'] as $previewField) {
+        if (array_key_exists($previewField, $data)) {
+            unset($data[$previewField]);
+        }
+    }
+
     if (isset($data['expiry_days']) && is_numeric($data['expiry_days']) && !empty($data['date'])) {
         $date = to_sql_date($data['date']);
         if ($date) {

@@ -7090,6 +7090,7 @@ function clear_item_preview_values(default_taxes) {
   previewArea.find('input[name="rate"]').val("");
   previewArea.find('input[name="unit"]').val("");
   previewArea.find('input[name="profit_percent"]').val("");
+  previewArea.find("input.otmain-profit-percent-preview").val("");
   previewArea.find('#main-optional').prop("checked", false);
   previewArea.find('#main-optional').trigger('change')
   previewArea.find('#main-optional-choosen').prop("checked", true);
@@ -7527,7 +7528,10 @@ function get_item_preview_values() {
   response.taxname = $(".main select.tax").selectpicker("val");
   response.rate = $('.main input[name="rate"]').val();
   response.unit = $('.main input[name="unit"]').val();
-  response.profit_percent = $('.main input[name="profit_percent"]').val();
+  response.profit_percent = $('.main input.otmain-profit-percent-preview').val();
+  if (response.profit_percent === undefined) {
+    response.profit_percent = $('.main input[name="profit_percent"]').val();
+  }
   response.is_optional = $('#main-optional').prop('checked') ? 1 : 0;
   response.is_selected = $('#main-optional-choosen').prop('checked') ? 1 : 0;
   return response;
