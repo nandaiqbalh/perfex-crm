@@ -372,6 +372,14 @@
         $row.find('.otmain-packing-line-total').val((qty * rate).toFixed(2));
     }
 
+    function otmainCurrencyDisplayCode(name) {
+        name = (name || '').toString().trim().toUpperCase();
+        if (!name || name === 'EUR' || name === '€' || name === 'EURO') {
+            return 'EURO';
+        }
+        return name.replace(/^€\s*/, '');
+    }
+
     function otmainSelectedCurrencyName($formSelector) {
         var $select = $(formSelector).find('select[name="currency"]');
         if (!$select.length) {
@@ -385,7 +393,7 @@
             // Perfex options usually: name in text, symbol in subtext
             name = raw.split(/\s|\(/)[0];
         }
-        return name.toUpperCase();
+        return otmainCurrencyDisplayCode(name);
     }
 
     function otmainUpdateCurrencyLabels($form, subtotalLabelId, totalLabelId) {
@@ -429,7 +437,7 @@
 
         var currencyName = otmainSelectedCurrencyName('#otmain-packing-list-form');
         var rate = parseFloat($('#otmain-eur-usd-rate').val());
-        var showUsd = (!currencyName || currencyName === 'EUR') && !isNaN(rate) && rate > 0;
+        var showUsd = (!currencyName || currencyName === 'EURO') && !isNaN(rate) && rate > 0;
         var subtotalUsd = showUsd ? subtotal * rate : 0;
 
         var $vatRows = [];
@@ -445,10 +453,10 @@
 
         $('#otmain-packing-subtotal-label').text(currencyName ? ('Subtotal ' + currencyName) : 'Subtotal');
         $('#otmain-packing-total-label').text(currencyName ? ('TOTAL ' + currencyName) : 'TOTAL');
-        $('#otmain-packing-subtotal-eur').text(subtotal.toFixed(2));
-        $('#otmain-packing-subtotal-usd').text(subtotalUsd > 0 ? subtotalUsd.toFixed(2) : '-');
+        $('#otmain-packing-subtotal-eur').text(subtotal.toFixed(2) + (currencyName ? (' ' + currencyName) : ''));
+        $('#otmain-packing-subtotal-usd').text(subtotalUsd > 0 ? (subtotalUsd.toFixed(2) + ' USD') : '-');
         $('#otmain-packing-usd-row').toggle(showUsd || subtotalUsd > 0);
-        $('#otmain-packing-total').html('<strong>' + (subtotal + totalTax).toFixed(2) + '</strong>');
+        $('#otmain-packing-total').html('<strong>' + (subtotal + totalTax).toFixed(2) + (currencyName ? (' ' + currencyName) : '') + '</strong>');
         $('#otmain-packing-total-weight').text(totalWeight > 0 ? totalWeight.toFixed(2) + ' KGS' : '-');
         $('#otmain-packing-total-cbm').text(totalCbm > 0 ? totalCbm.toFixed(3) : '0.00');
     }

@@ -95,7 +95,7 @@ $proposal = $proposal ?? null;
     <div class="col-md-12">
         <?php
         $value = isset($proposal) ? ($proposal->total_usd_display ?? '') : '';
-        echo render_input('total_usd_display', _l('otmain_total_usd_display'), $value, 'text', ['placeholder' => 'e.g. $ 9,00']);
+        echo render_input('total_usd_display', _l('otmain_total_usd_display'), $value, 'text', ['placeholder' => 'e.g. 9,00 USD']);
         ?>
     </div>
     <div class="col-md-12">

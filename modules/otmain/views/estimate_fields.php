@@ -74,7 +74,7 @@
     <div class="col-md-4">
         <?php
         $value = isset($estimate) ? ($estimate->total_usd_display ?? '') : '';
-        echo render_input('total_usd_display', 'TOTAL USD (display)', $value, 'text', ['placeholder' => 'e.g. $ 9,00']);
+        echo render_input('total_usd_display', 'TOTAL USD (display)', $value, 'text', ['placeholder' => 'e.g. 9,00 USD']);
         ?>
     </div>
     <div class="col-md-4">

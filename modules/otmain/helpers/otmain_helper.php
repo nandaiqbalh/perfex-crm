@@ -846,6 +846,62 @@ function otmain_packing_currency_name($packing)
     return $currency ? $currency->name : 'EUR';
 }
 
+/**
+ * Currency code for display (no symbols). EUR → EURO; others uppercase name.
+ *
+ * @param mixed $currency string name/code, currency object, or id
+ * @return string
+ */
+function otmain_currency_display_code($currency)
+{
+    $name = '';
+
+    if (is_object($currency)) {
+        $name = (string) ($currency->name ?? '');
+    } elseif (is_numeric($currency)) {
+        $row = get_currency((int) $currency);
+        $name = $row ? (string) $row->name : '';
+    } else {
+        $name = trim((string) $currency);
+        if ($name !== '') {
+            $row = get_currency($name);
+            if ($row && !empty($row->name)) {
+                $name = (string) $row->name;
+            }
+        }
+    }
+
+    $name = strtoupper(trim($name));
+    if ($name === '' || $name === '€' || $name === 'EURO') {
+        return 'EURO';
+    }
+    if ($name === 'EUR') {
+        return 'EURO';
+    }
+    // Strip leading symbol if name was stored oddly
+    $name = preg_replace('/^€\s*/u', '', $name);
+
+    return $name !== '' ? $name : 'EURO';
+}
+
+/**
+ * Format money as "1,234.00 EURO" / "1,234.00 USD" — never uses € / $ symbols.
+ *
+ * @param mixed $amount
+ * @param mixed $currency string name, object, or id
+ * @return string
+ */
+function otmain_format_money_text($amount, $currency = 'EUR')
+{
+    if (!isset($amount) || $amount === '' || (float) $amount == 0.0) {
+        return '-';
+    }
+
+    $code = otmain_currency_display_code($currency);
+
+    return app_format_number($amount) . ' ' . $code;
+}
+
 function otmain_pdf_po_left_block_html($po)
 {
     $poNumber = $po->formatted_number ?: otmain_format_purchase_order_number($po->id);
@@ -936,8 +992,8 @@ function otmain_pdf_po_items_table_html($po, $currencyName = 'EUR')
 
     foreach ($po->items as $item) {
         $lineTotal  = (float) ($item['qty'] ?? 0) * (float) ($item['unit_price'] ?? 0);
-        $unitPrice  = app_format_money($item['unit_price'], $currencyName);
-        $lineAmount = app_format_money($lineTotal, $currencyName);
+        $unitPrice  = otmain_format_money_text($item['unit_price'], $currencyName);
+        $lineAmount = otmain_format_money_text($lineTotal, $currencyName);
         $taxLabel   = otmain_pdf_format_tax_rate($item['taxrate'] ?? 0);
 
         $html .= '<tr>'
@@ -957,7 +1013,7 @@ function otmain_pdf_po_items_table_html($po, $currencyName = 'EUR')
 function otmain_pdf_po_totals_column_html($po, $currencyName = 'EUR')
 {
     $summary = otmain_pdf_po_calculate_vat_summary($po->items);
-    $currencyName = strtoupper(trim((string) $currencyName)) ?: 'EUR';
+    $currencyName = otmain_currency_display_code($currencyName);
 
     $html = '<table cellpadding="3" cellspacing="0" width="100%" style="font-size:10px;color:#424242;">';
     $html .= '<tr><td align="right" width="70%"><strong>Subtotal ' . e($currencyName) . '</strong></td><td align="right" width="30%">' . otmain_pdf_format_total_amount($summary['subtotal'], $currencyName) . '</td></tr>';
@@ -1412,8 +1468,8 @@ function otmain_pdf_items_table_html($items, $relType, $relId, $currencyName = '
         }
 
         $lineTotal  = (float) $item['qty'] * (float) $item['rate'];
-        $unitPrice  = $currencyName !== '' ? app_format_money($item['rate'], $currencyName) : app_format_number($item['rate']);
-        $lineAmount = $currencyName !== '' ? app_format_money($lineTotal, $currencyName) : app_format_number($lineTotal);
+        $unitPrice  = $currencyName !== '' ? otmain_format_money_text($item['rate'], $currencyName) : app_format_number($item['rate']);
+        $lineAmount = $currencyName !== '' ? otmain_format_money_text($lineTotal, $currencyName) : app_format_number($lineTotal);
 
         $html .= '<tr>'
             . '<td align="center">' . app_format_number($item['qty']) . '</td>'
@@ -1431,11 +1487,7 @@ function otmain_pdf_items_table_html($items, $relType, $relId, $currencyName = '
 
 function otmain_pdf_format_total_amount($amount, $currencyName)
 {
-    if (!isset($amount) || $amount === '' || (float) $amount == 0.0) {
-        return '-';
-    }
-
-    return app_format_money($amount, $currencyName);
+    return otmain_format_money_text($amount, $currencyName);
 }
 
 function otmain_pdf_invoice_two_table_html($items, $packingItems, $currencyName)
@@ -1475,8 +1527,8 @@ function otmain_pdf_invoice_two_table_html($items, $packingItems, $currencyName)
             $desc .= '<br /><span style="font-size:9px;">' . process_text_content_for_display($item['long_description']) . '</span>';
         }
 
-        $unitPrice = app_format_money($rate, $currencyName);
-        $lineAmt   = app_format_money($lineTotal, $currencyName);
+        $unitPrice = otmain_format_money_text($rate, $currencyName);
+        $lineAmt   = otmain_format_money_text($lineTotal, $currencyName);
 
         // Tax label
         $taxLabel = '-';
@@ -1575,7 +1627,7 @@ function otmain_pdf_invoice_two_table_html($items, $packingItems, $currencyName)
     $rate = (float) str_replace(',', '.', (string) get_option('otmain_eur_to_usd_rate'));
     $usdDisplay = '';
     if ($rate > 0) {
-        $usdDisplay = '$ ' . app_format_number($subtotalEur * $rate);
+        $usdDisplay = otmain_format_money_text($subtotalEur * $rate, 'USD');
     }
 
     // Total Weight + subtotal row
@@ -1584,7 +1636,7 @@ function otmain_pdf_invoice_two_table_html($items, $packingItems, $currencyName)
         . '<td style="' . $cellStyle . 'font-weight:bold;">Total Weight</td>'
         . '<td style="' . $cellStyle . 'text-align:right;font-weight:bold;">' . app_format_number($totalGw) . '</td>'
         . '<td style="' . $cellStyle . 'text-align:right;font-weight:bold;">' . app_format_number($totalNw) . '</td>'
-        . '<td style="' . $rightSty . 'font-weight:bold;background-color:#f5f5f5;">Subtotal<br />' . app_format_money($subtotalEur, $currencyName) . '</td>'
+        . '<td style="' . $rightSty . 'font-weight:bold;background-color:#f5f5f5;">Subtotal<br />' . otmain_format_money_text($subtotalEur, $currencyName) . '</td>'
         . '</tr>';
 
     // CBM row + USD
@@ -1659,7 +1711,7 @@ function otmain_pdf_totals_column_html($document, $items, $currencyName)
     if ($usdDisplay === '') {
         $rate = (float) str_replace(',', '.', (string) get_option('otmain_eur_to_usd_rate'));
         if ($rate > 0) {
-            $usdDisplay = '$ ' . app_format_number(((float) $document->total) * $rate);
+            $usdDisplay = otmain_format_money_text(((float) $document->total) * $rate, 'USD');
         }
     }
     if ($goldDisplay === '') {
@@ -1675,7 +1727,7 @@ function otmain_pdf_totals_column_html($document, $items, $currencyName)
     foreach ($byRate as $rate => $amount) {
         $html .= '<tr><td align="right" width="70%"><strong>VAT ' . e((string) $rate) . '%</strong></td><td align="right" width="30%">' . otmain_pdf_format_total_amount($amount, $currencyName) . '</td></tr>';
     }
-    $currencyLabel = strtoupper(trim((string) $currencyName)) ?: 'EUR';
+    $currencyLabel = otmain_currency_display_code($currencyName);
     $html .= '<tr><td align="right" width="70%"><strong>TOTAL ' . e($currencyLabel) . '</strong></td><td align="right" width="30%"><strong>' . otmain_pdf_format_total_amount($document->total, $currencyName) . '</strong></td></tr>';
     $html .= '<tr><td align="right" width="70%"><strong>TOTAL USD</strong></td><td align="right" width="30%">' . ($usdDisplay !== '' ? e($usdDisplay) : '-') . '</td></tr>';
     $html .= '<tr><td align="right" width="70%"><strong>TOTAL GOLD</strong></td><td align="right" width="30%">' . ($goldDisplay !== '' ? e($goldDisplay) : '-') . '</td></tr>';
@@ -2083,15 +2135,17 @@ function otmain_pdf_packing_list_html($packing)
 
     $vatSummary = otmain_pdf_po_calculate_vat_summary($packing->items);
 
+    $currencyCode = otmain_currency_display_code($currencyName);
+
     $html .= '<br /><br /><table cellpadding="3" cellspacing="0" width="100%" style="font-size:10px;color:#424242;">'
-        . '<tr><td align="right" width="70%"><strong>Subtotal in ' . e(strtoupper($currencyName)) . '</strong></td><td align="right" width="30%">' . otmain_pdf_format_total_amount($packing->subtotal, $currencyName) . '</td></tr>';
-    if (strtoupper($currencyName) === 'EUR' || $subtotalUsd > 0) {
-        $html .= '<tr><td align="right" width="70%"><strong>Subtotal in USD</strong></td><td align="right" width="30%">' . ($subtotalUsd > 0 ? '$ ' . app_format_number($subtotalUsd) : '-') . '</td></tr>';
+        . '<tr><td align="right" width="70%"><strong>Subtotal in ' . e($currencyCode) . '</strong></td><td align="right" width="30%">' . otmain_pdf_format_total_amount($packing->subtotal, $currencyName) . '</td></tr>';
+    if ($currencyCode === 'EURO' || $subtotalUsd > 0) {
+        $html .= '<tr><td align="right" width="70%"><strong>Subtotal in USD</strong></td><td align="right" width="30%">' . ($subtotalUsd > 0 ? otmain_format_money_text($subtotalUsd, 'USD') : '-') . '</td></tr>';
     }
     foreach ($vatSummary['by_rate'] as $rate => $amount) {
         $html .= '<tr><td align="right" width="70%"><strong>VAT ' . e((string) $rate) . '%</strong></td><td align="right" width="30%">' . otmain_pdf_format_total_amount($amount, $currencyName) . '</td></tr>';
     }
-    $html .= '<tr><td align="right" width="70%"><strong>TOTAL ' . e(strtoupper($currencyName)) . '</strong></td><td align="right" width="30%"><strong>' . otmain_pdf_format_total_amount($vatSummary['total'], $currencyName) . '</strong></td></tr>';
+    $html .= '<tr><td align="right" width="70%"><strong>TOTAL ' . e($currencyCode) . '</strong></td><td align="right" width="30%"><strong>' . otmain_pdf_format_total_amount($vatSummary['total'], $currencyName) . '</strong></td></tr>';
     $html .= '</table>';
 
     return $html;

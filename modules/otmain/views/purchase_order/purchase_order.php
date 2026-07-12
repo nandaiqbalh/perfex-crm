@@ -104,12 +104,12 @@ $currency = $isEdit ? $this->currencies_model->get($po->currency) : null;
                             <div class="row mtop15">
                                 <div class="col-md-6 col-md-offset-6">
                                     <table class="table text-right">
-                                        <?php $currencyLabel = $currency ? $currency->name : otmain_po_currency_name($po); ?>
-                                        <tr><td><strong><?php echo _l('otmain_subtotal'); ?> <?php echo e($currencyLabel); ?></strong></td><td><?php echo app_format_money($summary['subtotal'], $currency); ?></td></tr>
+                                        <?php $currencyLabel = otmain_currency_display_code($currency ? $currency->name : otmain_po_currency_name($po)); ?>
+                                        <tr><td><strong><?php echo _l('otmain_subtotal'); ?> <?php echo e($currencyLabel); ?></strong></td><td><?php echo otmain_format_money_text($summary['subtotal'], $currency ?: $currencyLabel); ?></td></tr>
                                         <?php foreach (($summary['by_rate'] ?? []) as $rate => $amount) { ?>
-                                        <tr><td><strong>VAT <?php echo e((string) $rate); ?>%</strong></td><td><?php echo app_format_money($amount, $currency); ?></td></tr>
+                                        <tr><td><strong>VAT <?php echo e((string) $rate); ?>%</strong></td><td><?php echo otmain_format_money_text($amount, $currency ?: $currencyLabel); ?></td></tr>
                                         <?php } ?>
-                                        <tr><td><strong><?php echo _l('otmain_total'); ?> <?php echo e($currencyLabel); ?></strong></td><td><strong><?php echo app_format_money($summary['total'], $currency); ?></strong></td></tr>
+                                        <tr><td><strong><?php echo _l('otmain_total'); ?> <?php echo e($currencyLabel); ?></strong></td><td><strong><?php echo otmain_format_money_text($summary['total'], $currency ?: $currencyLabel); ?></strong></td></tr>
                                     </table>
                                 </div>
                             </div>

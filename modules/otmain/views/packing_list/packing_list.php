@@ -120,11 +120,11 @@ $isEdit = !empty($pl);
                                     <table class="table text-right">
                                         <tr><td><strong><?php echo _l('otmain_total_weight'); ?></strong></td><td><?php echo isset($pl->total_weight) ? app_format_number($pl->total_weight) . ' KGS' : '-'; ?></td></tr>
                                         <tr><td><strong><?php echo _l('otmain_total_cbm'); ?></strong></td><td><?php echo isset($pl->total_cbm) ? app_format_number($pl->total_cbm) : '0.00'; ?></td></tr>
-                                        <tr><td><strong><?php echo _l('otmain_subtotal'); ?> <?php echo e($plCurrencyLabel); ?></strong></td><td><?php echo app_format_money($plSummary['subtotal'], $plCurrencyObj); ?></td></tr>
+                                        <tr><td><strong><?php echo _l('otmain_subtotal'); ?> <?php echo e(otmain_currency_display_code($plCurrencyLabel)); ?></strong></td><td><?php echo otmain_format_money_text($plSummary['subtotal'], $plCurrencyObj ?: $plCurrencyLabel); ?></td></tr>
                                         <?php foreach (($plSummary['by_rate'] ?? []) as $rate => $amount) { ?>
-                                        <tr><td><strong>VAT <?php echo e((string) $rate); ?>%</strong></td><td><?php echo app_format_money($amount, $plCurrencyObj); ?></td></tr>
+                                        <tr><td><strong>VAT <?php echo e((string) $rate); ?>%</strong></td><td><?php echo otmain_format_money_text($amount, $plCurrencyObj ?: $plCurrencyLabel); ?></td></tr>
                                         <?php } ?>
-                                        <tr><td><strong><?php echo _l('otmain_total'); ?> <?php echo e($plCurrencyLabel); ?></strong></td><td><strong><?php echo app_format_money($plSummary['total'], $plCurrencyObj); ?></strong></td></tr>
+                                        <tr><td><strong><?php echo _l('otmain_total'); ?> <?php echo e(otmain_currency_display_code($plCurrencyLabel)); ?></strong></td><td><strong><?php echo otmain_format_money_text($plSummary['total'], $plCurrencyObj ?: $plCurrencyLabel); ?></strong></td></tr>
                                     </table>
                                 </div>
                             </div>

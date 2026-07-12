@@ -41,7 +41,7 @@ foreach ($rResult as $aRow) {
 
     $row[] = e(_d($aRow['date']));
     $row[] = e(get_company_name($aRow['supplierid']));
-    $row[] = e(app_format_money($aRow['total'], get_currency($aRow['currency'])));
+    $row[] = e(otmain_format_money_text($aRow['total'], get_currency($aRow['currency'])));
     $row[] = e($aRow['supplier_quote_ref']);
 
     $row['DT_RowClass'] = 'has-row-options';
