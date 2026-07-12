@@ -87,7 +87,7 @@ $lang['otmain_total_gw']                = 'Total G.W';
 $lang['otmain_total_nw']                = 'Total N.W';
 $lang['otmain_total_cbm']               = 'Total CBM';
 $lang['otmain_conversion_rate']         = 'Conversion rate';
-$lang['otmain_conversion_rate_help']    = '1 unit of document currency = this many units of the target currency. Leave empty to use the default from Settings → OT-Main.';
+$lang['otmain_conversion_rate_help']    = '1 unit of document currency = this many units of the target currency.';
 $lang['otmain_conversion_currency']     = 'Convert to';
 $lang['otmain_subtotal_converted']      = 'Subtotal converted';
 $lang['otmain_default_conversion_rate'] = 'Default conversion rate';
