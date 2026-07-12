@@ -3,6 +3,90 @@
 defined('BASEPATH') or exit('No direct script access allowed');
 
 /**
+ * Extract a single numeric tax rate from Perfex taxname payload(s).
+ *
+ * @param mixed $taxname string "VAT|21", array of those, or tax row arrays
+ * @return float
+ */
+function otmain_extract_tax_rate($taxname)
+{
+    if ($taxname === null || $taxname === '') {
+        return 0.0;
+    }
+
+    if (is_array($taxname)) {
+        foreach ($taxname as $tax) {
+            if (is_array($tax)) {
+                if (isset($tax['taxrate'])) {
+                    return (float) $tax['taxrate'];
+                }
+                if (!empty($tax['taxname'])) {
+                    return otmain_extract_tax_rate($tax['taxname']);
+                }
+                continue;
+            }
+
+            return otmain_extract_tax_rate($tax);
+        }
+
+        return 0.0;
+    }
+
+    $parts = explode('|', (string) $taxname);
+    if (count($parts) >= 2 && is_numeric($parts[count($parts) - 1])) {
+        return (float) $parts[count($parts) - 1];
+    }
+
+    return is_numeric($taxname) ? (float) $taxname : 0.0;
+}
+
+/**
+ * Free-form VAT % input that still posts Perfex-compatible taxname "VAT|{rate}".
+ *
+ * @param string $name    input name, e.g. items[1][taxname][]
+ * @param mixed  $taxname current tax value(s)
+ * @return string
+ */
+function otmain_get_taxes_input_template($name, $taxname = '')
+{
+    $rate     = otmain_extract_tax_rate($taxname);
+    $rateAttr = rtrim(rtrim(number_format($rate, 4, '.', ''), '0'), '.');
+    if ($rateAttr === '') {
+        $rateAttr = '0';
+    }
+    $taxValue = 'VAT|' . $rateAttr;
+    $nameAttr = htmlspecialchars((string) $name, ENT_QUOTES, 'UTF-8');
+    $rateHtml = htmlspecialchars($rateAttr, ENT_QUOTES, 'UTF-8');
+    $taxHtml  = htmlspecialchars($taxValue, ENT_QUOTES, 'UTF-8');
+
+    return '<div class="otmain-tax-input-wrap">'
+        . '<div class="input-group">'
+        . '<input type="number" step="any" min="0" class="form-control otmain-tax-rate" value="' . $rateHtml . '" title="VAT %">'
+        . '<span class="input-group-addon">%</span>'
+        . '</div>'
+        . '<select class="tax otmain-tax-select' . ((string) $name === 'taxname' ? ' main-tax' : '') . '" name="' . $nameAttr . '" multiple tabindex="-1" aria-hidden="true">'
+        . '<option value="' . $taxHtml . '" data-taxrate="' . $rateHtml . '" selected>' . $rateHtml . '%</option>'
+        . '</select>'
+        . '</div>';
+}
+
+/**
+ * Main preview-row tax input (invoice / estimate / proposal / credit note).
+ *
+ * @return string
+ */
+function otmain_get_main_tax_input_html()
+{
+    $default_tax = get_option('default_tax');
+    $default_tax = $default_tax ? @unserialize($default_tax) : [];
+    if (!is_array($default_tax)) {
+        $default_tax = [];
+    }
+
+    return otmain_get_taxes_input_template('taxname', $default_tax);
+}
+
+/**
  * Open a labeled form section used across OT-Main edit forms.
  *
  * @param string $title Section heading (already translated)
@@ -501,34 +585,43 @@ function otmain_po_apply_missing_defaults($po)
     return $po;
 }
 
+function otmain_tax_rate_key($rate)
+{
+    $rate = (float) $rate;
+    if (fmod($rate, 1.0) === 0.0) {
+        return (string) (int) $rate;
+    }
+
+    return rtrim(rtrim(number_format($rate, 4, '.', ''), '0'), '.');
+}
+
 function otmain_pdf_po_calculate_vat_summary($items)
 {
     $subtotal = 0;
-    $vat21    = 0;
-    $vat0     = 0;
+    $byRate   = [];
 
     foreach ($items as $item) {
         $line = (float) ($item['qty'] ?? 0) * (float) ($item['unit_price'] ?? 0);
         $rate = (float) ($item['taxrate'] ?? 0);
         $subtotal += $line;
 
-        if ($rate == 0.0) {
-            continue;
+        $key = otmain_tax_rate_key($rate);
+        if (!isset($byRate[$key])) {
+            $byRate[$key] = 0.0;
         }
-
-        $taxAmount = $line * ($rate / 100);
-        if ($rate == 21.0) {
-            $vat21 += $taxAmount;
-        } else {
-            $vat21 += $taxAmount;
-        }
+        $byRate[$key] += $line * ($rate / 100);
     }
+
+    ksort($byRate, SORT_NUMERIC);
+
+    $totalTax = array_sum($byRate);
 
     return [
         'subtotal' => $subtotal,
-        'vat21'    => $vat21,
-        'vat0'     => $vat0,
-        'total'    => $subtotal + $vat21 + $vat0,
+        'by_rate'  => $byRate,
+        'vat21'    => $totalTax,
+        'vat0'     => 0.0,
+        'total'    => $subtotal + $totalTax,
     ];
 }
 
@@ -675,8 +768,9 @@ function otmain_pdf_po_totals_column_html($po, $currencyName = 'EUR')
 
     $html = '<table cellpadding="3" cellspacing="0" width="100%" style="font-size:10px;color:#424242;">';
     $html .= '<tr><td align="right" width="70%"><strong>Subtotal ' . e($currencyName) . '</strong></td><td align="right" width="30%">' . otmain_pdf_format_total_amount($summary['subtotal'], $currencyName) . '</td></tr>';
-    $html .= '<tr><td align="right"><strong>VAT 21%</strong></td><td align="right">' . otmain_pdf_format_total_amount($summary['vat21'], $currencyName) . '</td></tr>';
-    $html .= '<tr><td align="right"><strong>VAT 0%</strong></td><td align="right">' . otmain_pdf_format_total_amount($summary['vat0'], $currencyName) . '</td></tr>';
+    foreach ($summary['by_rate'] as $rate => $amount) {
+        $html .= '<tr><td align="right"><strong>VAT ' . e((string) $rate) . '%</strong></td><td align="right">' . otmain_pdf_format_total_amount($amount, $currencyName) . '</td></tr>';
+    }
     $html .= '<tr><td align="right"><strong>TOTAL ' . e($currencyName) . '</strong></td><td align="right"><strong>' . otmain_pdf_format_total_amount($summary['total'], $currencyName) . '</strong></td></tr>';
     $html .= '</table>';
 
@@ -1333,23 +1427,24 @@ function otmain_pdf_footer_layout_html($termsCol, $document, $items, $currencyNa
 
 function otmain_pdf_calculate_vat_totals($items)
 {
-    $vat21 = 0;
-    $vat0  = 0;
+    $byRate = [];
 
     foreach ($items->taxes() as $tax) {
-        if ((float) $tax['taxrate'] == 0) {
-            $vat0 += $tax['total_tax'];
-        } else {
-            $vat21 += $tax['total_tax'];
+        $rate = otmain_tax_rate_key((float) $tax['taxrate']);
+        if (!isset($byRate[$rate])) {
+            $byRate[$rate] = 0.0;
         }
+        $byRate[$rate] += (float) $tax['total_tax'];
     }
 
-    return [$vat21, $vat0];
+    ksort($byRate, SORT_NUMERIC);
+
+    return $byRate;
 }
 
 function otmain_pdf_totals_column_html($document, $items, $currencyName)
 {
-    [$vat21, $vat0] = otmain_pdf_calculate_vat_totals($items);
+    $byRate = otmain_pdf_calculate_vat_totals($items);
 
     $usdDisplay  = isset($document->total_usd_display) ? trim((string) $document->total_usd_display) : '';
     $goldDisplay = isset($document->total_gold_display) ? trim((string) $document->total_gold_display) : '';
@@ -1371,8 +1466,9 @@ function otmain_pdf_totals_column_html($document, $items, $currencyName)
 
     $html = '<table cellpadding="3" cellspacing="0" width="100%" style="font-size:10px;color:#424242;">';
     $html .= '<tr><td align="right" width="70%"><strong>Subtotal</strong></td><td align="right" width="30%">' . otmain_pdf_format_total_amount($document->subtotal, $currencyName) . '</td></tr>';
-    $html .= '<tr><td align="right" width="70%"><strong>VAT 21%</strong></td><td align="right" width="30%">' . otmain_pdf_format_total_amount($vat21, $currencyName) . '</td></tr>';
-    $html .= '<tr><td align="right" width="70%"><strong>VAT 0%</strong></td><td align="right" width="30%">' . otmain_pdf_format_total_amount($vat0, $currencyName) . '</td></tr>';
+    foreach ($byRate as $rate => $amount) {
+        $html .= '<tr><td align="right" width="70%"><strong>VAT ' . e((string) $rate) . '%</strong></td><td align="right" width="30%">' . otmain_pdf_format_total_amount($amount, $currencyName) . '</td></tr>';
+    }
     $currencyLabel = strtoupper(trim((string) $currencyName)) ?: 'EUR';
     $html .= '<tr><td align="right" width="70%"><strong>TOTAL ' . e($currencyLabel) . '</strong></td><td align="right" width="30%"><strong>' . otmain_pdf_format_total_amount($document->total, $currencyName) . '</strong></td></tr>';
     $html .= '<tr><td align="right" width="70%"><strong>TOTAL USD</strong></td><td align="right" width="30%">' . ($usdDisplay !== '' ? e($usdDisplay) : '-') . '</td></tr>';
@@ -1656,8 +1752,9 @@ function otmain_pdf_packing_list_html($packing)
     $html .= '<table border="1" cellpadding="4" cellspacing="0" width="100%" style="' . $style . 'border-collapse:collapse;">'
         . '<tr style="background-color:#00205B;color:#ffffff;">'
         . '<th width="8%" align="center"><strong>QTY</strong></th>'
-        . '<th width="47%"><strong>Description</strong></th>'
-        . '<th width="20%" align="right"><strong>Unit Price</strong></th>'
+        . '<th width="42%"><strong>Description</strong></th>'
+        . '<th width="15%" align="right"><strong>Unit Price</strong></th>'
+        . '<th width="10%" align="center"><strong>VAT %</strong></th>'
         . '<th width="25%" align="right"><strong>Total</strong></th>'
         . '</tr>';
 
@@ -1666,6 +1763,7 @@ function otmain_pdf_packing_list_html($packing)
             . '<td align="center">' . app_format_number($item['qty']) . '</td>'
             . '<td>' . otmain_pdf_packing_item_description_html($item) . '</td>'
             . '<td align="right">' . app_format_number($item['unit_price']) . '</td>'
+            . '<td align="center">' . e(otmain_pdf_format_tax_rate($item['taxrate'] ?? 0)) . '</td>'
             . '<td align="right">' . app_format_number($item['total']) . '</td>'
             . '</tr>';
     }
@@ -1732,11 +1830,17 @@ function otmain_pdf_packing_list_html($packing)
         $totalNw += (float) ($item['net_weight'] ?? 0);
     }
 
+    $vatSummary = otmain_pdf_po_calculate_vat_summary($packing->items);
+
     $html .= '<br /><br /><table cellpadding="3" cellspacing="0" width="100%" style="font-size:10px;color:#424242;">'
         . '<tr><td align="right" width="70%"><strong>Subtotal in ' . e(strtoupper($currencyName)) . '</strong></td><td align="right" width="30%">' . otmain_pdf_format_total_amount($packing->subtotal, $currencyName) . '</td></tr>';
     if (strtoupper($currencyName) === 'EUR' || $subtotalUsd > 0) {
         $html .= '<tr><td align="right" width="70%"><strong>Subtotal in USD</strong></td><td align="right" width="30%">' . ($subtotalUsd > 0 ? '$ ' . app_format_number($subtotalUsd) : '-') . '</td></tr>';
     }
+    foreach ($vatSummary['by_rate'] as $rate => $amount) {
+        $html .= '<tr><td align="right" width="70%"><strong>VAT ' . e((string) $rate) . '%</strong></td><td align="right" width="30%">' . otmain_pdf_format_total_amount($amount, $currencyName) . '</td></tr>';
+    }
+    $html .= '<tr><td align="right" width="70%"><strong>TOTAL ' . e(strtoupper($currencyName)) . '</strong></td><td align="right" width="30%"><strong>' . otmain_pdf_format_total_amount($vatSummary['total'], $currencyName) . '</strong></td></tr>';
     $html .= '</table>';
 
     return $html;

@@ -141,6 +141,7 @@ class Packing_list_model extends App_Model
     {
         $order       = 1;
         $subtotal    = 0;
+        $totalTax    = 0;
         $totalWeight = 0;
 
         foreach ($items as $item) {
@@ -148,10 +149,12 @@ class Packing_list_model extends App_Model
                 continue;
             }
 
-            $qty   = (float) ($item['qty'] ?? 1);
-            $rate  = (float) ($item['unit_price'] ?? 0);
-            $total = $qty * $rate;
+            $qty     = (float) ($item['qty'] ?? 1);
+            $rate    = (float) ($item['unit_price'] ?? 0);
+            $taxrate = (float) ($item['taxrate'] ?? 0);
+            $total   = $qty * $rate;
             $subtotal += $total;
+            $totalTax += $total * ($taxrate / 100);
             $totalWeight += (float) ($item['gross_weight'] ?? 0);
 
             $this->db->insert(db_prefix() . 'otmain_packing_list_items', [
@@ -160,6 +163,7 @@ class Packing_list_model extends App_Model
                 'hs_code'         => $item['hs_code'] ?? '',
                 'qty'             => $qty,
                 'unit_price'      => $rate,
+                'taxrate'         => $taxrate,
                 'total'           => $total,
                 'packing_detail'  => $item['packing_detail'] ?? '',
                 'gross_weight'    => $item['gross_weight'] !== '' ? $item['gross_weight'] : null,
@@ -184,11 +188,20 @@ class Packing_list_model extends App_Model
             $subtotalUsd = $subtotal * $rate;
         }
 
+        $update = [
+            'subtotal'     => $subtotal,
+            'subtotal_usd' => $subtotalUsd,
+            'total_weight' => $totalWeight,
+        ];
+
+        if ($this->db->field_exists('total_tax', db_prefix() . 'otmain_packing_lists')) {
+            $update['total_tax'] = $totalTax;
+        }
+        if ($this->db->field_exists('total', db_prefix() . 'otmain_packing_lists')) {
+            $update['total'] = $subtotal + $totalTax;
+        }
+
         $this->db->where('id', $id);
-        $this->db->update(db_prefix() . 'otmain_packing_lists', [
-            'subtotal'      => $subtotal,
-            'subtotal_usd'  => $subtotalUsd,
-            'total_weight'  => $totalWeight,
-        ]);
+        $this->db->update(db_prefix() . 'otmain_packing_lists', $update);
     }
 }

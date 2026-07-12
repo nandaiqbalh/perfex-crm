@@ -69,6 +69,7 @@ $isEdit = !empty($pl);
                                             <th><?php echo _l('otmain_hs_code'); ?></th>
                                             <th class="text-right"><?php echo _l('invoice_table_quantity_heading'); ?></th>
                                             <th class="text-right"><?php echo _l('invoice_table_rate_heading'); ?></th>
+                                            <th class="text-right">VAT %</th>
                                             <th><?php echo _l('otmain_packing_detail'); ?></th>
                                             <th class="text-right"><?php echo _l('otmain_gross_weight'); ?></th>
                                             <th class="text-right"><?php echo _l('otmain_net_weight'); ?></th>
@@ -83,6 +84,7 @@ $isEdit = !empty($pl);
                                             <td><?php echo e($item['hs_code']); ?></td>
                                             <td class="text-right"><?php echo e($item['qty']); ?></td>
                                             <td class="text-right"><?php echo app_format_number($item['unit_price']); ?></td>
+                                            <td class="text-right"><?php echo e($item['taxrate'] ?? 0); ?></td>
                                             <td><?php echo e($item['packing_detail']); ?></td>
                                             <td class="text-right"><?php echo e($item['gross_weight']); ?></td>
                                             <td class="text-right"><?php echo e($item['net_weight']); ?></td>
@@ -92,6 +94,24 @@ $isEdit = !empty($pl);
                                         <?php } ?>
                                     </tbody>
                                 </table>
+                            </div>
+                            <?php
+                            $plSummary = otmain_pdf_po_calculate_vat_summary($pl->items);
+                            $CI = &get_instance();
+                            $CI->load->model('currencies_model');
+                            $plCurrencyObj = !empty($pl->currency) ? $CI->currencies_model->get($pl->currency) : null;
+                            $plCurrencyLabel = $plCurrencyObj ? $plCurrencyObj->name : otmain_packing_currency_name($pl);
+                            ?>
+                            <div class="row mtop15">
+                                <div class="col-md-6 col-md-offset-6">
+                                    <table class="table text-right">
+                                        <tr><td><strong><?php echo _l('otmain_subtotal'); ?> <?php echo e($plCurrencyLabel); ?></strong></td><td><?php echo app_format_money($plSummary['subtotal'], $plCurrencyObj); ?></td></tr>
+                                        <?php foreach (($plSummary['by_rate'] ?? []) as $rate => $amount) { ?>
+                                        <tr><td><strong>VAT <?php echo e((string) $rate); ?>%</strong></td><td><?php echo app_format_money($amount, $plCurrencyObj); ?></td></tr>
+                                        <?php } ?>
+                                        <tr><td><strong><?php echo _l('otmain_total'); ?> <?php echo e($plCurrencyLabel); ?></strong></td><td><strong><?php echo app_format_money($plSummary['total'], $plCurrencyObj); ?></strong></td></tr>
+                                    </table>
+                                </div>
                             </div>
                         </div>
                     </div>

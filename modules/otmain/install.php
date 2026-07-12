@@ -131,6 +131,7 @@ if (!$CI->db->table_exists(db_prefix() . 'otmain_packing_list_items')) {
         `hs_code` varchar(100) DEFAULT NULL,
         `qty` decimal(15,2) NOT NULL DEFAULT 1.00,
         `unit_price` decimal(15,2) NOT NULL DEFAULT 0.00,
+        `taxrate` decimal(15,2) NOT NULL DEFAULT 0.00,
         `total` decimal(15,2) NOT NULL DEFAULT 0.00,
         `packing_detail` text,
         `gross_weight` decimal(15,2) DEFAULT NULL,
@@ -140,6 +141,27 @@ if (!$CI->db->table_exists(db_prefix() . 'otmain_packing_list_items')) {
         PRIMARY KEY (`id`),
         KEY `packing_list_id` (`packing_list_id`)
     ) ENGINE=InnoDB DEFAULT CHARSET=" . $CI->db->char_set . ';');
+}
+
+$packingItemColumns = [
+    'taxrate' => 'DECIMAL(15,2) NOT NULL DEFAULT 0.00',
+];
+
+foreach ($packingItemColumns as $column => $definition) {
+    if ($CI->db->table_exists(db_prefix() . 'otmain_packing_list_items') && !$CI->db->field_exists($column, db_prefix() . 'otmain_packing_list_items')) {
+        $CI->db->query('ALTER TABLE `' . db_prefix() . 'otmain_packing_list_items` ADD `' . $column . '` ' . $definition);
+    }
+}
+
+$packingHeaderColumns = [
+    'total_tax' => 'DECIMAL(15,2) NOT NULL DEFAULT 0.00',
+    'total'     => 'DECIMAL(15,2) NOT NULL DEFAULT 0.00',
+];
+
+foreach ($packingHeaderColumns as $column => $definition) {
+    if ($CI->db->table_exists(db_prefix() . 'otmain_packing_lists') && !$CI->db->field_exists($column, db_prefix() . 'otmain_packing_lists')) {
+        $CI->db->query('ALTER TABLE `' . db_prefix() . 'otmain_packing_lists` ADD `' . $column . '` ' . $definition);
+    }
 }
 
 if (!$CI->db->table_exists(db_prefix() . 'otmain_purchase_orders')) {

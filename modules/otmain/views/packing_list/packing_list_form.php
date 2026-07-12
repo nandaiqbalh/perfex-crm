@@ -137,6 +137,7 @@ if (!empty($pl) && !empty($pl->quote_ref_ids)) {
                         <th><?php echo _l('invoice_table_item_heading'); ?></th>
                         <th><?php echo _l('otmain_hs_code'); ?></th>
                         <th><?php echo _l('invoice_table_rate_heading'); ?></th>
+                        <th width="10%">VAT %</th>
                         <th><?php echo _l('total'); ?></th>
                         <th><?php echo _l('otmain_dimensions'); ?></th>
                         <th><?php echo _l('otmain_gross_weight'); ?></th>
@@ -151,6 +152,7 @@ if (!empty($pl) && !empty($pl->quote_ref_ids)) {
                         <td><input type="text" name="items[<?php echo $i; ?>][description]" class="form-control" value="<?php echo e($item['description']); ?>"></td>
                         <td><input type="text" name="items[<?php echo $i; ?>][hs_code]" class="form-control" value="<?php echo e($item['hs_code']); ?>"></td>
                         <td><input type="number" step="any" name="items[<?php echo $i; ?>][unit_price]" class="form-control otmain-packing-rate" value="<?php echo e($item['unit_price']); ?>"></td>
+                        <td><input type="number" step="any" min="0" name="items[<?php echo $i; ?>][taxrate]" class="form-control otmain-packing-tax" value="<?php echo e($item['taxrate'] ?? 0); ?>"></td>
                         <td><input type="text" class="form-control otmain-packing-line-total" readonly value="<?php echo e(app_format_number($item['total'])); ?>"></td>
                         <td><input type="text" name="items[<?php echo $i; ?>][packing_detail]" class="form-control" value="<?php echo e($item['packing_detail']); ?>"></td>
                         <td><input type="number" step="any" name="items[<?php echo $i; ?>][gross_weight]" class="form-control otmain-packing-gross-weight" value="<?php echo e($item['gross_weight']); ?>"></td>
@@ -169,18 +171,22 @@ if (!empty($pl) && !empty($pl->quote_ref_ids)) {
         <?php otmain_form_section_open(_l('otmain_section_totals'), 'otmain-pl-totals-section'); ?>
         <div class="row">
             <div class="col-md-6 col-md-offset-6 otmain-col-right">
-                <table class="table text-right">
+                <table class="table text-right" id="otmain-packing-totals-table">
                     <tr>
                         <td><strong><?php echo _l('otmain_total_weight'); ?></strong></td>
                         <td id="otmain-packing-total-weight">0</td>
                     </tr>
-                    <tr>
+                    <tr id="otmain-packing-subtotal-row">
                         <td><strong id="otmain-packing-subtotal-label"><?php echo _l('otmain_subtotal'); ?></strong></td>
                         <td id="otmain-packing-subtotal-eur">0</td>
                     </tr>
                     <tr id="otmain-packing-usd-row">
                         <td><strong><?php echo _l('otmain_subtotal_usd'); ?></strong></td>
                         <td id="otmain-packing-subtotal-usd">0</td>
+                    </tr>
+                    <tr id="otmain-packing-total-row">
+                        <td><strong id="otmain-packing-total-label"><?php echo _l('otmain_total'); ?></strong></td>
+                        <td id="otmain-packing-total"><strong>0</strong></td>
                     </tr>
                 </table>
             </div>

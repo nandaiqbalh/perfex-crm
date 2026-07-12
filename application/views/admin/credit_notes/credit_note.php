@@ -386,20 +386,23 @@ if (isset($credit_note) && $credit_note->show_quantity_as == 2 || isset($hours_q
                                         </td>
                                         <td>
                                             <?php
- $default_tax = unserialize(get_option('default_tax'));
-$select       = '<select class="selectpicker display-block tax main-tax" data-width="100%" name="taxname" multiple data-none-selected-text="' . _l('no_tax') . '">';
-
-foreach ($taxes as $tax) {
-    $selected = '';
-    if (is_array($default_tax)) {
-        if (in_array($tax['name'] . '|' . $tax['taxrate'], $default_tax)) {
-            $selected = ' selected ';
+if (function_exists('otmain_get_main_tax_input_html')) {
+    echo otmain_get_main_tax_input_html();
+} else {
+    $default_tax = unserialize(get_option('default_tax'));
+    $select       = '<select class="selectpicker display-block tax main-tax" data-width="100%" name="taxname" multiple data-none-selected-text="' . _l('no_tax') . '">';
+    foreach ($taxes as $tax) {
+        $selected = '';
+        if (is_array($default_tax)) {
+            if (in_array($tax['name'] . '|' . $tax['taxrate'], $default_tax)) {
+                $selected = ' selected ';
+            }
         }
+        $select .= '<option value="' . $tax['name'] . '|' . $tax['taxrate'] . '"' . $selected . 'data-taxrate="' . $tax['taxrate'] . '" data-taxname="' . $tax['name'] . '" data-subtext="' . $tax['name'] . '">' . $tax['taxrate'] . '%</option>';
     }
-    $select .= '<option value="' . $tax['name'] . '|' . $tax['taxrate'] . '"' . $selected . 'data-taxrate="' . $tax['taxrate'] . '" data-taxname="' . $tax['name'] . '" data-subtext="' . $tax['name'] . '">' . $tax['taxrate'] . '%</option>';
+    $select .= '</select>';
+    echo $select;
 }
-$select .= '</select>';
-echo $select;
 ?>
                                         </td>
                                         <td></td>

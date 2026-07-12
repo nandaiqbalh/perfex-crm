@@ -65,3 +65,26 @@
     border-bottom: 0;
     padding-bottom: 0;
 }
+
+/* Free-form VAT % on sales line items */
+.otmain-tax-input-wrap {
+    position: relative;
+    min-width: 90px;
+}
+
+.otmain-tax-input-wrap .input-group {
+    width: 100%;
+}
+
+.otmain-tax-input-wrap .otmain-tax-rate {
+    min-width: 64px;
+}
+
+.otmain-tax-input-wrap select.otmain-tax-select {
+    position: absolute !important;
+    left: -9999px !important;
+    width: 1px !important;
+    height: 1px !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+}

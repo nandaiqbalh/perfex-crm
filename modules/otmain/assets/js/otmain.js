@@ -1,6 +1,168 @@
 (function($) {
     'use strict';
 
+    function otmainFormatTaxRateValue(rate) {
+        rate = parseFloat(rate);
+        if (isNaN(rate)) {
+            rate = 0;
+        }
+        if (Math.abs(rate % 1) < 1e-9) {
+            return String(parseInt(rate, 10));
+        }
+        return String(parseFloat(rate.toFixed(4)));
+    }
+
+    function otmainSyncTaxWrap($wrap) {
+        if (!$wrap || !$wrap.length) {
+            return null;
+        }
+        var rate = parseFloat($wrap.find('.otmain-tax-rate').val());
+        if (isNaN(rate) || rate < 0) {
+            rate = 0;
+        }
+        var rateLabel = otmainFormatTaxRateValue(rate);
+        var taxname = 'VAT|' + rateLabel;
+        var $sel = $wrap.find('select.otmain-tax-select');
+        $sel.empty().append(
+            $('<option></option>')
+                .attr('value', taxname)
+                .attr('data-taxrate', rateLabel)
+                .prop('selected', true)
+                .text(rateLabel + '%')
+        );
+        $sel.val([taxname]);
+        return taxname;
+    }
+
+    function otmainConvertLegacyTaxSelect($select) {
+        if (!$select.length || $select.hasClass('otmain-tax-select') || $select.closest('.otmain-tax-input-wrap').length) {
+            return;
+        }
+
+        var name = $select.attr('name') || 'taxname';
+        var rate = 0;
+        var current = null;
+
+        try {
+            if ($select.data('selectpicker') || $select.parent().hasClass('bootstrap-select')) {
+                current = $select.selectpicker('val');
+            } else {
+                current = $select.val();
+            }
+        } catch (e) {
+            current = $select.val();
+        }
+
+        if ($.isArray(current) && current.length) {
+            current = current[0];
+        }
+        if (current) {
+            var parts = String(current).split('|');
+            rate = parseFloat(parts.length > 1 ? parts[parts.length - 1] : current) || 0;
+        } else {
+            var $selected = $select.find('option:selected').first();
+            if ($selected.length) {
+                rate = parseFloat($selected.data('taxrate')) || 0;
+            }
+        }
+
+        if ($select.data('selectpicker') || $select.parent().hasClass('bootstrap-select')) {
+            try {
+                $select.selectpicker('destroy');
+            } catch (e2) {
+                // ignore
+            }
+        }
+
+        var rateLabel = otmainFormatTaxRateValue(rate);
+        var isMain = $select.hasClass('main-tax') || name === 'taxname';
+        var $wrap = $(
+            '<div class="otmain-tax-input-wrap">' +
+            '<div class="input-group">' +
+            '<input type="number" step="any" min="0" class="form-control otmain-tax-rate" value="' + rateLabel + '" title="VAT %">' +
+            '<span class="input-group-addon">%</span>' +
+            '</div>' +
+            '<select class="tax otmain-tax-select' + (isMain ? ' main-tax' : '') + '" name="' + name + '" multiple tabindex="-1" aria-hidden="true"></select>' +
+            '</div>'
+        );
+        $select.replaceWith($wrap);
+        otmainSyncTaxWrap($wrap);
+    }
+
+    function otmainInitFreeTaxInputs() {
+        $('select.tax').not('.otmain-tax-select').each(function() {
+            otmainConvertLegacyTaxSelect($(this));
+        });
+
+        $('select.otmain-tax-select').each(function() {
+            var $sel = $(this);
+            if ($sel.parent().hasClass('bootstrap-select')) {
+                try {
+                    $sel.selectpicker('destroy');
+                } catch (e) {
+                    // ignore
+                }
+            }
+            otmainSyncTaxWrap($sel.closest('.otmain-tax-input-wrap'));
+        });
+    }
+
+    // Make core calculate_total / preview helpers work with free-form VAT %.
+    if ($.fn.selectpicker && !$.fn.selectpicker._otmainPatched) {
+        var otmainOrigSelectpicker = $.fn.selectpicker;
+        $.fn.selectpicker = function(option, val) {
+            var $otmainOnly = this.filter('.otmain-tax-select');
+            if ($otmainOnly.length && $otmainOnly.length === this.length) {
+                if (option === 'val') {
+                    if (arguments.length >= 2) {
+                        return this.each(function() {
+                            var $wrap = $(this).closest('.otmain-tax-input-wrap');
+                            var raw = val;
+                            var rate = 0;
+                            if ($.isArray(raw) && raw.length) {
+                                raw = raw[0];
+                            }
+                            if (raw) {
+                                var parts = String(raw).split('|');
+                                rate = parseFloat(parts.length > 1 ? parts[parts.length - 1] : raw) || 0;
+                            }
+                            $wrap.find('.otmain-tax-rate').val(otmainFormatTaxRateValue(rate));
+                            otmainSyncTaxWrap($wrap);
+                        });
+                    }
+                    var $first = this.first();
+                    otmainSyncTaxWrap($first.closest('.otmain-tax-input-wrap'));
+                    var currentVal = $first.val();
+                    if (currentVal == null || currentVal === '') {
+                        return null;
+                    }
+                    return $.isArray(currentVal) ? currentVal : [currentVal];
+                }
+                if (option === 'refresh' || option === 'destroy' || option === 'render') {
+                    return this;
+                }
+                return this;
+            }
+            return otmainOrigSelectpicker.apply(this, arguments);
+        };
+        $.fn.selectpicker._otmainPatched = true;
+    }
+
+    $(function() {
+        otmainInitFreeTaxInputs();
+
+        $('body').on('input change', '.otmain-tax-rate', function() {
+            otmainSyncTaxWrap($(this).closest('.otmain-tax-input-wrap'));
+            if (typeof calculate_total === 'function') {
+                calculate_total();
+            }
+        });
+
+        $(document).on('item-added-to-table item-added-to-preview', function() {
+            setTimeout(otmainInitFreeTaxInputs, 20);
+        });
+    });
+
     function otmainCalculateExpiryDate(dateField, daysField, targetField) {
         var days = parseInt($(daysField).val(), 10);
         var dateVal = $(dateField).val();
@@ -108,11 +270,22 @@
     }
 
     function otmainBuildPackingRow(item, index) {
+        var taxrate = (item.taxrate !== undefined && item.taxrate !== null && item.taxrate !== '')
+            ? item.taxrate
+            : 0;
+        if (item.taxname && !taxrate) {
+            var rawTax = $.isArray(item.taxname) ? item.taxname[0] : item.taxname;
+            if (rawTax) {
+                var parts = String(rawTax).split('|');
+                taxrate = parseFloat(parts.length > 1 ? parts[parts.length - 1] : rawTax) || 0;
+            }
+        }
         return '<tr class="item-row">' +
             '<td><input type="number" step="any" name="items[' + index + '][qty]" class="form-control otmain-packing-qty" value="' + (item.qty || 1) + '"></td>' +
             '<td><input type="text" name="items[' + index + '][description]" class="form-control" value="' + (item.description || '') + '"></td>' +
             '<td><input type="text" name="items[' + index + '][hs_code]" class="form-control" value="' + (item.hs_code || '') + '"></td>' +
             '<td><input type="number" step="any" name="items[' + index + '][unit_price]" class="form-control otmain-packing-rate" value="' + (item.rate || item.unit_price || 0) + '"></td>' +
+            '<td><input type="number" step="any" min="0" name="items[' + index + '][taxrate]" class="form-control otmain-packing-tax" value="' + taxrate + '"></td>' +
             '<td><input type="text" class="form-control otmain-packing-line-total" readonly value="0"></td>' +
             '<td><input type="text" name="items[' + index + '][packing_detail]" class="form-control" value="' + (item.packing_detail || '') + '"></td>' +
             '<td><input type="number" step="any" name="items[' + index + '][gross_weight]" class="form-control otmain-packing-gross-weight" value="' + (item.gross_weight || '') + '"></td>' +
@@ -158,20 +331,50 @@
 
     function otmainRecalculatePackingTotals() {
         var subtotal = 0;
+        var totalTax = 0;
         var totalWeight = 0;
+        var byRate = {};
+
         $('#otmain-packing-list-form #otmain-packing-items tbody tr.item-row').each(function() {
             otmainRecalculatePackingRow($(this));
-            subtotal += parseFloat($(this).find('.otmain-packing-line-total').val()) || 0;
+            var line = parseFloat($(this).find('.otmain-packing-line-total').val()) || 0;
+            var tax = parseFloat($(this).find('.otmain-packing-tax').val());
+            if (isNaN(tax)) {
+                tax = 0;
+            }
+            var taxAmount = line * (tax / 100);
+            subtotal += line;
+            totalTax += taxAmount;
             totalWeight += parseFloat($(this).find('.otmain-packing-gross-weight').val()) || 0;
+            var key = String(tax);
+            if (!byRate[key]) {
+                byRate[key] = 0;
+            }
+            byRate[key] += taxAmount;
         });
+
         var currencyName = otmainSelectedCurrencyName('#otmain-packing-list-form');
         var rate = parseFloat($('#otmain-eur-usd-rate').val());
         var showUsd = (!currencyName || currencyName === 'EUR') && !isNaN(rate) && rate > 0;
         var subtotalUsd = showUsd ? subtotal * rate : 0;
+
+        var $vatRows = [];
+        Object.keys(byRate).sort(function(a, b) {
+            return parseFloat(a) - parseFloat(b);
+        }).forEach(function(key) {
+            $vatRows.push(
+                '<tr class="otmain-packing-vat-row"><td><strong>VAT ' + key + '%</strong></td><td>' + byRate[key].toFixed(2) + '</td></tr>'
+            );
+        });
+        $('#otmain-packing-totals-table tr.otmain-packing-vat-row').remove();
+        $('#otmain-packing-total-row').before($vatRows.join(''));
+
         $('#otmain-packing-subtotal-label').text(currencyName ? ('Subtotal ' + currencyName) : 'Subtotal');
+        $('#otmain-packing-total-label').text(currencyName ? ('TOTAL ' + currencyName) : 'TOTAL');
         $('#otmain-packing-subtotal-eur').text(subtotal.toFixed(2));
         $('#otmain-packing-subtotal-usd').text(subtotalUsd > 0 ? subtotalUsd.toFixed(2) : '-');
         $('#otmain-packing-usd-row').toggle(showUsd || subtotalUsd > 0);
+        $('#otmain-packing-total').html('<strong>' + (subtotal + totalTax).toFixed(2) + '</strong>');
         $('#otmain-packing-total-weight').text(totalWeight > 0 ? totalWeight.toFixed(2) + ' KGS' : '-');
     }
 
@@ -427,7 +630,7 @@
                 });
             });
 
-            $('body').on('input change', '.otmain-packing-qty, .otmain-packing-rate, .otmain-packing-gross-weight', otmainRecalculatePackingTotals);
+            $('body').on('input change', '.otmain-packing-qty, .otmain-packing-rate, .otmain-packing-tax, .otmain-packing-gross-weight', otmainRecalculatePackingTotals);
             $('#otmain-packing-list-form select[name="currency"]').on('change', otmainRecalculatePackingTotals);
 
             otmainRecalculatePackingTotals();
@@ -491,26 +694,41 @@
 
     function otmainRecalcPoTotals() {
         var subtotal = 0;
-        var vat21 = 0;
-        var vat0 = 0;
+        var byRate = {};
+        var totalTax = 0;
 
         $('#otmain-po-items tbody tr.item-row').each(function() {
             otmainRecalcPoRow($(this));
             var qty = parseFloat($(this).find('.otmain-po-qty').val()) || 0;
             var rate = parseFloat($(this).find('.otmain-po-rate').val()) || 0;
-            var tax = parseFloat($(this).find('.otmain-po-tax').val()) || 0;
+            var tax = parseFloat($(this).find('.otmain-po-tax').val());
+            if (isNaN(tax)) {
+                tax = 0;
+            }
             var line = qty * rate;
             subtotal += line;
-
-            if (tax !== 0) {
-                vat21 += line * (tax / 100);
+            var taxAmount = line * (tax / 100);
+            totalTax += taxAmount;
+            var key = String(tax);
+            if (!byRate[key]) {
+                byRate[key] = 0;
             }
+            byRate[key] += taxAmount;
         });
 
+        var $vatRows = [];
+        Object.keys(byRate).sort(function(a, b) {
+            return parseFloat(a) - parseFloat(b);
+        }).forEach(function(key) {
+            $vatRows.push(
+                '<tr class="otmain-po-vat-row"><td><strong>VAT ' + key + '%</strong></td><td>' + byRate[key].toFixed(2) + '</td></tr>'
+            );
+        });
+        $('#otmain-po-totals-table tr.otmain-po-vat-row').remove();
+        $('#otmain-po-subtotal-row').after($vatRows.join(''));
+
         $('#otmain-po-subtotal').text(subtotal.toFixed(2));
-        $('#otmain-po-vat21').text(vat21.toFixed(2));
-        $('#otmain-po-vat0').text(vat0.toFixed(2));
-        $('#otmain-po-total').html('<strong>' + (subtotal + vat21 + vat0).toFixed(2) + '</strong>');
+        $('#otmain-po-total').html('<strong>' + (subtotal + totalTax).toFixed(2) + '</strong>');
         otmainUpdateCurrencyLabels($('#otmain-purchase-order-form'), '#otmain-po-subtotal-label', '#otmain-po-total-label');
     }
 

@@ -19,6 +19,7 @@ register_language_files(OTMAIN_MODULE_NAME, [OTMAIN_MODULE_NAME]);
 
 hooks()->add_action('admin_init', 'otmain_permissions');
 hooks()->add_action('admin_init', 'otmain_init_menu');
+hooks()->add_action('admin_init', 'otmain_ensure_schema');
 hooks()->add_action('app_admin_head', 'otmain_admin_head_css');
 hooks()->add_action('app_admin_footer', 'otmain_admin_footer_assets');
 hooks()->add_action('otmain_invoice_form_fields', 'otmain_render_invoice_fields');
@@ -44,6 +45,32 @@ hooks()->add_filter('invoice_currency_attributes', 'otmain_enable_currency_selec
 hooks()->add_filter('estimate_currency_attributes', 'otmain_enable_currency_select');
 hooks()->add_filter('proposal_currency_attributes', 'otmain_enable_currency_select');
 hooks()->add_filter('credit_note_currency_attributes', 'otmain_enable_currency_select');
+
+// Free-form VAT % on sales line items (invoice / estimate / proposal / credit note)
+// and OT-Main custom docs (packing list / purchase order via their own forms).
+hooks()->add_filter('taxes_dropdown_template', 'otmain_taxes_dropdown_template', 10, 7);
+
+/**
+ * Replace tax dropdown with a numeric VAT % input for document line items.
+ *
+ * @param mixed  $custom
+ * @param string $name
+ * @param mixed  $taxname
+ * @param string $type
+ * @param mixed  $item_id
+ * @param bool   $is_edit
+ * @param bool   $manual
+ * @return mixed
+ */
+function otmain_taxes_dropdown_template($custom, $name, $taxname, $type = '', $item_id = '', $is_edit = false, $manual = false)
+{
+    // Keep Setup → Finance → default tax as a normal multi-select.
+    if (strpos((string) $name, '[taxname]') === false && (string) $name !== 'taxname') {
+        return $custom;
+    }
+
+    return otmain_get_taxes_input_template($name, $taxname);
+}
 
 /**
  * Remove the core "disabled" lock so staff can pick any configured currency.
@@ -124,6 +151,20 @@ function otmain_module_activation_hook()
     require_once __DIR__ . '/install.php';
 }
 
+/**
+ * Apply additive schema upgrades without requiring module re-activation.
+ */
+function otmain_ensure_schema()
+{
+    static $done = false;
+    if ($done) {
+        return;
+    }
+    $done = true;
+
+    require_once __DIR__ . '/install.php';
+}
+
 function otmain_permissions()
 {
     $capabilities = [
@@ -182,8 +223,8 @@ function otmain_admin_footer_assets()
         || strpos($uri, 'otmain/packing_list') !== false
         || strpos($uri, 'otmain/purchase_order') !== false
     ) {
-        echo '<link rel="stylesheet" href="' . module_dir_url(OTMAIN_MODULE_NAME, 'assets/css/otmain-forms.css') . '?v=1.0.1" />';
-        echo '<script src="' . module_dir_url(OTMAIN_MODULE_NAME, 'assets/js/otmain.js') . '?v=1.0.9"></script>';
+        echo '<link rel="stylesheet" href="' . module_dir_url(OTMAIN_MODULE_NAME, 'assets/css/otmain-forms.css') . '?v=1.0.2" />';
+        echo '<script src="' . module_dir_url(OTMAIN_MODULE_NAME, 'assets/js/otmain.js') . '?v=1.1.1"></script>';
     }
 }
 

@@ -106,8 +106,9 @@ $currency = $isEdit ? $this->currencies_model->get($po->currency) : null;
                                     <table class="table text-right">
                                         <?php $currencyLabel = $currency ? $currency->name : otmain_po_currency_name($po); ?>
                                         <tr><td><strong><?php echo _l('otmain_subtotal'); ?> <?php echo e($currencyLabel); ?></strong></td><td><?php echo app_format_money($summary['subtotal'], $currency); ?></td></tr>
-                                        <tr><td><strong>VAT 21%</strong></td><td><?php echo app_format_money($summary['vat21'], $currency); ?></td></tr>
-                                        <tr><td><strong>VAT 0%</strong></td><td><?php echo app_format_money($summary['vat0'], $currency); ?></td></tr>
+                                        <?php foreach (($summary['by_rate'] ?? []) as $rate => $amount) { ?>
+                                        <tr><td><strong>VAT <?php echo e((string) $rate); ?>%</strong></td><td><?php echo app_format_money($amount, $currency); ?></td></tr>
+                                        <?php } ?>
                                         <tr><td><strong><?php echo _l('otmain_total'); ?> <?php echo e($currencyLabel); ?></strong></td><td><strong><?php echo app_format_money($summary['total'], $currency); ?></strong></td></tr>
                                     </table>
                                 </div>

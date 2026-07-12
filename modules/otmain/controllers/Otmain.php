@@ -102,12 +102,19 @@ class Otmain extends AdminController
                 $hsCode = trim($matches[1]);
             }
 
+            $taxrate = 0.0;
+            $taxes   = get_proposal_item_taxes($item['id']);
+            if (!empty($taxes[0]['taxrate'])) {
+                $taxrate = (float) $taxes[0]['taxrate'];
+            }
+
             $items[] = [
                 'description'      => $item['description'],
                 'long_description' => $item['long_description'] ?? '',
                 'hs_code'          => $hsCode,
                 'qty'              => $item['qty'],
                 'rate'             => $item['rate'],
+                'taxrate'          => $taxrate,
             ];
         }
 

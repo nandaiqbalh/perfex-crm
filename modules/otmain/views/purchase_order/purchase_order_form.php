@@ -146,11 +146,9 @@ $poNumber = isset($po) ? $po->formatted_number : ($next_po_number ?? otmain_prev
         <?php otmain_form_section_open(_l('otmain_section_totals')); ?>
         <div class="row">
             <div class="col-md-6 col-md-offset-6 otmain-col-right">
-                <table class="table text-right">
-                    <tr><td><strong id="otmain-po-subtotal-label"><?php echo _l('otmain_subtotal'); ?></strong></td><td id="otmain-po-subtotal">0.00</td></tr>
-                    <tr><td><strong>VAT 21%</strong></td><td id="otmain-po-vat21">0.00</td></tr>
-                    <tr><td><strong>VAT 0%</strong></td><td id="otmain-po-vat0">0.00</td></tr>
-                    <tr><td><strong id="otmain-po-total-label"><?php echo _l('otmain_total'); ?></strong></td><td id="otmain-po-total"><strong>0.00</strong></td></tr>
+                <table class="table text-right" id="otmain-po-totals-table">
+                    <tr id="otmain-po-subtotal-row"><td><strong id="otmain-po-subtotal-label"><?php echo _l('otmain_subtotal'); ?></strong></td><td id="otmain-po-subtotal">0.00</td></tr>
+                    <tr id="otmain-po-total-row"><td><strong id="otmain-po-total-label"><?php echo _l('otmain_total'); ?></strong></td><td id="otmain-po-total"><strong>0.00</strong></td></tr>
                 </table>
             </div>
         </div>

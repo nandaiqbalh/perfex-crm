@@ -21,6 +21,11 @@ class Misc_model extends App_Model
 
     public function get_taxes_dropdown_template($name, $taxname, $type = '', $item_id = '', $is_edit = false, $manual = false)
     {
+        $custom = hooks()->apply_filters('taxes_dropdown_template', null, $name, $taxname, $type, $item_id, $is_edit, $manual);
+        if ($custom !== null) {
+            return $custom;
+        }
+
         // if passed manually - like in proposal convert items or project
         if ($manual == true) {
             // + is no longer used and is here for backward compatibilities
