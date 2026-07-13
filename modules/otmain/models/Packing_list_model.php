@@ -164,9 +164,6 @@ class Packing_list_model extends App_Model
             $totalTax += $total * ($taxrate / 100);
             $totalWeight += (float) ($item['gross_weight'] ?? 0);
 
-            $packingQty = isset($item['packing_qty']) && $item['packing_qty'] !== ''
-                ? (float) $item['packing_qty']
-                : $qty;
             $unitType = strtolower(trim((string) ($item['unit_type'] ?? 'box')));
             if (!in_array($unitType, ['box', 'pallet', 'other'], true)) {
                 $unitType = 'box';
@@ -179,13 +176,28 @@ class Packing_list_model extends App_Model
             $cbm = 0.0;
             $packingDetail = trim((string) ($item['packing_detail'] ?? ''));
             $volume = trim((string) ($item['volume'] ?? ''));
+            $hasPackaging = ($length !== null && $width !== null && $height !== null && $length > 0 && $width > 0 && $height > 0)
+                || $packingDetail !== ''
+                || $volume !== ''
+                || (isset($item['gross_weight']) && $item['gross_weight'] !== '' && (float) $item['gross_weight'] > 0)
+                || (isset($item['net_weight']) && $item['net_weight'] !== '' && (float) $item['net_weight'] > 0);
+
+            // packing_qty only for lines that actually have packaging; do not copy commercial qty.
+            // Column is NOT NULL — use 0 for commercial-only lines (Dimensions skips via has_packaging).
+            if (isset($item['packing_qty']) && $item['packing_qty'] !== '') {
+                $packingQty = (float) $item['packing_qty'];
+            } elseif ($hasPackaging) {
+                $packingQty = $qty;
+            } else {
+                $packingQty = 0;
+            }
 
             if ($length !== null && $width !== null && $height !== null && $length > 0 && $width > 0 && $height > 0) {
-                $cbm = otmain_calc_cbm_mm($length, $width, $height, $packingQty);
-                $packingDetail = otmain_format_packing_dimensions_string($packingQty, $unitType, $unitLabel, $length, $width, $height);
+                $cbm = otmain_calc_cbm_mm($length, $width, $height, $packingQty ?: 1);
+                $packingDetail = otmain_format_packing_dimensions_string($packingQty ?: 1, $unitType, $unitLabel, $length, $width, $height);
                 $volume = $cbm > 0 ? number_format($cbm, 3, '.', '') . ' CBM' : '';
             } elseif ($packingDetail !== '') {
-                $cbm = otmain_cbm_from_dimensions_text($packingDetail, $packingQty);
+                $cbm = otmain_cbm_from_dimensions_text($packingDetail, $packingQty ?: 1);
                 if ($cbm > 0 && $volume === '') {
                     $volume = number_format($cbm, 3, '.', '') . ' CBM';
                 }
@@ -201,10 +213,10 @@ class Packing_list_model extends App_Model
                 'unit_price'      => $rate,
                 'taxrate'         => $taxrate,
                 'total'           => $total,
-                'packing_detail'  => $packingDetail,
-                'gross_weight'    => $item['gross_weight'] !== '' ? $item['gross_weight'] : null,
-                'net_weight'      => $item['net_weight'] !== '' ? $item['net_weight'] : null,
-                'volume'          => $volume,
+                'packing_detail'  => $hasPackaging ? $packingDetail : '',
+                'gross_weight'    => isset($item['gross_weight']) && $item['gross_weight'] !== '' ? $item['gross_weight'] : null,
+                'net_weight'      => isset($item['net_weight']) && $item['net_weight'] !== '' ? $item['net_weight'] : null,
+                'volume'          => $hasPackaging ? $volume : '',
                 'item_order'      => $order++,
             ];
 
@@ -213,10 +225,11 @@ class Packing_list_model extends App_Model
                 $row['packing_qty'] = $packingQty;
             }
             if ($this->db->field_exists('unit_type', $table)) {
-                $row['unit_type'] = $unitType;
+                // unit_type is NOT NULL with default 'box'
+                $row['unit_type'] = $hasPackaging ? $unitType : 'box';
             }
             if ($this->db->field_exists('unit_label', $table)) {
-                $row['unit_label'] = $unitType === 'other' ? $unitLabel : null;
+                $row['unit_label'] = ($hasPackaging && $unitType === 'other') ? $unitLabel : '';
             }
             if ($this->db->field_exists('length', $table)) {
                 $row['length'] = $length;

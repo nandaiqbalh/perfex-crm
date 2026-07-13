@@ -25,9 +25,15 @@
 
                         <hr />
                         <p class="text-muted">
-                            Seed <strong>hanya mengganti dokumen yang pernah di-seed</strong> (tracked di <code>otmain_seed_document_ids</code>).
-                            Customers di-upsert; dokumen manual lain tidak disentuh.
-                            Untuk seed ulang: <a href="<?php echo admin_url('otmain/seed?force=1'); ?>">Seed ulang (?force=1)</a>
+                            <code>?force=1</code> — ganti hanya dokumen yang pernah di-seed (tracked di <code>otmain_seed_document_ids</code>). Customers di-upsert; dokumen manual lain aman.
+                        </p>
+                        <p class="text-muted">
+                            <code>?reset=1</code> — hapus <strong>semua</strong> proposal, packing list, purchase order, dan item tracker dulu (customers tetap), reset nomor PL/PO, lalu seed ulang.
+                            URL: <a href="<?php echo admin_url('otmain/seed?reset=1'); ?>"><?php echo admin_url('otmain/seed?reset=1'); ?></a>
+                            (atau <code>?force=1&amp;reset=1</code> — sama saja; <code>reset</code> sudah imply force).
+                        </p>
+                        <p class="text-muted">
+                            Seed ulang tracked saja: <a href="<?php echo admin_url('otmain/seed?force=1'); ?>">?force=1</a>
                         </p>
                     </div>
                 </div>

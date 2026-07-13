@@ -68,6 +68,56 @@ function otmain_calc_cbm_mm($length, $width, $height, $qty = 1)
 }
 
 /**
+ * Whether a packing-list item has physical packing data (dims / volume / weight).
+ * Commercial-only lines should not appear in the Dimensions PDF table.
+ *
+ * @param array|object $item
+ * @return bool
+ */
+function otmain_packing_item_has_packaging($item)
+{
+    $item = (array) $item;
+    $length = isset($item['length']) && $item['length'] !== '' && $item['length'] !== null ? (float) $item['length'] : 0;
+    $width  = isset($item['width']) && $item['width'] !== '' && $item['width'] !== null ? (float) $item['width'] : 0;
+    $height = isset($item['height']) && $item['height'] !== '' && $item['height'] !== null ? (float) $item['height'] : 0;
+    if ($length > 0 && $width > 0 && $height > 0) {
+        return true;
+    }
+    if (trim((string) ($item['packing_detail'] ?? '')) !== '') {
+        return true;
+    }
+    if (trim((string) ($item['volume'] ?? '')) !== '') {
+        return true;
+    }
+    $gw = $item['gross_weight'] ?? null;
+    $nw = $item['net_weight'] ?? null;
+    if ($gw !== null && $gw !== '' && (float) $gw > 0) {
+        return true;
+    }
+    if ($nw !== null && $nw !== '' && (float) $nw > 0) {
+        return true;
+    }
+
+    return false;
+}
+
+/**
+ * Format quantity for PDF/UI: whole numbers without trailing decimals (1 not 1.00).
+ *
+ * @param mixed $qty
+ * @return string
+ */
+function otmain_format_qty($qty)
+{
+    $qty = (float) $qty;
+    if (fmod($qty, 1.0) === 0.0) {
+        return (string) (int) $qty;
+    }
+
+    return app_format_number($qty);
+}
+
+/**
  * Build packing dimensions display string, e.g. "2 Box: L2630 x W860 x H1000mm".
  *
  * @param float  $qty
@@ -80,7 +130,7 @@ function otmain_calc_cbm_mm($length, $width, $height, $qty = 1)
  */
 function otmain_format_packing_dimensions_string($qty, $unitType, $unitLabel, $length, $width, $height)
 {
-    $qtyDisplay = (fmod((float) $qty, 1.0) === 0.0) ? (string) (int) $qty : (string) $qty;
+    $qtyDisplay = otmain_format_qty($qty);
     $unit       = otmain_packing_unit_display($unitType, $unitLabel);
     $length     = (float) $length;
     $width      = (float) $width;
@@ -1273,7 +1323,7 @@ function otmain_pdf_po_items_table_html($po, $currencyName = 'EUR')
         $taxLabel   = otmain_pdf_format_tax_rate($item['taxrate'] ?? 0);
 
         $html .= '<tr>'
-            . '<td align="center">' . app_format_number($item['qty']) . '</td>'
+            . '<td align="center">' . otmain_format_qty($item['qty']) . '</td>'
             . '<td>' . e($item['description']) . '</td>'
             . '<td align="right">' . $unitPrice . '</td>'
             . '<td align="center">' . e($taxLabel) . '</td>'
@@ -1783,7 +1833,7 @@ function otmain_pdf_items_table_html($items, $relType, $relId, $currencyName = '
         $lineAmount = $currencyName !== '' ? otmain_format_money_text($lineTotal, $currencyName) : app_format_number($lineTotal);
 
         $html .= '<tr>'
-            . '<td align="center">' . app_format_number($item['qty']) . '</td>'
+            . '<td align="center">' . otmain_format_qty($item['qty']) . '</td>'
             . '<td>' . $description . '</td>'
             . '<td align="right">' . $unitPrice . '</td>'
             . '<td align="center">' . e($taxLabel) . '</td>'
@@ -1830,7 +1880,7 @@ function otmain_pdf_invoice_two_table_html($items, $packingItems, $currencyName,
         $lineTotals[] = $lineTotal;
 
         // QTY: show integer if round
-        $qtyDisplay = (fmod($qty, 1.0) === 0.0) ? (string) (int) $qty : app_format_number($qty);
+        $qtyDisplay = otmain_format_qty($qty);
 
         // Description with HS Code from long_description
         $desc = e($item['description']);
@@ -1891,9 +1941,15 @@ function otmain_pdf_invoice_two_table_html($items, $packingItems, $currencyName,
 
     if (!empty($packingItems)) {
         foreach ($packingItems as $pItem) {
-            $qtyPack = (float) ($pItem['qty'] ?? 1);
-            $gw      = (float) ($pItem['gw'] ?? 0);
-            $nw      = (float) ($pItem['nw'] ?? 0);
+            if (!otmain_packing_item_has_packaging($pItem)) {
+                continue;
+            }
+
+            $qtyPack = isset($pItem['packing_qty']) && $pItem['packing_qty'] !== '' && $pItem['packing_qty'] !== null
+                ? (float) $pItem['packing_qty']
+                : (float) ($pItem['qty'] ?? 1);
+            $gw      = (float) ($pItem['gw'] ?? $pItem['gross_weight'] ?? 0);
+            $nw      = (float) ($pItem['nw'] ?? $pItem['net_weight'] ?? 0);
             $cbm     = (float) ($pItem['cbm'] ?? 0);
             $unitDisp = otmain_packing_unit_display($pItem['unit_type'] ?? 'box', $pItem['unit_label'] ?? '');
 
@@ -1904,7 +1960,7 @@ function otmain_pdf_invoice_two_table_html($items, $packingItems, $currencyName,
                 $cbm = otmain_calc_cbm_mm($length, $width, $height, $qtyPack);
             }
 
-            $dims = $pItem['dimensions'] ?? '';
+            $dims = $pItem['dimensions'] ?? ($pItem['packing_detail'] ?? '');
             if ($length && $width && $height) {
                 $dims = otmain_format_packing_dimensions_string($qtyPack, $pItem['unit_type'] ?? 'box', $pItem['unit_label'] ?? '', $length, $width, $height);
             }
@@ -1913,12 +1969,12 @@ function otmain_pdf_invoice_two_table_html($items, $packingItems, $currencyName,
             $totalNw  += $nw;
             $totalCbm += $cbm;
 
-            $qtyPackDisplay = (fmod($qtyPack, 1.0) === 0.0) ? (string) (int) $qtyPack : app_format_number($qtyPack);
+            $qtyPackDisplay = otmain_format_qty($qtyPack);
             $qtyPackDisplay .= ' ' . e($unitDisp);
 
             $dimHtml = e($dims);
             if ($cbm > 0) {
-                $dimHtml .= '<br /><span style="font-size:9px;">Volume: ' . app_format_number($cbm) . ' CBM</span>';
+                $dimHtml .= '<br /><span style="font-size:9px;">Volume: ' . number_format($cbm, 2, '.', '') . ' CBM</span>';
             }
 
             $html .= '<tr>'
@@ -2369,7 +2425,7 @@ function otmain_pdf_packing_list_html($packing)
 
     foreach ($packing->items as $item) {
         $html .= '<tr>'
-            . '<td align="center">' . app_format_number($item['qty']) . '</td>'
+            . '<td align="center">' . otmain_format_qty($item['qty']) . '</td>'
             . '<td>' . otmain_pdf_packing_item_description_html($item) . '</td>'
             . '<td align="right">' . app_format_number($item['unit_price']) . '</td>'
             . '<td align="center">' . e(otmain_pdf_format_tax_rate($item['taxrate'] ?? 0)) . '</td>'
@@ -2389,10 +2445,19 @@ function otmain_pdf_packing_list_html($packing)
         . '</tr>';
 
     $totalCbmFooter = 0;
+    $hasPackingRows = false;
     foreach ($packing->items as $item) {
-        $packQty = (float) ($item['packing_qty'] ?? $item['qty'] ?? 1);
+        if (!otmain_packing_item_has_packaging($item)) {
+            continue;
+        }
+        $hasPackingRows = true;
+
+        // Packing QTY = physical units (box/pallet), not commercial line qty.
+        $packQty = isset($item['packing_qty']) && $item['packing_qty'] !== '' && $item['packing_qty'] !== null
+            ? (float) $item['packing_qty']
+            : 1.0;
         $unitDisp = otmain_packing_unit_display($item['unit_type'] ?? 'box', $item['unit_label'] ?? '');
-        $qtyDisplay = (fmod($packQty, 1.0) === 0.0) ? (string) (int) $packQty : app_format_number($packQty);
+        $qtyDisplay = otmain_format_qty($packQty);
         $qtyDisplay .= ' ' . e($unitDisp);
 
         $length = $item['length'] ?? null;
@@ -2421,7 +2486,7 @@ function otmain_pdf_packing_list_html($packing)
 
         $dimHtml = e($dims);
         if ($cbm > 0) {
-            $dimHtml .= '<br /><span style="font-size:9px;">Volume: ' . app_format_number($cbm) . ' CBM</span>';
+            $dimHtml .= '<br /><span style="font-size:9px;">Volume: ' . number_format($cbm, 2, '.', '') . ' CBM</span>';
         }
 
         $html .= '<tr>'
@@ -2433,10 +2498,23 @@ function otmain_pdf_packing_list_html($packing)
             . '</tr>';
     }
 
+    if (!$hasPackingRows) {
+        $html .= '<tr>'
+            . '<td align="center">-</td>'
+            . '<td>-</td>'
+            . '<td align="right">-</td>'
+            . '<td align="right">-</td>'
+            . '<td align="right">&nbsp;</td>'
+            . '</tr>';
+    }
+
     // Add Total Weight row at bottom of packing table
     $totalGwFooter = 0;
     $totalNwFooter = 0;
     foreach ($packing->items as $item) {
+        if (!otmain_packing_item_has_packaging($item)) {
+            continue;
+        }
         $totalGwFooter += (float) ($item['gross_weight'] ?? 0);
         $totalNwFooter += (float) ($item['net_weight'] ?? 0);
     }

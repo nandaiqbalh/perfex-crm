@@ -54,17 +54,27 @@ class Otmain_seed
         $this->seedPath = dirname(__FILE__) . '/seed';
     }
 
-    public function run($force = false)
+    /**
+     * @param bool $force Recreate when marker already applied (tracked docs only, unless $reset)
+     * @param bool $reset Wipe ALL proposals / packing / PO / item tracker first (customers kept)
+     * @return array
+     */
+    public function run($force = false, $reset = false)
     {
-        if (!$force && get_option('otmain_seed_marker') === $this->marker) {
+        if (!$force && !$reset && get_option('otmain_seed_marker') === $this->marker) {
             return [
                 'status'  => 'skipped',
-                'message' => 'Production seed already applied. Add ?force=1 to recreate.',
+                'message' => 'Production seed already applied. Add ?force=1 to recreate tracked docs, or ?reset=1 to wipe all OT-Main docs then seed.',
                 'links'   => $this->links(),
             ];
         }
 
-        $this->cleanup();
+        if ($reset) {
+            $this->resetDocuments();
+        } else {
+            $this->cleanup();
+        }
+
         $this->relatedRegistry    = [];
         $this->clientIdsByCompany = [];
         $this->seededIds          = [
@@ -134,10 +144,15 @@ class Otmain_seed
             'poId'       => (int) $poId,
         ];
 
+        $modeMsg = $reset
+            ? 'Reset all OT-Main documents first (customers kept), then seeded.'
+            : 'Only previous seed docs were replaced; other DB data kept.';
+
         return [
             'status'  => 'success',
             'message' => 'Production seed applied (' . count($this->clientIdsByCompany) . ' customers upserted, '
-                . count($proposalIds) . ' proposals). Only previous seed docs were replaced; other DB data kept.',
+                . count($proposalIds) . ' proposals). ' . $modeMsg,
+            'reset'   => (bool) $reset,
             'ids'     => array_merge($ids, [
                 'tpClientId'  => (int) $tpClientId,
                 'proposalIds' => $proposalIds,
@@ -181,31 +196,34 @@ class Otmain_seed
         }
 
         $clientId = $this->clientIdsByCompany[$company];
-        $row      = $this->customerByCompany($company);
-        $payload  = $this->customerToPayload($row, $eurId, $usdId);
+        $master   = $this->getClientMasterData($clientId);
         $proposal = $def['proposal'] ?? [];
-
-        $useCustomerContact = !empty($proposal['use_customer_contact']);
         unset($proposal['use_customer_contact']);
 
-        $proposal['currency'] = $eurId;
-        $proposal['assigned'] = get_staff_user_id();
-        $proposal['rel_type'] = $proposal['rel_type'] ?? 'customer';
-        $proposal['rel_id']   = $clientId;
-        $proposal['proposal_to'] = $proposal['proposal_to'] ?? $payload['company'];
-        $proposal['country']     = $proposal['country'] ?? $payload['country'];
+        // Company / address block always from tblclients (never overwrite client master from PDF).
+        $proposal['currency']    = $eurId;
+        $proposal['assigned']    = get_staff_user_id();
+        $proposal['rel_type']    = $proposal['rel_type'] ?? 'customer';
+        $proposal['rel_id']      = $clientId;
+        $proposal['proposal_to'] = $master['company'];
+        $proposal['address']     = $master['address'];
+        $proposal['city']        = $master['city'];
+        $proposal['state']       = $proposal['state'] ?? '';
+        $proposal['zip']         = $master['zip'];
+        $proposal['country']     = $master['country'];
+        $proposal['phone']       = $master['phonenumber'];
+        $proposal['email']       = $master['email'];
 
-        if ($useCustomerContact) {
-            $proposal['email']   = $proposal['email'] ?? $payload['email'];
-            $proposal['phone']   = $proposal['phone'] ?? $payload['phonenumber'];
-            $proposal['address'] = $proposal['address'] ?? $payload['address'];
-            $proposal['city']    = $proposal['city'] ?? $payload['city'];
-            $proposal['zip']     = $proposal['zip'] ?? $payload['zip'];
-        }
-
-        if (($proposal['contact_person_phone'] ?? '') === '') {
-            $proposal['contact_person_phone'] = get_option('invoice_company_phonenumber') ?: '+31647239658';
-        }
+        // PDF contact → ensure in tblcontacts (add if new, never replace existing), link otmain_contact_id.
+        $contact = $this->resolveDocumentContact($clientId, [
+            'name'  => $proposal['contact_person_name'] ?? '',
+            'email' => $proposal['contact_person_email'] ?? '',
+            'phone' => $proposal['contact_person_phone'] ?? '',
+        ], $master);
+        $proposal['otmain_contact_id']      = $contact['id'];
+        $proposal['contact_person_name']    = $contact['doc_name'];
+        $proposal['contact_person_email']   = $contact['doc_email'];
+        $proposal['contact_person_phone']   = $contact['doc_phone'];
 
         $proposalId = (int) $this->CI->proposals_model->add($proposal);
         if ($proposalId < 1) {
@@ -315,9 +333,47 @@ class Otmain_seed
         if (empty($packing['quote_ref']) && $quoteRefLines !== []) {
             $packing['quote_ref'] = implode("\n", $quoteRefLines);
         }
+
+        // Consignee / purchaser / contact from tblclients (+ primary contact).
+        $master = $this->getClientMasterData($packing['clientid']);
+        $addrBlock = function_exists('otmain_format_client_address_lines')
+            ? otmain_format_client_address_lines($packing['clientid'])
+            : $this->formatClientAddressBlock($master);
+        if (trim($addrBlock) === '') {
+            $addrBlock = $this->formatClientAddressBlock($master);
+        }
+        $packing['consignee_name']    = $master['company'];
+        $packing['consignee_address'] = $addrBlock;
+        $packing['consignee_phone']   = $master['phonenumber'];
+        $packing['consignee_email']   = $master['email'];
+        $packing['purchaser_name']    = $master['company'];
+        $packing['purchaser_address'] = $addrBlock;
+        $packing['purchaser_phone']   = $master['phonenumber'];
+        $packing['purchaser_email']   = $master['email'];
+
+        $contact = $this->resolveDocumentContact($packing['clientid'], [
+            'name'  => $packing['contact_person_name'] ?? '',
+            'email' => $packing['contact_person_email'] ?? '',
+            'phone' => $packing['contact_person_phone'] ?? '',
+        ], $master);
+        $packing['otmain_contact_id']    = $contact['id'];
+        $packing['contact_person_name']  = $contact['doc_name'];
+        $packing['contact_person_email'] = $contact['doc_email'];
+        $packing['contact_person_phone'] = $contact['doc_phone'];
+
         $packing['items'] = $def['items'] ?? ($packing['items'] ?? []);
 
+        // Explicit PDF USD — model save_items recalculates subtotal_usd from rate; re-apply after add.
+        $explicitUsd = null;
+        if (array_key_exists('subtotal_usd', $packing) && $packing['subtotal_usd'] !== '' && $packing['subtotal_usd'] !== null) {
+            $explicitUsd = (float) $packing['subtotal_usd'];
+        }
+        unset($packing['subtotal_usd']);
+
         $packingId = (int) $this->CI->packing_list_model->add($packing);
+        if ($packingId > 0 && $explicitUsd !== null) {
+            $this->applyPackingSubtotalUsd($packingId, $explicitUsd);
+        }
         if ($packingId > 0 && !empty($def['save_option'])) {
             update_option($def['save_option'], $packingId);
         }
@@ -326,6 +382,32 @@ class Otmain_seed
         }
 
         return $packingId;
+    }
+
+    /**
+     * Force packing Subtotal in USD to the PDF value and keep conversion_rate in sync.
+     *
+     * @param int   $packingId
+     * @param float $subtotalUsd
+     */
+    protected function applyPackingSubtotalUsd($packingId, $subtotalUsd)
+    {
+        $table = db_prefix() . 'otmain_packing_lists';
+        $row   = $this->CI->db->select('subtotal, conversion_rate')->where('id', (int) $packingId)->get($table)->row();
+        if (!$row) {
+            return;
+        }
+
+        $update = ['subtotal_usd' => round((float) $subtotalUsd, 2)];
+        $eur    = (float) ($row->subtotal ?? 0);
+        if ($eur > 0 && $this->CI->db->field_exists('conversion_rate', $table)) {
+            $hasRate = isset($row->conversion_rate) && $row->conversion_rate !== null && $row->conversion_rate !== '';
+            if (!$hasRate) {
+                $update['conversion_rate'] = round(((float) $subtotalUsd) / $eur, 6);
+            }
+        }
+
+        $this->CI->db->where('id', (int) $packingId)->update($table, $update);
     }
 
     /**
@@ -344,6 +426,24 @@ class Otmain_seed
         $po['supplierid'] = $this->clientIdsByCompany[$company];
         $po['currency']   = $po['currency'] ?? $eurId;
         $po['items']      = $def['items'] ?? ($po['items'] ?? []);
+
+        $master = $this->getClientMasterData($po['supplierid']);
+        $contact = $this->resolveDocumentContact($po['supplierid'], [
+            'name'  => $po['contact_person'] ?? '',
+            'email' => $po['email'] ?? '',
+            'phone' => $po['phone'] ?? '',
+        ], $master);
+        $po['otmain_contact_id'] = $contact['id'];
+        $po['contact_person']    = $contact['doc_name'];
+        $po['email']             = $contact['doc_email'];
+        $po['phone']             = $contact['doc_phone'];
+
+        $po['supplier_address'] = function_exists('otmain_format_client_address_lines')
+            ? otmain_format_client_address_lines($po['supplierid'])
+            : $this->formatClientAddressBlock($master);
+        if (trim((string) $po['supplier_address']) === '') {
+            $po['supplier_address'] = $this->formatClientAddressBlock($master);
+        }
 
         $poId = (int) $this->CI->purchase_order_model->add($po);
         if ($poId > 0 && !empty($def['save_option'])) {
@@ -499,7 +599,8 @@ class Otmain_seed
 
         $existing = $this->CI->db->where('company', $company)->get(db_prefix() . 'clients')->row();
         if ($existing) {
-            $update = [
+            // Fill empty fields only — never replace existing client master data.
+            $fill = [
                 'phonenumber'     => $data['phonenumber'] ?? '',
                 'address'         => $data['address'] ?? '',
                 'city'            => $data['city'] ?? '',
@@ -511,9 +612,21 @@ class Otmain_seed
                 'billing_country' => $data['billing_country'] ?? ($data['country'] ?? 0),
             ];
             if (isset($data['default_currency'])) {
-                $update['default_currency'] = $data['default_currency'];
+                $fill['default_currency'] = $data['default_currency'];
             }
-            $this->CI->db->where('userid', $existing->userid)->update(db_prefix() . 'clients', $update);
+
+            $update = [];
+            foreach ($fill as $col => $newVal) {
+                $cur = $existing->{$col} ?? null;
+                $curEmpty = ($cur === null || $cur === '' || $cur === 0 || $cur === '0');
+                $newEmpty = ($newVal === null || $newVal === '' || $newVal === 0 || $newVal === '0');
+                if ($curEmpty && !$newEmpty) {
+                    $update[$col] = $newVal;
+                }
+            }
+            if ($update !== []) {
+                $this->CI->db->where('userid', $existing->userid)->update(db_prefix() . 'clients', $update);
+            }
 
             return (int) $existing->userid;
         }
@@ -521,6 +634,151 @@ class Otmain_seed
         $payload = array_merge($data, ['company' => $company]);
 
         return (int) $this->CI->clients_model->add($payload, true);
+    }
+
+    /**
+     * Resolve PDF contact against tblcontacts for a client.
+     * - Match existing by email (same client) → reuse, do NOT update row
+     * - Else create new non-primary contact
+     * - Document keeps PDF contact fields (doc_*); empty PDF → primary contact
+     *
+     * @param int   $clientId
+     * @param array $pdf {name,email,phone}
+     * @param array $master from getClientMasterData
+     * @return array{id:int,doc_name:string,doc_email:string,doc_phone:string}
+     */
+    protected function resolveDocumentContact($clientId, array $pdf, array $master)
+    {
+        $clientId = (int) $clientId;
+        $name     = trim((string) ($pdf['name'] ?? ''));
+        $email    = strtolower(trim((string) ($pdf['email'] ?? '')));
+        $phone    = trim((string) ($pdf['phone'] ?? ''));
+
+        $pdfEmpty = ($name === '' && $email === '' && $phone === '');
+        if ($pdfEmpty) {
+            $primaryId = $this->getPrimaryContactId($clientId);
+
+            return [
+                'id'        => $primaryId,
+                'doc_name'  => $master['contact_name'],
+                'doc_email' => $master['email'],
+                'doc_phone' => $master['contact_phone'] !== '' ? $master['contact_phone'] : $master['phonenumber'],
+            ];
+        }
+
+        $contactId = $this->ensureClientContact($clientId, $name, $email, $phone);
+
+        return [
+            'id'        => $contactId,
+            'doc_name'  => $name !== '' ? $name : $master['contact_name'],
+            'doc_email' => $email !== '' ? $email : $master['email'],
+            'doc_phone' => $phone !== '' ? $phone : ($master['contact_phone'] !== '' ? $master['contact_phone'] : $master['phonenumber']),
+        ];
+    }
+
+    /**
+     * @param int $clientId
+     * @return int
+     */
+    protected function getPrimaryContactId($clientId)
+    {
+        $row = $this->CI->db
+            ->select('id')
+            ->where('userid', (int) $clientId)
+            ->where('is_primary', 1)
+            ->get(db_prefix() . 'contacts')
+            ->row();
+        if ($row) {
+            return (int) $row->id;
+        }
+        $row = $this->CI->db
+            ->select('id')
+            ->where('userid', (int) $clientId)
+            ->order_by('id', 'ASC')
+            ->limit(1)
+            ->get(db_prefix() . 'contacts')
+            ->row();
+
+        return $row ? (int) $row->id : 0;
+    }
+
+    /**
+     * Find or create contact under client. Never updates existing contact rows.
+     *
+     * @param int    $clientId
+     * @param string $name
+     * @param string $email
+     * @param string $phone
+     * @return int contact id
+     */
+    protected function ensureClientContact($clientId, $name, $email, $phone)
+    {
+        $clientId = (int) $clientId;
+        $email    = strtolower(trim((string) $email));
+        $name     = trim((string) $name);
+        $phone    = trim((string) $phone);
+
+        if ($email !== '') {
+            $existing = $this->CI->db
+                ->where('userid', $clientId)
+                ->where('email', $email)
+                ->get(db_prefix() . 'contacts')
+                ->row();
+            if ($existing) {
+                return (int) $existing->id;
+            }
+        }
+
+        if ($name !== '' && $email === '') {
+            $contacts = $this->CI->db
+                ->where('userid', $clientId)
+                ->get(db_prefix() . 'contacts')
+                ->result_array();
+            $needle = strtolower(preg_replace('/\s+/', ' ', $name));
+            foreach ($contacts as $c) {
+                $full = strtolower(preg_replace('/\s+/', ' ', trim(($c['firstname'] ?? '') . ' ' . ($c['lastname'] ?? ''))));
+                if ($full === $needle) {
+                    return (int) $c['id'];
+                }
+            }
+        }
+
+        $emailForDb = $email;
+        if ($emailForDb === '') {
+            $emailForDb = 'seed.contact.' . $clientId . '.' . substr(md5($name . '|' . $phone), 0, 10) . '@otmain.local';
+        } else {
+            // Globally unique email constraint — if owned by another client, use local alias (PDF email stays on document).
+            $other = $this->CI->clients_model->get_contact_by_email($emailForDb);
+            if ($other && (int) $other->userid !== $clientId) {
+                $emailForDb = 'seed.contact.' . $clientId . '.' . substr(md5($email), 0, 10) . '@otmain.local';
+            }
+        }
+
+        $parts = preg_split('/\s+/', $name !== '' ? $name : 'Contact', 2);
+        $first = $parts[0] !== '' ? $parts[0] : 'Contact';
+        $last  = $parts[1] ?? '';
+
+        $contactId = (int) $this->CI->clients_model->add_contact([
+            'firstname'             => $first,
+            'lastname'              => $last,
+            'email'                 => $emailForDb,
+            'phonenumber'           => $phone,
+            'password'              => '123Password!',
+            'donotsendwelcomeemail' => true,
+            'invoice_emails'        => 0,
+            'estimate_emails'       => 0,
+            'credit_note_emails'    => 0,
+            'contract_emails'       => 0,
+            'task_emails'           => 0,
+            'project_emails'        => 0,
+            'ticket_emails'         => 0,
+        ], $clientId, true);
+
+        if ($contactId < 1) {
+            throw new RuntimeException('Failed to add contact for client ' . $clientId . ': ' . $name);
+        }
+
+        return $contactId;
     }
 
     protected function customerByCompany($company)
@@ -593,6 +851,71 @@ class Otmain_seed
     }
 
     /**
+     * Master customer data from tblclients + primary tblcontacts.
+     *
+     * @param int $clientId
+     * @return array{company:string,address:string,city:string,zip:string,country:int,phonenumber:string,email:string,contact_name:string,contact_phone:string}
+     */
+    protected function getClientMasterData($clientId)
+    {
+        $clientId = (int) $clientId;
+        $client   = $this->CI->db->where('userid', $clientId)->get(db_prefix() . 'clients')->row_array();
+        if (!$client) {
+            throw new RuntimeException('Client not found for seed master data: ' . $clientId);
+        }
+
+        $contact = $this->CI->db
+            ->where('userid', $clientId)
+            ->where('is_primary', 1)
+            ->get(db_prefix() . 'contacts')
+            ->row_array();
+        if (!$contact) {
+            $contact = $this->CI->db
+                ->where('userid', $clientId)
+                ->order_by('id', 'ASC')
+                ->limit(1)
+                ->get(db_prefix() . 'contacts')
+                ->row_array();
+        }
+
+        $contactName = '';
+        if ($contact) {
+            $contactName = trim(($contact['firstname'] ?? '') . ' ' . ($contact['lastname'] ?? ''));
+        }
+
+        return [
+            'company'       => (string) ($client['company'] ?? ''),
+            'address'       => (string) ($client['address'] ?? ''),
+            'city'          => (string) ($client['city'] ?? ''),
+            'zip'           => (string) ($client['zip'] ?? ''),
+            'country'       => (int) ($client['country'] ?? 0),
+            'phonenumber'   => (string) ($client['phonenumber'] ?? ''),
+            'email'         => (string) ($contact['email'] ?? ''),
+            'contact_name'  => $contactName,
+            'contact_phone' => (string) ($contact['phonenumber'] ?? ''),
+        ];
+    }
+
+    /**
+     * @param array $master
+     * @return string
+     */
+    protected function formatClientAddressBlock(array $master)
+    {
+        $lines = array_filter([
+            trim((string) ($master['address'] ?? '')),
+            trim(implode(' ', array_filter([
+                trim((string) ($master['zip'] ?? '')),
+                trim((string) ($master['city'] ?? '')),
+            ]))),
+        ], static function ($line) {
+            return $line !== '';
+        });
+
+        return implode("\n", $lines);
+    }
+
+    /**
      * Wipe only documents previously created by this seed (otmain_seed_document_ids).
      * Customers and non-seed documents are preserved.
      */
@@ -633,6 +956,65 @@ class Otmain_seed
             $this->CI->invoices_model->delete((int) $id, true);
         }
 
+        $this->clearSeedOptions();
+    }
+
+    /**
+     * Full document reset for dirty DB / development:
+     * deletes ALL proposals, packing lists, purchase orders, item tracker rows.
+     * Customers / contacts are NOT touched. Perfex invoices/estimates are NOT wiped.
+     */
+    protected function resetDocuments()
+    {
+        $db = $this->CI->db;
+        $p  = db_prefix();
+
+        if ($db->table_exists($p . 'otmain_item_tracker')) {
+            $db->empty_table($p . 'otmain_item_tracker');
+        }
+
+        if ($db->table_exists($p . 'otmain_packing_list_items')) {
+            $db->empty_table($p . 'otmain_packing_list_items');
+        }
+        if ($db->table_exists($p . 'otmain_packing_lists')) {
+            $db->empty_table($p . 'otmain_packing_lists');
+        }
+
+        if ($db->table_exists($p . 'otmain_purchase_order_items')) {
+            $db->empty_table($p . 'otmain_purchase_order_items');
+        }
+        if ($db->table_exists($p . 'otmain_purchase_orders')) {
+            $db->empty_table($p . 'otmain_purchase_orders');
+        }
+
+        // Proposal items then proposals (Perfex core tables)
+        if ($db->table_exists($p . 'itemable')) {
+            $db->where('rel_type', 'proposal')->delete($p . 'itemable');
+        }
+        if ($db->table_exists($p . 'proposal_comments')) {
+            $db->empty_table($p . 'proposal_comments');
+        }
+        if ($db->table_exists($p . 'proposals')) {
+            $proposalIds = $db->select('id')->get($p . 'proposals')->result_array();
+            foreach ($proposalIds as $row) {
+                $this->CI->proposals_model->delete((int) $row['id']);
+            }
+            // Fallback if model left orphans
+            $db->empty_table($p . 'proposals');
+        }
+
+        $this->clearSeedOptions();
+
+        // Restart OT-Main document numbering for a clean seed run
+        update_option('next_otmain_packing_list_number', '1');
+        update_option('next_otmain_purchase_order_number', '100');
+    }
+
+    /**
+     * Clear seed marker / registry / legacy option keys.
+     */
+    protected function clearSeedOptions()
+    {
         $optionKeys = [
             'otmain_seed_marker',
             'otmain_seed_document_ids',
@@ -641,6 +1023,7 @@ class Otmain_seed
             'otmain_seed_proposal_tp_suction_hose',
             'otmain_seed_invoice_id',
             'otmain_seed_packing_id',
+            'otmain_seed_packing_valves_id',
             'otmain_seed_po_id',
             'otmain_demo_seed_marker',
             'otmain_demo_seed_estimate_id',
@@ -652,6 +1035,16 @@ class Otmain_seed
         ];
         foreach ($optionKeys as $key) {
             delete_option($key);
+        }
+
+        // Dynamic save_option keys from seed files (otmain_seed_*)
+        $rows = $this->CI->db
+            ->select('name')
+            ->like('name', 'otmain_seed_', 'after')
+            ->get(db_prefix() . 'options')
+            ->result_array();
+        foreach ($rows as $row) {
+            delete_option($row['name']);
         }
     }
 

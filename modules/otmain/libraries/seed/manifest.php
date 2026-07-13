@@ -11,9 +11,11 @@ return [
         'proposals/tp_suction_hose.php',
         'proposals/tp_otmsq_104.php',
         'proposals/tp_otmsq_111.php',
+        'proposals/tp_valves.php',
     ],
     'packing_lists' => [
         'packing_lists/tp_vigor_packing.php',
+        'packing_lists/tp_valves_packing.php',
     ],
     'invoices' => [
     ],

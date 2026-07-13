@@ -5,6 +5,9 @@ defined('BASEPATH') or exit('No direct script access allowed');
 /**
  * Production quotation — TP Company Limited
  * Source PDF: 3 - 2026 - OTMSQ - 103 - Suction Hose (21-01-2026)
+ *
+ * Address / company phone / email diisi orchestrator dari tblclients + primary contact.
+ * contact_person_* di bawah = override dari PDF (deal contact); kosongkan agar pakai primary contact.
  */
 return [
     'key'                 => 'tp_suction_hose',
@@ -26,12 +29,6 @@ return [
         'open_till'            => '2026-01-27',
         'status'               => 3,
         'rel_type'             => 'customer',
-        'email'                => 's.ibrahim@otmain.com',
-        'phone'                => '+31618228651',
-        'address'              => 'Bumbwini',
-        'city'                 => 'Zanzibar',
-        'state'                => '',
-        'zip'                  => 'P.O BOX 271',
         'client_ref'           => '',
         'quote_title'          => 'Suction Hose',
         'document_title'       => 'Quotation',
@@ -39,6 +36,7 @@ return [
         'expiry_days'          => 6,
         'availability'         => '',
         'notes'                => '',
+        // PDF deal contact (optional override; leave empty to use primary contact)
         'contact_person_name'  => 'S.A.Ibrahim',
         'contact_person_email' => 's.ibrahim@otmain.com',
         'contact_person_phone' => '+31618228651',
@@ -55,7 +53,6 @@ return [
         'discount_total'       => 0,
         'show_quantity_as'     => 1,
         'allow_comments'       => 1,
-        'use_customer_contact' => false,
         'newitems'             => [
             1 => [
                 'description'      => 'Vigor Ship Unloader – Suction Nozzle DN400',

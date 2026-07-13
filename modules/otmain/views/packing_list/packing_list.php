@@ -93,7 +93,7 @@ $isEdit = !empty($pl);
                                         <tr>
                                             <td><?php echo e($item['description']); ?></td>
                                             <td><?php echo e($item['hs_code']); ?></td>
-                                            <td class="text-right"><?php echo e($item['qty']); ?></td>
+                                            <td class="text-right"><?php echo e(otmain_format_qty($item['qty'])); ?></td>
                                             <td class="text-right"><?php echo app_format_number($item['unit_price']); ?></td>
                                             <td class="text-right"><?php echo e($item['taxrate'] ?? 0); ?></td>
                                             <td><?php echo e($unitDisp); ?></td>
