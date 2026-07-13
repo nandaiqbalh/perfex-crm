@@ -15,11 +15,13 @@
 
                         <p>Gunakan link di bawah untuk melihat data demo yang sudah dibuat:</p>
                         <ul class="list-unstyled tw-space-y-2">
-                            <li><a href="<?php echo $result['links']['clients']; ?>">Customers / Clients (4 demo)</a></li>
-                            <li><a href="<?php echo $result['links']['estimate']; ?>">Quotation / Proposal demo</a></li>
+                            <li><a href="<?php echo $result['links']['clients']; ?>">Customers / Clients (47 relations)</a></li>
+                            <li><a href="<?php echo $result['links']['proposal']; ?>">Quotation / Proposal demo</a></li>
                             <li><a href="<?php echo $result['links']['invoice']; ?>">Invoice demo</a></li>
                             <li><a href="<?php echo $result['links']['packing_edit']; ?>">Packing List demo (Commercial Invoice)</a></li>
                             <li><a href="<?php echo $result['links']['purchase_order_edit']; ?>">Purchase Order demo</a></li>
+                            <li><a href="<?php echo $result['links']['item_tracker_detail']; ?>">Item Tracker demo</a></li>
+                            <li><a href="<?php echo $result['links']['item_tracker']; ?>">Item Tracker list</a></li>
                         </ul>
 
                         <hr />

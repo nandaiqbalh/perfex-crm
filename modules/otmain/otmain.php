@@ -26,6 +26,12 @@ hooks()->add_action('otmain_invoice_form_fields', 'otmain_render_invoice_fields'
 hooks()->add_action('otmain_estimate_form_fields', 'otmain_render_estimate_fields');
 hooks()->add_action('otmain_proposal_form_fields', 'otmain_render_proposal_fields');
 
+// Item Tracker hooks
+hooks()->add_action('proposal_accepted', 'otmain_item_tracker_on_accepted');
+hooks()->add_action('after_proposal_staff_status_changed', 'otmain_item_tracker_on_staff_status');
+hooks()->add_action('after_proposal_converted_to_invoice', 'otmain_item_tracker_link_invoice');
+hooks()->add_action('clients_init', 'otmain_item_tracker_client_menu');
+
 hooks()->add_filter('sales_number_format', 'otmain_sales_number_format', 10, 2);
 hooks()->add_filter('format_estimate_number', 'otmain_format_estimate_number', 10, 2);
 hooks()->add_filter('format_invoice_number', 'otmain_format_invoice_number', 10, 2);
@@ -179,6 +185,15 @@ function otmain_permissions()
 
     register_staff_capabilities('otmain_packing_list', $capabilities, _l('otmain_packing_lists'));
     register_staff_capabilities('otmain_purchase_order', $capabilities, _l('otmain_purchase_orders'));
+
+    $trackerCapabilities = [
+        'capabilities' => [
+            'view'   => _l('permission_view') . '(' . _l('permission_global') . ')',
+            'edit'   => _l('permission_edit'),
+            'delete' => _l('permission_delete'),
+        ],
+    ];
+    register_staff_capabilities('otmain_item_tracker', $trackerCapabilities, _l('otmain_item_tracker'));
 }
 
 function otmain_init_menu()
@@ -203,6 +218,15 @@ function otmain_init_menu()
         ]);
     }
 
+    if (staff_can('view', 'otmain_item_tracker')) {
+        $CI->app_menu->add_sidebar_children_item('sales', [
+            'slug'     => 'otmain-item-tracker',
+            'name'     => _l('otmain_item_tracker'),
+            'href'     => admin_url('otmain/item_tracker'),
+            'position' => 28,
+        ]);
+    }
+
     $CI->app->add_settings_section_child('finance', 'otmain', [
         'name'     => _l('otmain_settings'),
         'view'     => 'otmain/settings',
@@ -223,9 +247,23 @@ function otmain_admin_footer_assets()
         || strpos($uri, 'credit_notes/credit_note') !== false
         || strpos($uri, 'otmain/packing_list') !== false
         || strpos($uri, 'otmain/purchase_order') !== false
+        || strpos($uri, 'otmain/item_tracker') !== false
     ) {
         echo '<link rel="stylesheet" href="' . module_dir_url(OTMAIN_MODULE_NAME, 'assets/css/otmain-forms.css') . '?v=1.0.2" />';
         echo '<script src="' . module_dir_url(OTMAIN_MODULE_NAME, 'assets/js/otmain.js') . '?v=1.2.8"></script>';
+    }
+
+    if (strpos($uri, 'otmain/item_tracker') !== false) {
+        echo '<style>
+.item-status-pending,.quote-status-pending{background:#fbbf24;color:#000;}
+.item-status-ordered,.quote-status-in_progress{background:#3b82f6;color:#fff;}
+.item-status-eta{background:#a855f7;color:#fff;}
+.item-status-quality_check{background:#9ca3af;color:#fff;}
+.item-status-received,.quote-status-ready_for_shipment{background:#22c55e;color:#fff;}
+.quote-status-shipped{background:#6b7280;color:#fff;}
+.otmain-status-badge{display:inline-block;padding:3px 10px;border-radius:12px;font-size:12px;font-weight:600;line-height:1.4;}
+.table-otmain-item-trackers .row-options{position:static!important;left:auto!important;}
+</style>';
     }
 
     // Keep customer default currency freely editable (any currency from Settings → Currencies).
@@ -255,7 +293,8 @@ function otmain_admin_head_css()
 .table-proposals .row-options,
 .table-invoices .row-options,
 .table-otmain-packing-lists .row-options,
-.table-otmain-purchase-orders .row-options {
+.table-otmain-purchase-orders .row-options,
+.table-otmain-item-trackers .row-options {
     position: static !important;
     left: auto !important;
 }
@@ -494,4 +533,65 @@ function otmain_before_proposal_update($hookData, $id)
     $hookData['data'] = $result['data'];
 
     return $hookData;
+}
+
+/**
+ * Populate item tracker when customer accepts a proposal.
+ *
+ * @param int $proposal_id
+ */
+function otmain_item_tracker_on_accepted($proposal_id)
+{
+    $CI = &get_instance();
+    $CI->load->model('otmain/item_tracker_model');
+    $CI->item_tracker_model->populate_from_proposal((int) $proposal_id);
+}
+
+/**
+ * Populate item tracker when staff marks proposal as Accepted (status 3).
+ * Note: proposal_accepted only fires on client accept path.
+ *
+ * @param array $data
+ */
+function otmain_item_tracker_on_staff_status($data)
+{
+    if ((int) ($data['new_status'] ?? 0) !== 3) {
+        return;
+    }
+
+    otmain_item_tracker_on_accepted((int) ($data['proposal_id'] ?? 0));
+}
+
+/**
+ * Link invoice_id on tracker rows after proposal → invoice conversion.
+ *
+ * @param array $data
+ */
+function otmain_item_tracker_link_invoice($data)
+{
+    $proposal_id = (int) ($data['proposal_id'] ?? 0);
+    $invoice_id  = (int) ($data['invoice_id'] ?? 0);
+    if ($proposal_id < 1 || $invoice_id < 1) {
+        return;
+    }
+
+    $CI = &get_instance();
+    $CI->load->model('otmain/item_tracker_model');
+    $CI->item_tracker_model->link_invoice($proposal_id, $invoice_id);
+}
+
+/**
+ * Add Item Tracker menu item in client area.
+ */
+function otmain_item_tracker_client_menu()
+{
+    if (!is_client_logged_in()) {
+        return;
+    }
+
+    add_theme_menu_item('item-tracker', [
+        'name'     => _l('otmain_item_tracker'),
+        'href'     => site_url('otmain/item_tracker_client'),
+        'position' => 32,
+    ]);
 }

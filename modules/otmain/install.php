@@ -264,6 +264,39 @@ if (!$CI->db->table_exists(db_prefix() . 'otmain_purchase_order_items')) {
     ) ENGINE=InnoDB DEFAULT CHARSET=" . $CI->db->char_set . ';');
 }
 
+if (!$CI->db->table_exists(db_prefix() . 'otmain_item_tracker')) {
+    $CI->db->query('CREATE TABLE `' . db_prefix() . "otmain_item_tracker` (
+        `id` int(11) NOT NULL AUTO_INCREMENT,
+        `rel_type` varchar(20) NOT NULL DEFAULT 'proposal',
+        `rel_id` int(11) NOT NULL,
+        `invoice_id` int(11) DEFAULT NULL,
+        `item_order` int(11) NOT NULL DEFAULT 0,
+        `description` text DEFAULT NULL,
+        `long_description` text DEFAULT NULL,
+        `qty` decimal(15,2) NOT NULL DEFAULT 1.00,
+        `unit` varchar(50) DEFAULT NULL,
+        `rate` decimal(15,2) DEFAULT NULL,
+        `item_status` varchar(30) NOT NULL DEFAULT 'pending',
+        `eta_date` date DEFAULT NULL,
+        `notes` text DEFAULT NULL,
+        `admin_notes` text DEFAULT NULL,
+        `updated_by` int(11) DEFAULT NULL,
+        `datecreated` datetime NOT NULL,
+        `dateupdated` datetime DEFAULT NULL,
+        `deleted_at` datetime DEFAULT NULL,
+        PRIMARY KEY (`id`),
+        KEY `rel_type_rel_id` (`rel_type`, `rel_id`),
+        KEY `invoice_id` (`invoice_id`),
+        KEY `item_status` (`item_status`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=" . $CI->db->char_set . ';');
+}
+
+if (!$CI->db->field_exists('quotation_status', db_prefix() . 'proposals')) {
+    $CI->db->query('ALTER TABLE `' . db_prefix() . "proposals`
+        ADD COLUMN `quotation_status` varchar(30) NOT NULL DEFAULT 'pending'
+        COMMENT 'pending|in_progress|ready_for_shipment|shipped' AFTER `status`");
+}
+
 $options = [
     'next_otmain_packing_list_number'   => '1',
     'next_otmain_purchase_order_number' => '100',

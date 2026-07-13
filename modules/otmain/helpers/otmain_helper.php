@@ -2435,3 +2435,68 @@ function otmain_pdf_packing_list_html($packing)
 
     return $html;
 }
+
+/**
+ * Format item tracker status as a colored badge.
+ *
+ * @param string $status
+ * @return string
+ */
+function otmain_format_item_status($status)
+{
+    $status = $status ?: 'pending';
+    $label  = _l('otmain_status_' . $status);
+    if ($label === 'otmain_status_' . $status) {
+        $label = ucwords(str_replace('_', ' ', $status));
+    }
+
+    return '<span class="otmain-status-badge item-status-' . e($status) . '">' . e($label) . '</span>';
+}
+
+/**
+ * Format quotation tracker status as a colored badge.
+ *
+ * @param string $status
+ * @return string
+ */
+function otmain_format_quotation_status($status)
+{
+    $status = $status ?: 'pending';
+    $label  = _l('otmain_qstatus_' . $status);
+    if ($label === 'otmain_qstatus_' . $status) {
+        $label = ucwords(str_replace('_', ' ', $status));
+    }
+
+    return '<span class="otmain-status-badge quote-status-' . e($status) . '">' . e($label) . '</span>';
+}
+
+/**
+ * Item status options for dropdowns.
+ *
+ * @return array
+ */
+function otmain_item_tracker_status_options()
+{
+    return [
+        'pending'       => _l('otmain_status_pending'),
+        'ordered'       => _l('otmain_status_ordered'),
+        'eta'           => _l('otmain_status_eta'),
+        'quality_check' => _l('otmain_status_quality_check'),
+        'received'      => _l('otmain_status_received'),
+    ];
+}
+
+/**
+ * Quotation status options for dropdowns.
+ *
+ * @return array
+ */
+function otmain_quotation_status_options()
+{
+    return [
+        'pending'            => _l('otmain_qstatus_pending'),
+        'in_progress'        => _l('otmain_qstatus_in_progress'),
+        'ready_for_shipment' => _l('otmain_qstatus_ready_for_shipment'),
+        'shipped'            => _l('otmain_qstatus_shipped'),
+    ];
+}
