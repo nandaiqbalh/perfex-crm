@@ -2006,8 +2006,10 @@ function otmain_pdf_totals_column_html($document, $items, $currencyName)
 {
     $byRate = otmain_pdf_calculate_vat_totals($items);
 
-    $usdDisplay  = isset($document->total_usd_display) ? trim((string) $document->total_usd_display) : '';
-    $goldDisplay = isset($document->total_gold_display) ? trim((string) $document->total_gold_display) : '';
+    $origUsdDisplay  = isset($document->total_usd_display) ? trim((string) $document->total_usd_display) : '';
+    $origGoldDisplay = isset($document->total_gold_display) ? trim((string) $document->total_gold_display) : '';
+    $usdDisplay      = $origUsdDisplay;
+    $goldDisplay     = $origGoldDisplay;
     if ($goldDisplay === '0' || $goldDisplay === '0.00' || strtolower($goldDisplay) === '0') {
         $goldDisplay = '';
     }
@@ -2049,15 +2051,19 @@ function otmain_pdf_totals_column_html($document, $items, $currencyName)
     $currencyLabel = otmain_currency_display_code($currencyName);
     $html .= '<tr><td align="right" width="70%"><strong>TOTAL ' . e($currencyLabel) . '</strong></td><td ' . $cellAmt . '><strong>' . otmain_pdf_format_total_amount($document->total, $currencyName) . '</strong></td></tr>';
 
-    if ($canConvert || $usdDisplay !== '') {
+    // USD conversion row — only shown when total_usd_display was EXPLICITLY set on the document
+    if ($origUsdDisplay !== '') {
         $convertedLabel = 'TOTAL CONVERTED';
         if ($target) {
             $convertedLabel = 'TOTAL ' . otmain_currency_display_code($target);
         }
-        $html .= '<tr><td align="right" width="70%"><strong>' . e($convertedLabel) . '</strong></td><td ' . $cellAmt . '>' . ($usdDisplay !== '' ? e($usdDisplay) : '-') . '</td></tr>';
+        $html .= '<tr><td align="right" width="70%"><strong>' . e($convertedLabel) . '</strong></td><td ' . $cellAmt . '>' . e($usdDisplay) . '</td></tr>';
     }
 
-    $html .= '<tr><td align="right" width="70%"><strong>TOTAL GOLD</strong></td><td ' . $cellAmt . '>' . ($goldDisplay !== '' ? e($goldDisplay) : '-') . '</td></tr>';
+    // Gold row — only shown when total_gold_display was EXPLICITLY set on the document
+    if ($origGoldDisplay !== '') {
+        $html .= '<tr><td align="right" width="70%"><strong>TOTAL GOLD</strong></td><td ' . $cellAmt . '>' . e($goldDisplay) . '</td></tr>';
+    }
     $html .= '</table>';
 
     return $html;
