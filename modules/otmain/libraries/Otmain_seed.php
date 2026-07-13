@@ -188,7 +188,7 @@ class Otmain_seed
             'rel_type'             => 'customer',
             'rel_id'               => $packingClientId,
             'proposal_to'          => $packingPayload['company'],
-            'email'                => $packingPayload['email'],
+            'email'                => 's.ibrahim@otmain.com',
             'phone'                => '+31618228651',
             'address'              => 'Bumbwini',
             'city'                 => 'Zanzibar',
@@ -198,6 +198,7 @@ class Otmain_seed
             'client_ref'           => '',
             'quote_title'          => 'Suction Nozzle',
             'document_title'       => 'Quotation',
+            'terms'                => 'OT-Main cannot be held responsible for hydraulic failures or structural wear in cases where the recommended analyses and engineering have not been carried out.',
             'expiry_days'          => 30,
             'availability'         => '',
             'notes'                => '',
@@ -218,7 +219,9 @@ class Otmain_seed
             'newitems'             => [
                 1 => [
                     'description'      => 'Rotating Suction Nozzle (Raw Supply) DN400',
-                    'long_description' => 'Including all required materials limited to suction nozzle only.
+                    'long_description' => 'Vigor Ship Unloader — Suction Nozzle DN400
+
+Including all required materials limited to suction nozzle only.
 The components will be delivered as separate parts and assembled by Vigor.
 The existing design will be scaled up to DN400 only; no design changes are included.
 The overall design concept and configuration will remain unchanged.',
