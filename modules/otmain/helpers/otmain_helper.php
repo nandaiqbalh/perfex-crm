@@ -2055,9 +2055,12 @@ function otmain_pdf_totals_column_html($document, $items, $currencyName)
         }
         $html .= '<tr><td align="right" width="70%"><strong>' . e($discountLabel) . '</strong></td><td ' . $cellAmt . '>-' . otmain_pdf_format_total_amount($document->discount_total, $currencyName) . '</td></tr>';
     }
-    foreach ($byRate as $vatRate => $amount) {
-        $html .= '<tr><td align="right" width="70%"><strong>VAT ' . e((string) $vatRate) . '%</strong></td><td ' . $cellAmt . '>' . otmain_pdf_format_total_amount($amount, $currencyName) . '</td></tr>';
-    }
+    // Always show VAT rows — even when amount is 0 (displayed as € -).
+    // Standard rates: 21%, then 0%.
+    $vat21 = isset($byRate[21]) ? $byRate[21] : 0.0;
+    $vat0  = isset($byRate[0]) ? $byRate[0] : 0.0;
+    $html .= '<tr><td align="right" width="70%"><strong>VAT 21%</strong></td><td ' . $cellAmt . '>' . otmain_pdf_format_total_amount($vat21, $currencyName) . '</td></tr>';
+    $html .= '<tr><td align="right" width="70%"><strong>VAT 0%</strong></td><td ' . $cellAmt . '>' . otmain_pdf_format_total_amount($vat0, $currencyName) . '</td></tr>';
     $currencyLabel = otmain_currency_display_code($currencyName);
     $html .= '<tr><td align="right" width="70%"><strong>TOTAL ' . e($currencyLabel) . '</strong></td><td ' . $cellAmt . '><strong>' . otmain_pdf_format_total_amount($document->total, $currencyName) . '</strong></td></tr>';
 
