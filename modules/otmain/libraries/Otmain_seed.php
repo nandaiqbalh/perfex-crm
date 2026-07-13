@@ -175,6 +175,82 @@ class Otmain_seed
             }
         }
 
+        //
+        // TP Company Limited — Suction Nozzle DN400 Quotation
+        //
+        $tpProposalId = $this->CI->proposals_model->add([
+            'subject'              => 'Suction Nozzle DN400 - Proposal',
+            'date'                 => '2026-01-07',
+            'open_till'            => '2026-02-06',
+            'currency'             => $eurId,
+            'status'               => 3,
+            'assigned'             => get_staff_user_id(),
+            'rel_type'             => 'customer',
+            'rel_id'               => $packingClientId,
+            'proposal_to'          => $packingPayload['company'],
+            'email'                => $packingPayload['email'],
+            'phone'                => '+31618228651',
+            'address'              => 'Bumbwini',
+            'city'                 => 'Zanzibar',
+            'state'                => '',
+            'zip'                  => 'P.O BOX 271',
+            'country'              => $packingPayload['country'],
+            'client_ref'           => '',
+            'quote_title'          => 'Suction Nozzle',
+            'document_title'       => 'Quotation',
+            'expiry_days'          => 30,
+            'availability'         => '',
+            'notes'                => '',
+            'contact_person_name'  => 'S.A.Ibrahim',
+            'contact_person_email' => 's.ibrahim@otmain.com',
+            'contact_person_phone' => '+31618228651',
+            'payment_terms_text'   => '50% in advance<br />50% before delivery',
+            'shipment_terms'       => 'EXW - Rotterdam sea transport can be arranged',
+            'delivery_time'        => '4 weeks',
+            'total_usd_display'    => '',
+            'total_gold_display'   => '',
+            'subtotal'             => 21750,
+            'total_tax'            => 0,
+            'total'                => 21750,
+            'discount_type'        => '',
+            'discount_percent'     => 0,
+            'discount_total'       => 0,
+            'newitems'             => [
+                1 => [
+                    'description'      => 'Rotating Suction Nozzle (Raw Supply) DN400',
+                    'long_description' => 'Including all required materials limited to suction nozzle only.
+The components will be delivered as separate parts and assembled by Vigor.
+The existing design will be scaled up to DN400 only; no design changes are included.
+The overall design concept and configuration will remain unchanged.',
+                    'qty'              => 1,
+                    'rate'             => 21750,
+                    'unit'             => 'unit',
+                    'taxname'          => [],
+                    'order'            => 1,
+                ],
+            ],
+            'show_quantity_as'     => 1,
+            'allow_comments'       => 1,
+        ]);
+
+        if ($tpProposalId) {
+            $this->CI->db->where('id', $tpProposalId);
+            $this->CI->db->update(db_prefix() . 'proposals', [
+                'status' => 3,
+            ]);
+
+            $this->CI->item_tracker_model->populate_from_proposal((int) $tpProposalId);
+
+            $tpTrackerItems = $this->CI->item_tracker_model->get((int) $tpProposalId);
+            if (!empty($tpTrackerItems[0])) {
+                $this->CI->item_tracker_model->update_item((int) $tpTrackerItems[0]['id'], [
+                    'item_status' => 'pending',
+                    'notes'       => '',
+                    'admin_notes' => 'Demo seed — TP Company quotation.',
+                ]);
+            }
+        }
+
         $invoiceId = $this->CI->invoices_model->add([
             'clientid'                 => $invoiceClientId,
             'project_id'               => 0,
@@ -328,6 +404,7 @@ class Otmain_seed
         update_option('otmain_demo_seed_invoice_id', (int) $invoiceId);
         update_option('otmain_demo_seed_packing_id', (int) $packingId);
         update_option('otmain_demo_seed_po_id', (int) $poId);
+        update_option('otmain_demo_seed_tp_proposal_id', (int) $tpProposalId);
 
         $ids = [
             'estimateId' => (int) $estimateId,
@@ -392,6 +469,9 @@ class Otmain_seed
             'item_tracker'        => admin_url('otmain/item_tracker'),
             'item_tracker_detail' => $proposalId > 0
                 ? admin_url('otmain/item_tracker/detail/' . $proposalId)
+                : admin_url('otmain/item_tracker'),
+            'item_tracker_tp'     => $proposalId > 0
+                ? admin_url('otmain/item_tracker/detail/' . (int) get_option('otmain_demo_seed_tp_proposal_id'))
                 : admin_url('otmain/item_tracker'),
         ];
     }

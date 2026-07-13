@@ -20,7 +20,8 @@
                             <li><a href="<?php echo $result['links']['invoice']; ?>">Invoice demo</a></li>
                             <li><a href="<?php echo $result['links']['packing_edit']; ?>">Packing List demo (Commercial Invoice)</a></li>
                             <li><a href="<?php echo $result['links']['purchase_order_edit']; ?>">Purchase Order demo</a></li>
-                            <li><a href="<?php echo $result['links']['item_tracker_detail']; ?>">Item Tracker demo</a></li>
+                            <li><a href="<?php echo $result['links']['item_tracker_detail']; ?>">Item Tracker demo (Kovako M120)</a></li>
+                            <li><a href="<?php echo $result['links']['item_tracker_tp']; ?>">Item Tracker — TP Company Limited (Suction Nozzle)</a></li>
                             <li><a href="<?php echo $result['links']['item_tracker']; ?>">Item Tracker list</a></li>
                         </ul>
 
