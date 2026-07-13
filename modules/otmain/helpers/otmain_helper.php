@@ -1121,6 +1121,38 @@ function otmain_currency_display_code($currency)
     return $name !== '' ? $name : 'EURO';
 }
 
+/**
+ * Get the currency symbol (€, $, etc.) for display in PDFs.
+ * Falls back to the display code if no symbol is found.
+ *
+ * @param object|string|int $currency Currency object, name string, or ID
+ * @return string
+ */
+function otmain_currency_display_symbol($currency)
+{
+    $symbol = '';
+
+    if (is_object($currency) && !empty($currency->symbol)) {
+        $symbol = trim((string) $currency->symbol);
+    } elseif (is_numeric($currency)) {
+        $row = get_currency((int) $currency);
+        if ($row && !empty($row->symbol)) {
+            $symbol = trim((string) $row->symbol);
+        }
+    } elseif (is_string($currency) && $currency !== '') {
+        $row = get_currency($currency);
+        if ($row && !empty($row->symbol)) {
+            $symbol = trim((string) $row->symbol);
+        }
+    }
+
+    if ($symbol === '€') {
+        return '€';
+    }
+
+    return $symbol !== '' ? $symbol : otmain_currency_display_code($currency);
+}
+
 function otmain_format_money_text($amount, $currency = 'EUR')
 {
     if (!isset($amount) || $amount === '' || (float) $amount == 0.0) {
@@ -1128,6 +1160,11 @@ function otmain_format_money_text($amount, $currency = 'EUR')
     }
 
     $code = otmain_currency_display_code($currency);
+    $symbol = otmain_currency_display_symbol($currency);
+
+    if ($symbol !== '') {
+        return $symbol . ' ' . app_format_number($amount);
+    }
 
     return app_format_number($amount) . ' ' . $code;
 }
