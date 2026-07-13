@@ -64,7 +64,7 @@
                                 </p>
                                 <p><strong><?php echo _l('date'); ?>:</strong> <?php echo e(_d($proposal->date)); ?></p>
                                 <p><strong><?php echo _l('proposal_total'); ?>:</strong>
-                                    <?php echo e(app_format_money($proposal->total, $proposal->currency_name ?? get_currency($proposal->currency))); ?>
+                                    <?php echo e(app_format_money($proposal->total, $currency)); ?>
                                 </p>
                             </div>
                             <div class="col-md-6">
@@ -157,7 +157,7 @@
                                         </td>
                                         <td class="text-center" style="width: 65px;"><?php echo e(floatval($item['qty'])); ?></td>
                                         <td class="text-center" style="width: 60px;"><?php echo e($item['unit']); ?></td>
-                                        <td class="text-right" style="width: 90px; white-space: nowrap;"><?php echo e(app_format_money($item['rate'], $proposal->currency_name ?? get_currency($proposal->currency))); ?></td>
+                                        <td class="text-right" style="width: 90px; white-space: nowrap;"><?php echo e(app_format_money($item['rate'], $currency)); ?></td>
                                         <td style="min-width: 130px;">
                                             <select name="items[<?php echo $itemId; ?>][item_status]"
                                                     class="selectpicker otmain-item-status"

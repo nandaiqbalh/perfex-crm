@@ -133,6 +133,7 @@ class Item_tracker extends AdminController
         $data['item_statuses']      = otmain_item_tracker_status_options();
         $data['quotation_statuses'] = otmain_quotation_status_options();
         $data['title']              = _l('otmain_item_tracker') . ' / ' . format_proposal_number($proposal_id);
+        $data['currency']           = get_currency($proposal->currency);
 
         $this->load->view('item_tracker/detail', $data);
     }
