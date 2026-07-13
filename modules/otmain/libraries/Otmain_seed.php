@@ -406,6 +406,21 @@ The overall design concept and configuration will remain unchanged.',
         update_option('otmain_demo_seed_po_id', (int) $poId);
         update_option('otmain_demo_seed_tp_proposal_id', (int) $tpProposalId);
 
+        // Set currency conversion defaults for demo
+        if (get_option('otmain_eur_to_usd_rate') === false || get_option('otmain_eur_to_usd_rate') === '') {
+            update_option('otmain_eur_to_usd_rate', '1.09');
+        }
+        if (get_option('otmain_gold_price_eur_per_gram') === false || get_option('otmain_gold_price_eur_per_gram') === '') {
+            update_option('otmain_gold_price_eur_per_gram', '75.50');
+        }
+        $eurCurrency = $this->CI->db->where('name', 'EUR')->get(db_prefix() . 'currencies')->row();
+        if ($eurCurrency && (get_option('otmain_default_conversion_currency') === false || get_option('otmain_default_conversion_currency') === '')) {
+            $usdCurrency = $this->CI->db->where('name', 'USD')->get(db_prefix() . 'currencies')->row();
+            if ($usdCurrency) {
+                update_option('otmain_default_conversion_currency', (string) $usdCurrency->id);
+            }
+        }
+
         $ids = [
             'estimateId' => (int) $estimateId,
             'proposalId' => (int) $proposalId,
