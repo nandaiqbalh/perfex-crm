@@ -250,7 +250,7 @@ function otmain_admin_footer_assets()
         || strpos($uri, 'otmain/item_tracker') !== false
     ) {
         echo '<link rel="stylesheet" href="' . module_dir_url(OTMAIN_MODULE_NAME, 'assets/css/otmain-forms.css') . '?v=1.0.2" />';
-        echo '<script src="' . module_dir_url(OTMAIN_MODULE_NAME, 'assets/js/otmain.js') . '?v=1.2.8"></script>';
+        echo '<script src="' . module_dir_url(OTMAIN_MODULE_NAME, 'assets/js/otmain.js') . '?v=1.3.0"></script>';
     }
 
     if (strpos($uri, 'otmain/item_tracker') !== false) {
@@ -359,6 +359,13 @@ function otmain_invoice_section($section, $invoice = null)
 function otmain_before_estimate_save($hookData)
 {
     $data = $hookData['data'];
+
+    // Preview-row fields must not be written to tblestimates.
+    foreach (['profit_percent', 'purchase_amount', 'quantity', 'rate', 'unit', 'description', 'long_description', 'taxname', 'isedit', 'taskid', 'expense_id', 'save_and_send'] as $previewField) {
+        if (array_key_exists($previewField, $data)) {
+            unset($data[$previewField]);
+        }
+    }
 
     if (isset($data['expiry_days']) && is_numeric($data['expiry_days']) && !empty($data['date'])) {
         $date = to_sql_date($data['date']);
@@ -488,7 +495,7 @@ function otmain_before_proposal_save($hookData)
     $data = $hookData['data'];
 
     // Preview-row fields must not be written to tblproposals.
-    foreach (['profit_percent', 'quantity', 'rate', 'unit', 'description', 'long_description', 'taxname', 'isedit', 'taskid', 'expense_id', 'save_and_send'] as $previewField) {
+    foreach (['profit_percent', 'purchase_amount', 'quantity', 'rate', 'unit', 'description', 'long_description', 'taxname', 'isedit', 'taskid', 'expense_id', 'save_and_send'] as $previewField) {
         if (array_key_exists($previewField, $data)) {
             unset($data[$previewField]);
         }

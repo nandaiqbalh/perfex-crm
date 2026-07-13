@@ -192,9 +192,12 @@ foreach ($packingHeaderColumns as $column => $definition) {
     }
 }
 
-// Proposal (and shared sales) line-item profit % — admin-only UI on proposals
+// Proposal/estimate line-item profit % and purchase amount — admin-only UI
 if ($CI->db->table_exists(db_prefix() . 'itemable') && !$CI->db->field_exists('profit_percent', db_prefix() . 'itemable')) {
     $CI->db->query('ALTER TABLE `' . db_prefix() . 'itemable` ADD `profit_percent` DECIMAL(15,2) NULL DEFAULT NULL');
+}
+if ($CI->db->table_exists(db_prefix() . 'itemable') && !$CI->db->field_exists('purchase_amount', db_prefix() . 'itemable')) {
+    $CI->db->query('ALTER TABLE `' . db_prefix() . 'itemable` ADD `purchase_amount` DECIMAL(15,2) NULL DEFAULT NULL');
 }
 
 if (!$CI->db->table_exists(db_prefix() . 'otmain_purchase_orders')) {

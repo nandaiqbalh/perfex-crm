@@ -62,15 +62,16 @@ if (isset($estimate) && $estimate->show_quantity_as == 2) {
                     <th width="10%" class="qty" align="right">
                         <?= e($qty_heading); ?>
                     </th>
-                    <th width="15%" align="right">
-                        <?= _l('estimate_table_rate_heading'); ?>
+                    <th width="12%" align="right" class="otmain-purchase-amount-col">
+                        <?= _l('otmain_purchase_amount'); ?>
                     </th>
-                    <?php if (!empty($is_proposal)) { ?>
-                    <th width="10%" align="right" class="otmain-profit-percent-col">
+                    <th width="8%" align="right" class="otmain-profit-percent-col">
                         <?= _l('otmain_profit_percent'); ?>
                     </th>
-                    <?php } ?>
-                    <th width="20%" align="right">
+                    <th width="12%" align="right">
+                        <?= _l('estimate_table_rate_heading'); ?>
+                    </th>
+                    <th width="15%" align="right">
                         <?= _l('estimate_table_tax_heading'); ?>
                     </th>
                     <th width="10%" align="right">
@@ -111,16 +112,18 @@ if (isset($estimate) && $estimate->show_quantity_as == 2) {
                             data-toggle="tooltip" 612 data-title="e.q kg, lots, packs" name="unit"
                             class="form-control input-transparent text-right">
                     </td>
-                    <td>
-                        <input type="number" name="rate" class="form-control"
-                            placeholder="<?= _l('item_rate_placeholder'); ?>">
+                    <td class="otmain-purchase-amount-col">
+                        <input type="number" step="any" name="purchase_amount" class="form-control otmain-purchase-amount-preview"
+                            placeholder="<?= _l('otmain_purchase_amount'); ?>">
                     </td>
-                    <?php if (!empty($is_proposal)) { ?>
                     <td class="otmain-profit-percent-col">
                         <input type="number" step="any" class="form-control otmain-profit-percent-preview"
                             placeholder="<?= _l('otmain_profit_percent'); ?>">
                     </td>
-                    <?php } ?>
+                    <td>
+                        <input type="number" name="rate" class="form-control otmain-selling-rate-preview" readonly
+                            placeholder="<?= _l('item_rate_placeholder'); ?>">
+                    </td>
                     <td>
                         <?php
 if (function_exists('otmain_get_main_tax_input_html')) {
@@ -212,13 +215,15 @@ if (isset($estimate)) {
                         }
                         $table_row .= '<input type="text" placeholder="' . $unit_placeholder . '" name="' . $items_indicator . '[' . $i . '][unit]" class="form-control input-transparent text-right" value="' . $item['unit'] . '">';
                         $table_row .= '</td>';
-                        $table_row .= '<td class="rate"><input type="number" data-toggle="tooltip" title="' . _l('numbers_not_formatted_while_editing') . '" onblur="calculate_total();" onchange="calculate_total();" name="' . $items_indicator . '[' . $i . '][rate]" value="' . $item['rate'] . '" class="form-control"></td>';
-                        if (!empty($is_proposal)) {
-                            $profitVal = isset($item['profit_percent']) && $item['profit_percent'] !== null && $item['profit_percent'] !== ''
-                                ? $item['profit_percent']
-                                : '';
-                            $table_row .= '<td class="otmain-profit-percent-col"><input type="number" step="any" name="' . $items_indicator . '[' . $i . '][profit_percent]" value="' . e($profitVal) . '" class="form-control" placeholder="' . _l('otmain_profit_percent') . '"></td>';
-                        }
+                        $purchaseVal = isset($item['purchase_amount']) && $item['purchase_amount'] !== null && $item['purchase_amount'] !== ''
+                            ? $item['purchase_amount']
+                            : '';
+                        $table_row .= '<td class="otmain-purchase-amount-col"><input type="number" step="any" data-toggle="tooltip" title="' . _l('numbers_not_formatted_while_editing') . '" name="' . $items_indicator . '[' . $i . '][purchase_amount]" value="' . e($purchaseVal) . '" class="form-control otmain-purchase-amount"></td>';
+                        $profitVal = isset($item['profit_percent']) && $item['profit_percent'] !== null && $item['profit_percent'] !== ''
+                            ? $item['profit_percent']
+                            : '';
+                        $table_row .= '<td class="otmain-profit-percent-col"><input type="number" step="any" name="' . $items_indicator . '[' . $i . '][profit_percent]" value="' . e($profitVal) . '" class="form-control otmain-profit-percent" placeholder="' . _l('otmain_profit_percent') . '"></td>';
+                        $table_row .= '<td class="rate"><input type="number" data-toggle="tooltip" title="' . _l('numbers_not_formatted_while_editing') . '" onblur="calculate_total();" onchange="calculate_total();" name="' . $items_indicator . '[' . $i . '][rate]" value="' . $item['rate'] . '" class="form-control otmain-selling-rate" readonly></td>';
                         $table_row .= '<td class="taxrate">' . $this->misc_model->get_taxes_dropdown_template('' . $items_indicator . '[' . $i . '][taxname][]', $estimate_item_taxes, (isset($is_proposal) ? 'proposal' : 'estimate'), $item['id'], true, $manual) . '</td>';
                         $table_row .= '<td class="amount" align="right">' . $amount . '</td>';
                         $table_row .= '<td><a href="#" class="btn btn-danger pull-left !tw-px-3" onclick="delete_item(this,' . $item['id'] . '); return false;"><i class="fa fa-times"></i></a></td>';

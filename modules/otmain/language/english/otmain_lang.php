@@ -55,6 +55,7 @@ $lang['otmain_bank_account_usd']       = 'USD Account';
 $lang['otmain_bank_account_help']      = 'Choose which bank account details appear on this invoice PDF (independent of invoice currency).';
 $lang['otmain_quote_reference_display'] = 'Quote Reference (display on PDF)';
 $lang['otmain_profit_percent']          = 'Profit %';
+$lang['otmain_purchase_amount']         = 'Purchase Amount';
 $lang['otmain_packing_invoice_items']   = 'Invoice Items';
 $lang['otmain_dimensions']              = 'Dimensions';
 $lang['otmain_total_weight']            = 'Total Weight';

@@ -726,6 +726,27 @@ function _maybe_insert_post_item_tax($item_id, $post_item, $rel_id, $rel_type)
 }
 
 /**
+ * Selling rate from purchase amount and profit markup %.
+ * Rate = Purchase Amount × (1 + Profit % / 100)
+ *
+ * @param mixed $purchase_amount
+ * @param mixed $profit_percent
+ * @return float|null null when purchase amount is not provided
+ */
+function sales_item_calc_rate_from_purchase($purchase_amount, $profit_percent = null)
+{
+    if ($purchase_amount === null || $purchase_amount === '') {
+        return null;
+    }
+
+    $purchase = (float) str_replace(',', '.', (string) $purchase_amount);
+    $profitRaw = trim((string) ($profit_percent ?? ''));
+    $profit = ($profitRaw === '') ? 0.0 : (float) str_replace(',', '.', $profitRaw);
+
+    return $purchase * (1 + ($profit / 100));
+}
+
+/**
  * Add new item do database, used for proposals,estimates,credit notes,invoices
  * This is repetitive action, that's why this function exists
  *
@@ -744,11 +765,19 @@ function add_new_sales_item_post($item, $rel_id, $rel_type)
     $CI         = &get_instance();
     $isOptional = $item['is_optional'] ?? false;
 
+    $rate = $item['rate'] ?? 0;
+    if (array_key_exists('purchase_amount', $item) && $item['purchase_amount'] !== '' && $item['purchase_amount'] !== null) {
+        $calc = sales_item_calc_rate_from_purchase($item['purchase_amount'], $item['profit_percent'] ?? null);
+        if ($calc !== null) {
+            $rate = $calc;
+        }
+    }
+
     $insert = [
         'description'      => $item['description'],
         'long_description' => nl2br($item['long_description']),
         'qty'              => $item['qty'],
-        'rate'             => number_format($item['rate'], get_decimal_places(), '.', ''),
+        'rate'             => number_format($rate, get_decimal_places(), '.', ''),
         'rel_id'           => $rel_id,
         'rel_type'         => $rel_type,
         'item_order'       => $item['order'],
@@ -760,6 +789,11 @@ function add_new_sales_item_post($item, $rel_id, $rel_type)
     if ($CI->db->field_exists('profit_percent', db_prefix() . 'itemable') && array_key_exists('profit_percent', $item)) {
         $pp = trim((string) $item['profit_percent']);
         $insert['profit_percent'] = ($pp === '') ? null : (float) str_replace(',', '.', $pp);
+    }
+
+    if ($CI->db->field_exists('purchase_amount', db_prefix() . 'itemable') && array_key_exists('purchase_amount', $item)) {
+        $pa = trim((string) $item['purchase_amount']);
+        $insert['purchase_amount'] = ($pa === '') ? null : (float) str_replace(',', '.', $pa);
     }
 
     $CI->db->insert(db_prefix() . 'itemable', $insert);
@@ -806,11 +840,19 @@ function update_sales_item_post($item_id, $data, $field = '')
     } else {
         $isOptional = $data['is_optional'] ?? false;
 
+        $rate = $data['rate'] ?? 0;
+        if (array_key_exists('purchase_amount', $data) && $data['purchase_amount'] !== '' && $data['purchase_amount'] !== null) {
+            $calc = sales_item_calc_rate_from_purchase($data['purchase_amount'], $data['profit_percent'] ?? null);
+            if ($calc !== null) {
+                $rate = $calc;
+            }
+        }
+
         $update = [
             'item_order'       => $data['order'],
             'description'      => $data['description'],
             'long_description' => nl2br($data['long_description']),
-            'rate'             => number_format($data['rate'], get_decimal_places(), '.', ''),
+            'rate'             => number_format($rate, get_decimal_places(), '.', ''),
             'qty'              => $data['qty'],
             'unit'             => $data['unit'],
             'is_optional'      => $isOptional ? 1 : 0,
@@ -820,6 +862,11 @@ function update_sales_item_post($item_id, $data, $field = '')
         if ($CI->db->field_exists('profit_percent', db_prefix() . 'itemable') && array_key_exists('profit_percent', $data)) {
             $pp = trim((string) $data['profit_percent']);
             $update['profit_percent'] = ($pp === '') ? null : (float) str_replace(',', '.', $pp);
+        }
+
+        if ($CI->db->field_exists('purchase_amount', db_prefix() . 'itemable') && array_key_exists('purchase_amount', $data)) {
+            $pa = trim((string) $data['purchase_amount']);
+            $update['purchase_amount'] = ($pa === '') ? null : (float) str_replace(',', '.', $pa);
         }
     }
 

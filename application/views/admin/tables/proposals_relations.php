@@ -74,6 +74,9 @@ foreach ($rResult as $aRow) {
     if (staff_can('edit', 'proposals')) {
         $numberOutput .= ' | <a href="' . admin_url('proposals/proposal/' . $aRow['id']) . '">' . _l('edit') . '</a>';
     }
+    if (staff_can('delete', 'proposals')) {
+        $numberOutput .= ' | <a href="' . admin_url('proposals/delete/' . $aRow['id']) . '" class="_delete text-danger">' . _l('delete') . '</a>';
+    }
     $numberOutput .= '</div>';
 
     $row[] = $numberOutput;

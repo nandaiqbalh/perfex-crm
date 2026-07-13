@@ -218,6 +218,12 @@ class Estimates_model extends App_Model
             }
             $new_invoice_data['newitems'][$key]['rate']  = $item['rate'];
             $new_invoice_data['newitems'][$key]['order'] = $item['item_order'];
+            if (array_key_exists('profit_percent', $item)) {
+                $new_invoice_data['newitems'][$key]['profit_percent'] = $item['profit_percent'];
+            }
+            if (array_key_exists('purchase_amount', $item)) {
+                $new_invoice_data['newitems'][$key]['purchase_amount'] = $item['purchase_amount'];
+            }
 
             foreach ($custom_fields_items as $cf) {
                 $new_invoice_data['newitems'][$key]['custom_fields']['items'][$cf['id']] = get_custom_field_value($item['id'], $cf['id'], 'items', false);
@@ -379,6 +385,12 @@ class Estimates_model extends App_Model
             }
             $new_estimate_data['newitems'][$key]['rate']  = $item['rate'];
             $new_estimate_data['newitems'][$key]['order'] = $item['item_order'];
+            if (array_key_exists('profit_percent', $item)) {
+                $new_estimate_data['newitems'][$key]['profit_percent'] = $item['profit_percent'];
+            }
+            if (array_key_exists('purchase_amount', $item)) {
+                $new_estimate_data['newitems'][$key]['purchase_amount'] = $item['purchase_amount'];
+            }
 
             foreach ($custom_fields_items as $cf) {
                 $new_estimate_data['newitems'][$key]['custom_fields']['items'][$cf['id']] = get_custom_field_value($item['id'], $cf['id'], 'items', false);

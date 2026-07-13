@@ -7091,6 +7091,9 @@ function clear_item_preview_values(default_taxes) {
   previewArea.find('input[name="unit"]').val("");
   previewArea.find('input[name="profit_percent"]').val("");
   previewArea.find("input.otmain-profit-percent-preview").val("");
+  previewArea.find('input[name="purchase_amount"]').val("");
+  previewArea.find("input.otmain-purchase-amount-preview").val("");
+  previewArea.find("input.otmain-selling-rate-preview").val("");
   previewArea.find('#main-optional').prop("checked", false);
   previewArea.find('#main-optional').trigger('change')
   previewArea.find('#main-optional-choosen').prop("checked", true);
@@ -7109,7 +7112,8 @@ function add_item_to_table(data, itemid, merge_invoice, bill_expense) {
   if (
     data.description === "" &&
     data.long_description === "" &&
-    data.rate === ""
+    data.rate === "" &&
+    (data.purchase_amount === undefined || data.purchase_amount === "")
   ) {
     return;
   }
@@ -7288,26 +7292,75 @@ function add_item_to_table(data, itemid, merge_invoice, bill_expense) {
 
     table_row += "</td>";
 
-    table_row +=
-      '<td class="rate"><input type="number" data-toggle="tooltip" title="' +
-      app.lang.item_field_not_formatted +
-      '" onblur="calculate_total();" onchange="calculate_total();" name="newitems[' +
-      item_key +
-      '][rate]" value="' +
-      data.rate +
-      '" class="form-control"></td>';
+    var usePurchaseProfit =
+      $("body").find(".proposal-form").length > 0 ||
+      $("body").find(".estimate-form").length > 0;
 
-    if ($("body").find(".proposal-form").length) {
+    if (usePurchaseProfit) {
+      var purchaseAmount =
+        data.purchase_amount !== undefined && data.purchase_amount !== null
+          ? data.purchase_amount
+          : "";
+      // Catalog/item select often only has rate — treat as purchase cost.
+      if (
+        (purchaseAmount === "" || purchaseAmount === null) &&
+        data.rate !== undefined &&
+        data.rate !== null &&
+        data.rate !== ""
+      ) {
+        purchaseAmount = data.rate;
+      }
       var profitPercent =
         data.profit_percent !== undefined && data.profit_percent !== null
           ? data.profit_percent
           : "";
+      var sellingRate = data.rate;
+      if (purchaseAmount !== "" && purchaseAmount !== null && purchaseAmount !== undefined) {
+        var pAmt = parseFloat(purchaseAmount);
+        var pPct = parseFloat(profitPercent);
+        if (isNaN(pPct)) {
+          pPct = 0;
+        }
+        if (!isNaN(pAmt)) {
+          sellingRate = pAmt * (1 + pPct / 100);
+          data.rate = sellingRate;
+          amount = data.rate * data.qty;
+        }
+      }
+
+      table_row +=
+        '<td class="otmain-purchase-amount-col"><input type="number" step="any" data-toggle="tooltip" title="' +
+        app.lang.item_field_not_formatted +
+        '" name="newitems[' +
+        item_key +
+        '][purchase_amount]" value="' +
+        purchaseAmount +
+        '" class="form-control otmain-purchase-amount"></td>';
+
       table_row +=
         '<td class="otmain-profit-percent-col"><input type="number" step="any" name="newitems[' +
         item_key +
         '][profit_percent]" value="' +
         profitPercent +
-        '" class="form-control" placeholder="Profit %"></td>';
+        '" class="form-control otmain-profit-percent" placeholder="Profit %"></td>';
+
+      table_row +=
+        '<td class="rate"><input type="number" data-toggle="tooltip" title="' +
+        app.lang.item_field_not_formatted +
+        '" onblur="calculate_total();" onchange="calculate_total();" name="newitems[' +
+        item_key +
+        '][rate]" value="' +
+        sellingRate +
+        '" class="form-control otmain-selling-rate" readonly></td>';
+    } else {
+      table_row +=
+        '<td class="rate"><input type="number" data-toggle="tooltip" title="' +
+        app.lang.item_field_not_formatted +
+        '" onblur="calculate_total();" onchange="calculate_total();" name="newitems[' +
+        item_key +
+        '][rate]" value="' +
+        data.rate +
+        '" class="form-control"></td>';
     }
 
     table_row += '<td class="taxrate">' + tax_dropdown + "</td>";
@@ -7528,6 +7581,10 @@ function get_item_preview_values() {
   response.taxname = $(".main select.tax").selectpicker("val");
   response.rate = $('.main input[name="rate"]').val();
   response.unit = $('.main input[name="unit"]').val();
+  response.purchase_amount = $('.main input.otmain-purchase-amount-preview').val();
+  if (response.purchase_amount === undefined) {
+    response.purchase_amount = $('.main input[name="purchase_amount"]').val();
+  }
   response.profit_percent = $('.main input.otmain-profit-percent-preview').val();
   if (response.profit_percent === undefined) {
     response.profit_percent = $('.main input[name="profit_percent"]').val();

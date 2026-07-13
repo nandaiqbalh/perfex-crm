@@ -150,17 +150,28 @@ if (!empty($pl) && !empty($pl->quote_ref_ids)) {
                     </tr>
                 </thead>
                 <tbody>
-                    <?php if (!empty($pl) && !empty($pl->items)) { foreach ($pl->items as $i => $item) { ?>
-                    <tr class="item-row" data-row-index="<?php echo (int) $i; ?>">
-                        <td><input type="number" step="any" name="items[<?php echo $i; ?>][qty]" class="form-control otmain-packing-qty" value="<?php echo e($item['qty']); ?>"></td>
-                        <td><input type="text" name="items[<?php echo $i; ?>][description]" class="form-control otmain-packing-description" value="<?php echo e($item['description']); ?>"></td>
-                        <td><input type="text" name="items[<?php echo $i; ?>][hs_code]" class="form-control" value="<?php echo e($item['hs_code']); ?>"></td>
-                        <td><input type="number" step="any" name="items[<?php echo $i; ?>][unit_price]" class="form-control otmain-packing-rate" value="<?php echo e($item['unit_price']); ?>"></td>
-                        <td><input type="number" step="any" min="0" name="items[<?php echo $i; ?>][taxrate]" class="form-control otmain-packing-tax" value="<?php echo e($item['taxrate'] ?? 0); ?>"></td>
+                    <?php
+                    $invoiceIndex = 0;
+                    if (!empty($pl) && !empty($pl->items)) {
+                        foreach ($pl->items as $item) {
+                            if (otmain_is_packing_only_line($item)) {
+                                continue;
+                            }
+                    ?>
+                    <tr class="item-row" data-row-index="<?php echo (int) $invoiceIndex; ?>">
+                        <td><input type="number" step="any" name="items[<?php echo $invoiceIndex; ?>][qty]" class="form-control otmain-packing-qty" value="<?php echo e($item['qty']); ?>"></td>
+                        <td><input type="text" name="items[<?php echo $invoiceIndex; ?>][description]" class="form-control otmain-packing-description" value="<?php echo e($item['description']); ?>"></td>
+                        <td><input type="text" name="items[<?php echo $invoiceIndex; ?>][hs_code]" class="form-control" value="<?php echo e($item['hs_code']); ?>"></td>
+                        <td><input type="number" step="any" name="items[<?php echo $invoiceIndex; ?>][unit_price]" class="form-control otmain-packing-rate" value="<?php echo e($item['unit_price']); ?>"></td>
+                        <td><input type="number" step="any" min="0" name="items[<?php echo $invoiceIndex; ?>][taxrate]" class="form-control otmain-packing-tax" value="<?php echo e($item['taxrate'] ?? 0); ?>"></td>
                         <td><input type="text" class="form-control otmain-packing-line-total" readonly value="<?php echo e(app_format_number($item['total'])); ?>"></td>
                         <td><button type="button" class="btn btn-danger btn-sm otmain-remove-row"><i class="fa fa-times"></i></button></td>
                     </tr>
-                    <?php } } ?>
+                    <?php
+                            $invoiceIndex++;
+                        }
+                    }
+                    ?>
                 </tbody>
             </table>
         </div>
@@ -183,49 +194,64 @@ if (!empty($pl) && !empty($pl->quote_ref_ids)) {
                         <th width="10%"><?php echo _l('otmain_cbm'); ?></th>
                         <th width="10%"><?php echo _l('otmain_gross_weight'); ?></th>
                         <th width="10%"><?php echo _l('otmain_net_weight'); ?></th>
+                        <th width="5%"></th>
                     </tr>
                 </thead>
                 <tbody>
-                    <?php if (!empty($pl) && !empty($pl->items)) { foreach ($pl->items as $i => $item) {
-                        $unitType = $item['unit_type'] ?? 'box';
-                        $unitLabel = $item['unit_label'] ?? '';
-                        $packingQty = $item['packing_qty'] ?? $item['qty'];
-                        $length = $item['length'] ?? '';
-                        $width = $item['width'] ?? '';
-                        $height = $item['height'] ?? '';
-                        $cbmDisplay = '';
-                        if ($length !== '' && $length !== null && $width !== '' && $width !== null && $height !== '' && $height !== null) {
-                            $cbmDisplay = number_format(otmain_calc_cbm_mm($length, $width, $height, $packingQty), 3, '.', '');
-                        } elseif (!empty($item['volume'])) {
-                            $cbmDisplay = preg_replace('/\s*CBM\s*/i', '', $item['volume']);
-                        }
+                    <?php
+                    $packingIndex = 0;
+                    if (!empty($pl) && !empty($pl->items)) {
+                        foreach ($pl->items as $item) {
+                            if (!otmain_packing_item_has_packaging($item)) {
+                                continue;
+                            }
+                            $unitType = $item['unit_type'] ?? 'box';
+                            $unitLabel = $item['unit_label'] ?? '';
+                            $packingQty = $item['packing_qty'] ?? 1;
+                            $length = $item['length'] ?? '';
+                            $width = $item['width'] ?? '';
+                            $height = $item['height'] ?? '';
+                            $cbmDisplay = '';
+                            if ($length !== '' && $length !== null && $width !== '' && $width !== null && $height !== '' && $height !== null) {
+                                $cbmDisplay = number_format(otmain_calc_cbm_mm($length, $width, $height, $packingQty), 3, '.', '');
+                            } elseif (!empty($item['volume'])) {
+                                $cbmDisplay = preg_replace('/\s*CBM\s*/i', '', $item['volume']);
+                            }
                     ?>
-                    <tr class="item-row packing-detail-row" data-row-index="<?php echo (int) $i; ?>">
+                    <tr class="item-row packing-detail-row" data-row-index="<?php echo (int) $packingIndex; ?>">
                         <td>
-                            <input type="text" class="form-control otmain-packing-detail-item-label" readonly value="<?php echo e($item['description']); ?>">
+                            <input type="text" name="packing_items[<?php echo $packingIndex; ?>][description]" class="form-control otmain-packing-detail-item-label" value="<?php echo e($item['description']); ?>">
                             <?php if (empty($length) && empty($width) && empty($height) && !empty($item['packing_detail'])) { ?>
-                            <input type="hidden" name="items[<?php echo $i; ?>][packing_detail]" value="<?php echo e($item['packing_detail']); ?>">
+                            <input type="hidden" name="packing_items[<?php echo $packingIndex; ?>][packing_detail]" value="<?php echo e($item['packing_detail']); ?>">
                             <?php } ?>
                         </td>
                         <td>
-                            <?php echo otmain_packing_unit_select_html($unitType, 'items[' . $i . '][unit_type]'); ?>
-                            <input type="text" name="items[<?php echo $i; ?>][unit_label]" class="form-control otmain-packing-unit-label mtop5" placeholder="<?php echo e(_l('otmain_unit_label')); ?>" value="<?php echo e($unitLabel); ?>" style="<?php echo $unitType === 'other' ? '' : 'display:none;'; ?>">
+                            <?php echo otmain_packing_unit_select_html($unitType, 'packing_items[' . $packingIndex . '][unit_type]'); ?>
+                            <input type="text" name="packing_items[<?php echo $packingIndex; ?>][unit_label]" class="form-control otmain-packing-unit-label mtop5" placeholder="<?php echo e(_l('otmain_unit_label')); ?>" value="<?php echo e($unitLabel); ?>" style="<?php echo $unitType === 'other' ? '' : 'display:none;'; ?>">
                         </td>
-                        <td><input type="number" step="any" min="0" name="items[<?php echo $i; ?>][packing_qty]" class="form-control otmain-packing-pack-qty" value="<?php echo e($packingQty); ?>"></td>
-                        <td><input type="number" step="any" min="0" name="items[<?php echo $i; ?>][length]" class="form-control otmain-packing-length" value="<?php echo e($length !== null ? $length : ''); ?>"></td>
-                        <td><input type="number" step="any" min="0" name="items[<?php echo $i; ?>][width]" class="form-control otmain-packing-width" value="<?php echo e($width !== null ? $width : ''); ?>"></td>
-                        <td><input type="number" step="any" min="0" name="items[<?php echo $i; ?>][height]" class="form-control otmain-packing-height" value="<?php echo e($height !== null ? $height : ''); ?>"></td>
+                        <td><input type="number" step="any" min="0" name="packing_items[<?php echo $packingIndex; ?>][packing_qty]" class="form-control otmain-packing-pack-qty" value="<?php echo e($packingQty); ?>"></td>
+                        <td><input type="number" step="any" min="0" name="packing_items[<?php echo $packingIndex; ?>][length]" class="form-control otmain-packing-length" value="<?php echo e($length !== null ? $length : ''); ?>"></td>
+                        <td><input type="number" step="any" min="0" name="packing_items[<?php echo $packingIndex; ?>][width]" class="form-control otmain-packing-width" value="<?php echo e($width !== null ? $width : ''); ?>"></td>
+                        <td><input type="number" step="any" min="0" name="packing_items[<?php echo $packingIndex; ?>][height]" class="form-control otmain-packing-height" value="<?php echo e($height !== null ? $height : ''); ?>"></td>
                         <td>
                             <input type="text" class="form-control otmain-packing-cbm-display" readonly value="<?php echo e($cbmDisplay !== '' ? $cbmDisplay : '0.00'); ?>">
-                            <input type="hidden" name="items[<?php echo $i; ?>][volume]" class="otmain-packing-volume-hidden" value="<?php echo e($item['volume'] ?? ''); ?>">
+                            <input type="hidden" name="packing_items[<?php echo $packingIndex; ?>][volume]" class="otmain-packing-volume-hidden" value="<?php echo e($item['volume'] ?? ''); ?>">
                         </td>
-                        <td><input type="number" step="any" name="items[<?php echo $i; ?>][gross_weight]" class="form-control otmain-packing-gross-weight" value="<?php echo e($item['gross_weight']); ?>"></td>
-                        <td><input type="number" step="any" name="items[<?php echo $i; ?>][net_weight]" class="form-control" value="<?php echo e($item['net_weight']); ?>"></td>
+                        <td><input type="number" step="any" name="packing_items[<?php echo $packingIndex; ?>][gross_weight]" class="form-control otmain-packing-gross-weight" value="<?php echo e($item['gross_weight']); ?>"></td>
+                        <td><input type="number" step="any" name="packing_items[<?php echo $packingIndex; ?>][net_weight]" class="form-control" value="<?php echo e($item['net_weight']); ?>"></td>
+                        <td><button type="button" class="btn btn-danger btn-sm otmain-remove-row"><i class="fa fa-times"></i></button></td>
                     </tr>
-                    <?php } } ?>
+                    <?php
+                            $packingIndex++;
+                        }
+                    }
+                    ?>
                 </tbody>
             </table>
         </div>
+        <button type="button" class="btn btn-default mtop10" id="otmain-add-packing-detail-row">
+            <i class="fa fa-plus tw-mr-1"></i><?php echo _l('add_item'); ?>
+        </button>
         <?php otmain_form_section_close(); ?>
 
         <?php otmain_form_section_open(_l('otmain_section_totals'), 'otmain-pl-totals-section'); ?>

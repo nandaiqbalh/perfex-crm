@@ -353,7 +353,7 @@
         var unitType = (item.unit_type || 'box').toString().toLowerCase();
         var packingQty = item.packing_qty !== undefined && item.packing_qty !== null && item.packing_qty !== ''
             ? item.packing_qty
-            : (item.qty || 1);
+            : 1;
         var length = item.length || '';
         var width = item.width || '';
         var height = item.height || '';
@@ -361,34 +361,38 @@
         var cbmDisplay = cbm > 0 ? cbm.toFixed(3) : '0.00';
         var volume = cbm > 0 ? (cbm.toFixed(3) + ' CBM') : (item.volume || '');
         return '<tr class="item-row packing-detail-row" data-row-index="' + index + '">' +
-            '<td><input type="text" class="form-control otmain-packing-detail-item-label" readonly value="' + (item.description || '') + '"></td>' +
+            '<td><input type="text" name="packing_items[' + index + '][description]" class="form-control otmain-packing-detail-item-label" value="' + (item.description || '') + '"></td>' +
             '<td>' +
-                '<select name="items[' + index + '][unit_type]" class="form-control otmain-packing-unit-type">' +
+                '<select name="packing_items[' + index + '][unit_type]" class="form-control otmain-packing-unit-type">' +
                     otmainPackingUnitOptionsHtml(unitType) +
                 '</select>' +
-                '<input type="text" name="items[' + index + '][unit_label]" class="form-control otmain-packing-unit-label mtop5" placeholder="Unit label" value="' + (item.unit_label || '') + '" style="' + (unitType === 'other' ? '' : 'display:none;') + '">' +
+                '<input type="text" name="packing_items[' + index + '][unit_label]" class="form-control otmain-packing-unit-label mtop5" placeholder="Unit label" value="' + (item.unit_label || '') + '" style="' + (unitType === 'other' ? '' : 'display:none;') + '">' +
             '</td>' +
-            '<td><input type="number" step="any" min="0" name="items[' + index + '][packing_qty]" class="form-control otmain-packing-pack-qty" value="' + packingQty + '"></td>' +
-            '<td><input type="number" step="any" min="0" name="items[' + index + '][length]" class="form-control otmain-packing-length" value="' + length + '"></td>' +
-            '<td><input type="number" step="any" min="0" name="items[' + index + '][width]" class="form-control otmain-packing-width" value="' + width + '"></td>' +
-            '<td><input type="number" step="any" min="0" name="items[' + index + '][height]" class="form-control otmain-packing-height" value="' + height + '"></td>' +
+            '<td><input type="number" step="any" min="0" name="packing_items[' + index + '][packing_qty]" class="form-control otmain-packing-pack-qty" value="' + packingQty + '"></td>' +
+            '<td><input type="number" step="any" min="0" name="packing_items[' + index + '][length]" class="form-control otmain-packing-length" value="' + length + '"></td>' +
+            '<td><input type="number" step="any" min="0" name="packing_items[' + index + '][width]" class="form-control otmain-packing-width" value="' + width + '"></td>' +
+            '<td><input type="number" step="any" min="0" name="packing_items[' + index + '][height]" class="form-control otmain-packing-height" value="' + height + '"></td>' +
             '<td>' +
                 '<input type="text" class="form-control otmain-packing-cbm-display" readonly value="' + cbmDisplay + '">' +
-                '<input type="hidden" name="items[' + index + '][volume]" class="otmain-packing-volume-hidden" value="' + volume + '">' +
+                '<input type="hidden" name="packing_items[' + index + '][volume]" class="otmain-packing-volume-hidden" value="' + volume + '">' +
             '</td>' +
-            '<td><input type="number" step="any" name="items[' + index + '][gross_weight]" class="form-control otmain-packing-gross-weight" value="' + (item.gross_weight || '') + '"></td>' +
-            '<td><input type="number" step="any" name="items[' + index + '][net_weight]" class="form-control" value="' + (item.net_weight || '') + '"></td>' +
+            '<td><input type="number" step="any" name="packing_items[' + index + '][gross_weight]" class="form-control otmain-packing-gross-weight" value="' + (item.gross_weight || '') + '"></td>' +
+            '<td><input type="number" step="any" name="packing_items[' + index + '][net_weight]" class="form-control" value="' + (item.net_weight || '') + '"></td>' +
+            '<td><button type="button" class="btn btn-danger btn-sm otmain-remove-row"><i class="fa fa-times"></i></button></td>' +
             '</tr>';
     }
 
     function otmainBuildPackingRow(item, index) {
-        // Kept for callers; appends both commercial + packing detail rows.
-        otmainAppendPackingPair(item, index);
+        // Legacy helper: invoice item only (packing is independent).
+        $('#otmain-packing-list-form #otmain-packing-items tbody').append(otmainBuildPackingItemRow(item, index));
         return '';
     }
 
-    function otmainAppendPackingPair(item, index) {
+    function otmainAppendInvoiceItem(item, index) {
         $('#otmain-packing-list-form #otmain-packing-items tbody').append(otmainBuildPackingItemRow(item, index));
+    }
+
+    function otmainAppendPackingDetail(item, index) {
         $('#otmain-packing-list-form #otmain-packing-details-items tbody').append(otmainBuildPackingDetailRow(item, index));
     }
 
@@ -407,17 +411,9 @@
             $(this).find('input, select, textarea').each(function() {
                 var name = $(this).attr('name');
                 if (name) {
-                    $(this).attr('name', name.replace(/items\[\d+]/, 'items[' + i + ']'));
+                    $(this).attr('name', name.replace(/packing_items\[\d+]/, 'packing_items[' + i + ']'));
                 }
             });
-        });
-    }
-
-    function otmainSyncPackingDetailLabels() {
-        $('#otmain-packing-list-form #otmain-packing-items tbody tr.item-row').each(function(i) {
-            var desc = $(this).find('.otmain-packing-description').val() || '';
-            $('#otmain-packing-list-form #otmain-packing-details-items tbody tr.item-row').eq(i)
-                .find('.otmain-packing-detail-item-label').val(desc);
         });
     }
 
@@ -537,18 +533,49 @@
         if (!items || !items.length) {
             return;
         }
+        // Quote import: commercial lines only — packing is added manually.
         var startIndex = $('#otmain-packing-list-form #otmain-packing-items tbody tr.item-row').length;
         $.each(items, function(offset, item) {
-            otmainAppendPackingPair(item, startIndex + offset);
+            otmainAppendInvoiceItem(item, startIndex + offset);
         });
         otmainRecalculatePackingTotals();
+    }
+
+    function otmainItemHasPackagingData(item) {
+        if (!item) {
+            return false;
+        }
+        var length = parseFloat(item.length) || 0;
+        var width = parseFloat(item.width) || 0;
+        var height = parseFloat(item.height) || 0;
+        if (length > 0 && width > 0 && height > 0) {
+            return true;
+        }
+        if (item.packing_detail || item.volume) {
+            return true;
+        }
+        if ((parseFloat(item.gross_weight) || 0) > 0 || (parseFloat(item.net_weight) || 0) > 0) {
+            return true;
+        }
+        return false;
     }
 
     function otmainFillPackingItems(items) {
         $('#otmain-packing-list-form #otmain-packing-items tbody').find('tr.item-row').remove();
         $('#otmain-packing-list-form #otmain-packing-details-items tbody').find('tr.item-row').remove();
+        var invoiceIdx = 0;
+        var packingIdx = 0;
         $.each(items, function(i, item) {
-            otmainAppendPackingPair(item, i);
+            var qty = parseFloat(item.qty);
+            var rate = parseFloat(item.rate !== undefined ? item.rate : item.unit_price);
+            var hasPackaging = otmainItemHasPackagingData(item);
+            var isPackingOnly = hasPackaging && (isNaN(qty) || qty === 0) && (isNaN(rate) || rate === 0);
+            if (!isPackingOnly) {
+                otmainAppendInvoiceItem(item, invoiceIdx++);
+            }
+            if (hasPackaging) {
+                otmainAppendPackingDetail(item, packingIdx++);
+            }
         });
         otmainRecalculatePackingTotals();
     }
@@ -564,6 +591,54 @@
         }
     }
 
+    function otmainCalcSellingRate(purchaseAmount, profitPercent) {
+        var purchase = parseFloat(purchaseAmount);
+        if (isNaN(purchase)) {
+            return null;
+        }
+        var profit = parseFloat(profitPercent);
+        if (isNaN(profit)) {
+            profit = 0;
+        }
+        return purchase * (1 + profit / 100);
+    }
+
+    function otmainQuoteUsesPurchaseProfit() {
+        return $('body').find('.proposal-form').length > 0 || $('body').find('.estimate-form').length > 0;
+    }
+
+    function otmainRecalcRowSellingRate($row) {
+        if (!$row || !$row.length) {
+            return;
+        }
+        var purchase = $row.find('.otmain-purchase-amount, .otmain-purchase-amount-preview, input[name="purchase_amount"]').filter(':visible').first().val();
+        if (purchase === undefined || purchase === null || purchase === '') {
+            purchase = $row.find('.otmain-purchase-amount').val();
+        }
+        var profit = $row.find('.otmain-profit-percent, .otmain-profit-percent-preview').first().val();
+        var rate = otmainCalcSellingRate(purchase, profit);
+        if (rate === null) {
+            return;
+        }
+        var rounded = (Math.round(rate * 10000) / 10000);
+        $row.find('.otmain-selling-rate, .otmain-selling-rate-preview, input[name="rate"]').val(rounded);
+    }
+
+    function otmainRecalcPreviewSellingRate() {
+        if (!otmainQuoteUsesPurchaseProfit()) {
+            return;
+        }
+        var $main = $('tr.main');
+        var purchase = $main.find('.otmain-purchase-amount-preview, input[name="purchase_amount"]').val();
+        var profit = $main.find('.otmain-profit-percent-preview').val();
+        var rate = otmainCalcSellingRate(purchase, profit);
+        if (rate === null) {
+            $main.find('.otmain-selling-rate-preview, input[name="rate"]').val('');
+            return;
+        }
+        $main.find('.otmain-selling-rate-preview, input[name="rate"]').val(Math.round(rate * 10000) / 10000);
+    }
+
     $(function() {
         otmainEnsureCurrencySelectable();
 
@@ -571,6 +646,36 @@
         $('body').on('changed.bs.select change', '.f_client_id select[name="clientid"], #clientid, #rel_type, #rel_id', function() {
             setTimeout(otmainEnsureCurrencySelectable, 50);
         });
+
+        if (otmainQuoteUsesPurchaseProfit()) {
+            $('body').on(
+                'input change',
+                '.otmain-purchase-amount, .otmain-purchase-amount-preview, .otmain-profit-percent, .otmain-profit-percent-preview, tr.main input[name="purchase_amount"]',
+                function() {
+                    var $row = $(this).closest('tr');
+                    if ($row.hasClass('main')) {
+                        otmainRecalcPreviewSellingRate();
+                    } else {
+                        otmainRecalcRowSellingRate($row);
+                        if (typeof calculate_total === 'function') {
+                            calculate_total();
+                        }
+                    }
+                }
+            );
+
+            // Item catalog fills rate — treat as purchase amount on quotations.
+            $(document).on('item-added-to-preview', function() {
+                var $main = $('tr.main');
+                var $rate = $main.find('input[name="rate"]');
+                var catalogRate = $rate.val();
+                if (catalogRate === undefined || catalogRate === '') {
+                    return;
+                }
+                $main.find('.otmain-purchase-amount-preview, input[name="purchase_amount"]').val(catalogRate);
+                otmainRecalcPreviewSellingRate();
+            });
+        }
 
         if ($('body').find('.estimate-form').length) {
             $('#expiry_days, input[name="date"]').on('change keyup', function() {
@@ -778,12 +883,14 @@
 
     $(document).on('click', '#otmain-packing-list-form #otmain-add-packing-row', function() {
         var i = $('#otmain-packing-list-form #otmain-packing-items tbody tr.item-row').length;
-        otmainAppendPackingPair({}, i);
+        otmainAppendInvoiceItem({}, i);
         otmainRecalculatePackingTotals();
     });
 
-    $(document).on('input', '#otmain-packing-list-form .otmain-packing-description', function() {
-        otmainSyncPackingDetailLabels();
+    $(document).on('click', '#otmain-packing-list-form #otmain-add-packing-detail-row', function() {
+        var i = $('#otmain-packing-list-form #otmain-packing-details-items tbody tr.item-row').length;
+        otmainAppendPackingDetail({}, i);
+        otmainRecalculatePackingTotals();
     });
 
     function otmainLoadPoContacts(clientId, selectedId) {
@@ -918,10 +1025,11 @@
 
     $(document).on('click', '.otmain-remove-row', function() {
         var $row = $(this).closest('tr');
-        if ($('#otmain-packing-list-form').length && $row.closest('#otmain-packing-items').length) {
-            var idx = $row.index();
+        if ($('#otmain-packing-list-form').length && (
+            $row.closest('#otmain-packing-items').length ||
+            $row.closest('#otmain-packing-details-items').length
+        )) {
             $row.remove();
-            $('#otmain-packing-list-form #otmain-packing-details-items tbody tr.item-row').eq(idx).remove();
             otmainReindexPackingRows();
             otmainRecalculatePackingTotals();
             return;

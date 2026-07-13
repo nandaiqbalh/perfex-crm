@@ -34,8 +34,9 @@ class Packing_list_model extends App_Model
 
     public function add($data)
     {
-        $items = $data['items'] ?? [];
-        unset($data['items']);
+        $items        = $data['items'] ?? [];
+        $packingItems = $data['packing_items'] ?? [];
+        unset($data['items'], $data['packing_items']);
 
         $data = $this->normalize_data($data);
 
@@ -51,7 +52,7 @@ class Packing_list_model extends App_Model
 
         if ($insert_id) {
             update_option('next_otmain_packing_list_number', (int) get_option('next_otmain_packing_list_number') + 1);
-            $this->save_items($insert_id, $items);
+            $this->save_items($insert_id, $items, $packingItems);
         }
 
         return $insert_id;
@@ -59,8 +60,9 @@ class Packing_list_model extends App_Model
 
     public function update($data, $id)
     {
-        $items = $data['items'] ?? [];
-        unset($data['items']);
+        $items        = $data['items'] ?? [];
+        $packingItems = $data['packing_items'] ?? [];
+        unset($data['items'], $data['packing_items']);
 
         $data = $this->normalize_data($data);
         $data['date'] = to_sql_date($data['date']);
@@ -69,7 +71,7 @@ class Packing_list_model extends App_Model
 
         $this->db->where('packing_list_id', $id);
         $this->db->delete(db_prefix() . 'otmain_packing_list_items');
-        $this->save_items($id, $items);
+        $this->save_items($id, $items, $packingItems);
 
         return true;
     }
@@ -143,14 +145,50 @@ class Packing_list_model extends App_Model
         return array_intersect_key($data, array_flip($allowed));
     }
 
-    private function save_items($id, $items)
+    /**
+     * Persist commercial invoice lines and packing detail lines independently.
+     * Invoice items no longer auto-create packing rows (one box may hold many items).
+     *
+     * When packing_items is empty (seed / legacy payloads), packaging fields on
+     * commercial items are split into separate packing-only rows.
+     *
+     * @param int   $id
+     * @param array $items         Commercial lines from items[]
+     * @param array $packingItems  Package lines from packing_items[]
+     */
+    private function save_items($id, $items, $packingItems = [])
     {
         $order       = 1;
         $subtotal    = 0;
         $totalTax    = 0;
         $totalWeight = 0;
         $totalCbm    = 0;
+        $table       = db_prefix() . 'otmain_packing_list_items';
 
+        // Legacy/seed: packaging still embedded on commercial items.
+        if (empty($packingItems) && !empty($items)) {
+            $packingItems = [];
+            foreach ($items as $item) {
+                if (!otmain_packing_item_has_packaging($item)) {
+                    continue;
+                }
+                $packingItems[] = [
+                    'description'    => $item['description'] ?? '',
+                    'unit_type'      => $item['unit_type'] ?? 'box',
+                    'unit_label'     => $item['unit_label'] ?? '',
+                    'packing_qty'    => $item['packing_qty'] ?? '',
+                    'length'         => $item['length'] ?? '',
+                    'width'          => $item['width'] ?? '',
+                    'height'         => $item['height'] ?? '',
+                    'packing_detail' => $item['packing_detail'] ?? '',
+                    'volume'         => $item['volume'] ?? '',
+                    'gross_weight'   => $item['gross_weight'] ?? '',
+                    'net_weight'     => $item['net_weight'] ?? '',
+                ];
+            }
+        }
+
+        // Commercial invoice lines (no packing fields).
         foreach ($items as $item) {
             if (empty($item['description'])) {
                 continue;
@@ -162,8 +200,46 @@ class Packing_list_model extends App_Model
             $total   = $qty * $rate;
             $subtotal += $total;
             $totalTax += $total * ($taxrate / 100);
-            $totalWeight += (float) ($item['gross_weight'] ?? 0);
 
+            $row = [
+                'packing_list_id' => $id,
+                'description'     => $item['description'],
+                'hs_code'         => $item['hs_code'] ?? '',
+                'qty'             => $qty,
+                'unit_price'      => $rate,
+                'taxrate'         => $taxrate,
+                'total'           => $total,
+                'packing_detail'  => '',
+                'gross_weight'    => null,
+                'net_weight'      => null,
+                'volume'          => '',
+                'item_order'      => $order++,
+            ];
+
+            if ($this->db->field_exists('packing_qty', $table)) {
+                $row['packing_qty'] = 0;
+            }
+            if ($this->db->field_exists('unit_type', $table)) {
+                $row['unit_type'] = 'box';
+            }
+            if ($this->db->field_exists('unit_label', $table)) {
+                $row['unit_label'] = '';
+            }
+            if ($this->db->field_exists('length', $table)) {
+                $row['length'] = null;
+            }
+            if ($this->db->field_exists('width', $table)) {
+                $row['width'] = null;
+            }
+            if ($this->db->field_exists('height', $table)) {
+                $row['height'] = null;
+            }
+
+            $this->db->insert($table, $row);
+        }
+
+        // Independent packing detail lines (qty/price = 0 so they stay out of invoice totals).
+        foreach ($packingItems as $item) {
             $unitType = strtolower(trim((string) ($item['unit_type'] ?? 'box')));
             if (!in_array($unitType, ['box', 'pallet', 'other'], true)) {
                 $unitType = 'box';
@@ -182,14 +258,18 @@ class Packing_list_model extends App_Model
                 || (isset($item['gross_weight']) && $item['gross_weight'] !== '' && (float) $item['gross_weight'] > 0)
                 || (isset($item['net_weight']) && $item['net_weight'] !== '' && (float) $item['net_weight'] > 0);
 
-            // packing_qty only for lines that actually have packaging; do not copy commercial qty.
-            // Column is NOT NULL — use 0 for commercial-only lines (Dimensions skips via has_packaging).
+            $description = trim((string) ($item['description'] ?? ''));
+            if ($description === '' && !$hasPackaging) {
+                continue;
+            }
+            if ($description === '') {
+                $description = $unitType === 'pallet' ? 'Pallet' : ($unitType === 'other' && $unitLabel !== '' ? $unitLabel : 'Box');
+            }
+
             if (isset($item['packing_qty']) && $item['packing_qty'] !== '') {
                 $packingQty = (float) $item['packing_qty'];
-            } elseif ($hasPackaging) {
-                $packingQty = $qty;
             } else {
-                $packingQty = 0;
+                $packingQty = $hasPackaging ? 1.0 : 0.0;
             }
 
             if ($length !== null && $width !== null && $height !== null && $length > 0 && $width > 0 && $height > 0) {
@@ -203,16 +283,21 @@ class Packing_list_model extends App_Model
                 }
             }
 
+            if (!$hasPackaging && $cbm <= 0) {
+                continue;
+            }
+
+            $totalWeight += (float) ($item['gross_weight'] ?? 0);
             $totalCbm += $cbm;
 
             $row = [
                 'packing_list_id' => $id,
-                'description'     => $item['description'],
-                'hs_code'         => $item['hs_code'] ?? '',
-                'qty'             => $qty,
-                'unit_price'      => $rate,
-                'taxrate'         => $taxrate,
-                'total'           => $total,
+                'description'     => $description,
+                'hs_code'         => '',
+                'qty'             => 0,
+                'unit_price'      => 0,
+                'taxrate'         => 0,
+                'total'           => 0,
                 'packing_detail'  => $hasPackaging ? $packingDetail : '',
                 'gross_weight'    => isset($item['gross_weight']) && $item['gross_weight'] !== '' ? $item['gross_weight'] : null,
                 'net_weight'      => isset($item['net_weight']) && $item['net_weight'] !== '' ? $item['net_weight'] : null,
@@ -220,12 +305,10 @@ class Packing_list_model extends App_Model
                 'item_order'      => $order++,
             ];
 
-            $table = db_prefix() . 'otmain_packing_list_items';
             if ($this->db->field_exists('packing_qty', $table)) {
                 $row['packing_qty'] = $packingQty;
             }
             if ($this->db->field_exists('unit_type', $table)) {
-                // unit_type is NOT NULL with default 'box'
                 $row['unit_type'] = $hasPackaging ? $unitType : 'box';
             }
             if ($this->db->field_exists('unit_label', $table)) {

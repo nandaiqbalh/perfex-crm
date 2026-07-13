@@ -672,6 +672,9 @@ class Proposals_model extends App_Model
             if (array_key_exists('profit_percent', $item)) {
                 $insert_data['newitems'][$key]['profit_percent'] = $item['profit_percent'];
             }
+            if (array_key_exists('purchase_amount', $item)) {
+                $insert_data['newitems'][$key]['purchase_amount'] = $item['purchase_amount'];
+            }
 
             foreach ($custom_fields_items as $cf) {
                 $insert_data['newitems'][$key]['custom_fields']['items'][$cf['id']] = get_custom_field_value($item['id'], $cf['id'], 'items', false);
@@ -1168,6 +1171,9 @@ class Proposals_model extends App_Model
             $new_invoice_data['newitems'][$key]['order'] = $item['item_order'];
             if (array_key_exists('profit_percent', $item)) {
                 $new_invoice_data['newitems'][$key]['profit_percent'] = $item['profit_percent'];
+            }
+            if (array_key_exists('purchase_amount', $item)) {
+                $new_invoice_data['newitems'][$key]['purchase_amount'] = $item['purchase_amount'];
             }
             $key++;
         }

@@ -102,6 +102,35 @@ function otmain_packing_item_has_packaging($item)
 }
 
 /**
+ * Packing-only line: physical package with no commercial qty/price.
+ * Used so Invoice Items and Packing Details can be independent
+ * (one box/pallet may cover multiple commercial lines).
+ *
+ * @param array|object $item
+ * @return bool
+ */
+function otmain_is_packing_only_line($item)
+{
+    $item = (array) $item;
+    if (!otmain_packing_item_has_packaging($item)) {
+        return false;
+    }
+
+    return (float) ($item['qty'] ?? 0) == 0.0 && (float) ($item['unit_price'] ?? 0) == 0.0;
+}
+
+/**
+ * Commercial invoice line (exclude packing-only package rows).
+ *
+ * @param array|object $item
+ * @return bool
+ */
+function otmain_is_commercial_line($item)
+{
+    return !otmain_is_packing_only_line($item);
+}
+
+/**
  * Format quantity for PDF/UI: whole numbers without trailing decimals (1 not 1.00).
  *
  * @param mixed $qty
@@ -2424,6 +2453,9 @@ function otmain_pdf_packing_list_html($packing)
         . '</tr>';
 
     foreach ($packing->items as $item) {
+        if (otmain_is_packing_only_line($item)) {
+            continue;
+        }
         $html .= '<tr>'
             . '<td align="center">' . otmain_format_qty($item['qty']) . '</td>'
             . '<td>' . otmain_pdf_packing_item_description_html($item) . '</td>'

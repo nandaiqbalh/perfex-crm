@@ -89,6 +89,9 @@ return App_table::find('proposals')
             if (staff_can('edit', 'proposals')) {
                 $numberOutput .= ' | <a href="' . admin_url('proposals/proposal/' . $aRow[db_prefix() . 'proposals.id']) . '"' . ($project_id ? 'target="_blank"' : '') . '>' . _l('edit') . '</a>';
             }
+            if (staff_can('delete', 'proposals')) {
+                $numberOutput .= ' | <a href="' . admin_url('proposals/delete/' . $aRow[db_prefix() . 'proposals.id']) . '" class="_delete text-danger">' . _l('delete') . '</a>';
+            }
             $numberOutput .= '</div>';
 
             $row[] = $numberOutput;
