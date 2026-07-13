@@ -2,12 +2,40 @@
 
 defined('BASEPATH') or exit('No direct script access allowed');
 
+/**
+ * OT-Main production seed orchestrator.
+ *
+ * Bulk payloads live under libraries/seed/ — see seed/manifest.php and seed/README.md.
+ * Do not grow this class with per-document arrays; add a new file and register it.
+ */
 class Otmain_seed
 {
     protected $CI;
 
     /** Bump when seed dataset structure changes so force reseed is clearer. */
-    protected $marker = 'otmain_demo_v2';
+    protected $marker = 'otmain_prod_v2';
+
+    /** @var string Absolute path to libraries/seed */
+    protected $seedPath;
+
+    /** @var array<string,int> source_quote_number|key → proposal id */
+    protected $relatedRegistry = [];
+
+    /** @var array<string,int> company → client id */
+    protected $clientIdsByCompany = [];
+
+    /**
+     * Document IDs created in this run (written to otmain_seed_document_ids).
+     *
+     * @var array{proposals:int[],packing_lists:int[],purchase_orders:int[],invoices:int[],estimates:int[]}
+     */
+    protected $seededIds = [
+        'proposals'       => [],
+        'packing_lists'   => [],
+        'purchase_orders' => [],
+        'invoices'        => [],
+        'estimates'       => [],
+    ];
 
     public function __construct()
     {
@@ -23,302 +51,80 @@ class Otmain_seed
             'packing_list_model',
             'item_tracker_model',
         ]);
+        $this->seedPath = dirname(__FILE__) . '/seed';
     }
 
     public function run($force = false)
     {
-        if (!$force && get_option('otmain_demo_seed_marker') === $this->marker) {
+        if (!$force && get_option('otmain_seed_marker') === $this->marker) {
             return [
                 'status'  => 'skipped',
-                'message' => 'Demo data already exists. Add ?force=1 to recreate.',
+                'message' => 'Production seed already applied. Add ?force=1 to recreate.',
                 'links'   => $this->links(),
             ];
         }
 
-        // Always wipe old customers/docs first, then insert fresh seed data.
         $this->cleanup();
+        $this->relatedRegistry    = [];
+        $this->clientIdsByCompany = [];
+        $this->seededIds          = [
+            'proposals'       => [],
+            'packing_lists'   => [],
+            'purchase_orders' => [],
+            'invoices'        => [],
+            'estimates'       => [],
+        ];
 
-        $eurId = $this->getCurrencyId('EUR');
-        $usdId = $this->getCurrencyId('USD');
+        $eurId    = $this->getCurrencyId('EUR');
+        $usdId    = $this->getCurrencyId('USD');
+        $manifest = $this->loadSeedFile('manifest.php');
 
-        // Seed all relation customers from the provided list.
-        $clientIdsByCompany = [];
-        foreach ($this->customerCatalog() as $row) {
+        foreach ($this->loadSeedFile('customers.php') as $row) {
             $payload = $this->customerToPayload($row, $eurId, $usdId);
-            $clientIdsByCompany[$row['company']] = $this->ensureClient($payload);
+            $this->clientIdsByCompany[$row['company']] = $this->ensureClient($payload);
         }
 
-        $buyer     = $this->customerByCompany('Handelsmij SPT b.v.');
-        $invoiceC  = $this->customerByCompany('Suriname Shiphandling & Services NV');
-        $packingC  = $this->customerByCompany('TP Company Limited');
-        $supplierC = $this->customerByCompany('RR Holland');
-
-        $buyerPayload     = $this->customerToPayload($buyer, $eurId, $usdId);
-        $invoicePayload   = $this->customerToPayload($invoiceC, $eurId, $usdId);
-        $packingPayload   = $this->customerToPayload($packingC, $eurId, $usdId);
-        $supplierPayload  = $this->customerToPayload($supplierC, $eurId, $usdId);
-
-        $buyerId         = $clientIdsByCompany[$buyer['company']];
-        $invoiceClientId = $clientIdsByCompany[$invoiceC['company']];
-        $packingClientId = $clientIdsByCompany[$packingC['company']];
-        $supplierId      = $clientIdsByCompany[$supplierC['company']];
-
-        $proposalId = $this->CI->proposals_model->add([
-            'subject'              => 'Kovako M120 - Proposal',
-            'date'                 => '2026-07-04',
-            'open_till'            => '2026-07-28',
-            'currency'             => $eurId,
-            'status'               => 4,
-            'assigned'             => get_staff_user_id(),
-            'rel_type'             => 'customer',
-            'rel_id'               => $buyerId,
-            'proposal_to'          => $buyerPayload['company'],
-            'email'                => $buyerPayload['email'],
-            'phone'                => $buyerPayload['phonenumber'],
-            'address'              => $buyerPayload['address'],
-            'city'                 => $buyerPayload['city'],
-            'state'                => '',
-            'zip'                  => $buyerPayload['zip'],
-            'country'              => $buyerPayload['country'],
-            'client_ref'           => 'PO-REF-2026-07',
-            'quote_title'          => 'Kovako M120',
-            'document_title'       => 'Quotation',
-            'expiry_days'          => 24,
-            'availability'         => 'Immediate availability, subject to prior sale.',
-            'notes'                => 'Demo proposal notes.',
-            'contact_person_name'  => 'OT-Main Sales',
-            'contact_person_email' => 'sales@otmain.com',
-            'contact_person_phone' => get_option('invoice_company_phonenumber') ?: '+31647239658',
-            'payment_terms_text'   => 'To be agreed.',
-            'shipment_terms'       => 'EXW (Ex Works)',
-            'delivery_time'        => 'To be agreed.',
-            'total_usd_display'    => '$ 9,00',
-            'total_gold_display'   => '999.9 in GR.',
-            'subtotal'             => 132300,
-            'total_tax'            => 27783,
-            'total'                => 160083,
-            'discount_type'        => '',
-            'discount_percent'     => 0,
-            'discount_total'       => 0,
-            'newitems'             => $this->demoLineItems(),
-            'show_quantity_as'     => 1,
-            'allow_comments'       => 1,
-        ]);
-
-        if ($proposalId) {
-            $this->CI->db->where('id', $proposalId);
-            $this->CI->db->update(db_prefix() . 'proposals', [
-                'status' => 3,
-            ]);
-
-            $this->CI->item_tracker_model->populate_from_proposal((int) $proposalId);
-
-            $trackerItems = $this->CI->item_tracker_model->get((int) $proposalId);
-            if (!empty($trackerItems[0])) {
-                $this->CI->item_tracker_model->update_item((int) $trackerItems[0]['id'], [
-                    'item_status' => 'received',
-                    'notes'       => 'Received and QC passed.',
-                    'admin_notes' => 'Demo seed — item 1 complete.',
-                ]);
-            }
-            if (!empty($trackerItems[1])) {
-                $this->CI->item_tracker_model->update_item((int) $trackerItems[1]['id'], [
-                    'item_status' => 'quality_check',
-                    'notes'       => 'Arrived, under quality check.',
-                    'admin_notes' => 'Demo seed — awaiting QC sign-off.',
-                ]);
-            }
-            if (!empty($trackerItems[2])) {
-                $etaSql = date('Y-m-d', strtotime('+14 days'));
-                $this->CI->db->where('id', (int) $trackerItems[2]['id']);
-                $this->CI->db->update(db_prefix() . 'otmain_item_tracker', [
-                    'item_status' => 'eta',
-                    'eta_date'    => $etaSql,
-                    'notes'       => 'Supplier confirmed ETA.',
-                    'admin_notes' => 'Demo seed — ETA set.',
-                    'updated_by'  => get_staff_user_id(),
-                    'dateupdated' => date('Y-m-d H:i:s'),
-                ]);
-                $this->CI->item_tracker_model->auto_update_quotation_status((int) $proposalId);
+        $proposalIds = [];
+        $proposalId  = 0;
+        foreach ($manifest['proposals'] ?? [] as $relative) {
+            $def = $this->loadSeedFile($relative);
+            $id  = $this->seedProposal($def, $eurId, $usdId);
+            $proposalIds[] = $id;
+            if ($proposalId < 1) {
+                $proposalId = $id;
             }
         }
 
-        //
-        // TP Company Limited — Suction Hose DN400 Quotation
-        //
-        $tpProposalId = $this->CI->proposals_model->add([
-            'subject'              => 'Suction Hose DN400 - Proposal',
-            'date'                 => '2026-01-21',
-            'open_till'            => '2026-01-27',
-            'currency'             => $eurId,
-            'status'               => 3,
-            'assigned'             => get_staff_user_id(),
-            'rel_type'             => 'customer',
-            'rel_id'               => $packingClientId,
-            'proposal_to'          => $packingPayload['company'],
-            'email'                => 's.ibrahim@otmain.com',
-            'phone'                => '+316****8651',
-            'address'              => 'Bumbwini',
-            'city'                 => 'Zanzibar',
-            'state'                => '',
-            'zip'                  => 'P.O BOX 271',
-            'country'              => $packingPayload['country'],
-            'client_ref'           => '',
-            'quote_title'          => 'Suction Hose',
-            'document_title'       => 'Quotation',
-            'terms'                => '',
-            'expiry_days'          => 6,
-            'availability'         => '',
-            'notes'                => '',
-            'contact_person_name'  => 'S.A.Ibrahim',
-            'contact_person_email' => 's.ibrahim@otmain.com',
-            'contact_person_phone' => '+316****8651',
-            'payment_terms_text'   => '50% in advance<br />50% before delivery',
-            'shipment_terms'       => 'EXW Jakarta',
-            'delivery_time'        => '45 days',
-            'total_usd_display'    => '$ 28.665,00',
-            'total_gold_display'   => '999.9 in Gram',
-            'subtotal'             => 23880,
-            'total_tax'            => 0,
-            'total'                => 23880,
-            'discount_type'        => '',
-            'discount_percent'     => 0,
-            'discount_total'       => 0,
-            'newitems'             => [
-                1 => [
-                    'description'      => 'Vigor Ship Unloader — Suction Nozzle DN400',
-                    'long_description' => 'Complete assembled
-
-Scope of supply:
-Rotating suction nozzle, complete assembly
-DN400 suction nozzle with wear-resistant steel to ensure long service life
-Heavy-duty, dust-free slewing bearing for smooth and well-protected rotation
-Renewed and optimized false air hole design for improved airflow control
-
-Item: slew drive assembly 5613-20641-25-8.20-A-2026.03.10
-1 wooden box packing size: 2630X860X1000(mm)=2.262CBM GW: 731kg
-Hydraulic pinion drive equipped with an improved gear system',
-                    'qty'              => 1,
-                    'rate'             => 23880,
-                    'unit'             => 'unit',
-                    'taxname'          => [],
-                    'order'            => 1,
-                ],
-            ],
-            'show_quantity_as'     => 1,
-            'allow_comments'       => 1,
-        ]);
-
-        if ($tpProposalId) {
-            $this->CI->db->where('id', $tpProposalId);
-            $this->CI->db->update(db_prefix() . 'proposals', [
-                'status' => 3,
-            ]);
-
-            $this->CI->item_tracker_model->populate_from_proposal((int) $tpProposalId);
-
-            $tpTrackerItems = $this->CI->item_tracker_model->get((int) $tpProposalId);
-            if (!empty($tpTrackerItems[0])) {
-                $this->CI->item_tracker_model->update_item((int) $tpTrackerItems[0]['id'], [
-                    'item_status' => 'pending',
-                    'notes'       => '',
-                    'admin_notes' => 'Demo seed — TP Company quotation.',
-                ]);
-            }
+        $packingId = 0;
+        foreach ($manifest['packing_lists'] ?? [] as $relative) {
+            $packingId = $this->seedPackingList($this->loadSeedFile($relative), $eurId) ?: $packingId;
         }
 
+        $invoiceId = 0;
+        foreach ($manifest['invoices'] ?? [] as $relative) {
+            $this->loadSeedFile($relative);
+        }
+
+        $poId = 0;
+        foreach ($manifest['purchase_orders'] ?? [] as $relative) {
+            $poId = $this->seedPurchaseOrder($this->loadSeedFile($relative), $eurId) ?: $poId;
+        }
+
+        $this->saveSeededRegistry($this->seededIds);
+
+        update_option('otmain_seed_marker', $this->marker);
+        update_option('otmain_seed_proposal_id', (int) $proposalId);
+        if ($packingId > 0) {
+            update_option('otmain_seed_packing_id', (int) $packingId);
+        }
+        if ($poId > 0) {
+            update_option('otmain_seed_po_id', (int) $poId);
+        }
+
+        $this->ensureCurrencyDefaults();
+
+        $tpClientId = $this->clientIdsByCompany['TP Company Limited'] ?? 0;
         $estimateId = 0;
-        $invoiceId  = 0;
-        $packingId  = 0;
-        $poId       = 0;
-
-        //
-        // TP Company Limited — Suction Nozzle DN400 (quotation)
-        //
-        $tpProposalId2 = $this->CI->proposals_model->add([
-            'subject'              => 'Suction Nozzle DN400 - Proposal',
-            'date'                 => '2026-01-07',
-            'open_till'            => '2026-02-06',
-            'currency'             => $eurId,
-            'status'               => 3,
-            'assigned'             => get_staff_user_id(),
-            'rel_type'             => 'customer',
-            'rel_id'               => $packingClientId,
-            'proposal_to'          => $packingPayload['company'],
-            'email'                => 's.ibrahim@otmain.com',
-            'phone'                => '+316****8651',
-            'address'              => 'Bumbwini',
-            'city'                 => 'Zanzibar',
-            'state'                => '',
-            'zip'                  => 'P.O BOX 271',
-            'country'              => $packingPayload['country'],
-            'client_ref'           => '',
-            'quote_title'          => 'Suction Nozzle',
-            'document_title'       => 'Quotation',
-            'terms'                => '',
-            'expiry_days'          => 30,
-            'availability'         => '',
-            'notes'                => '',
-            'contact_person_name'  => 'S.A.Ibrahim',
-            'contact_person_email' => 's.ibrahim@otmain.com',
-            'contact_person_phone' => '+316****8651',
-            'payment_terms_text'   => '50% in advance<br />50% before delivery',
-            'shipment_terms'       => 'EXW - Rotterdam sea transport can be arranged',
-            'delivery_time'        => '4 weeks',
-            'total_usd_display'    => '',
-            'total_gold_display'   => '',
-            'subtotal'             => 21750,
-            'total_tax'            => 0,
-            'total'                => 21750,
-            'discount_type'        => '',
-            'discount_percent'     => 0,
-            'discount_total'       => 0,
-            'newitems'             => [
-                1 => [
-                    'description'      => 'Rotating Suction Nozzle (Raw Supply) DN400',
-                    'long_description' => 'Vigor Ship Unloader — Suction Nozzle DN400
-
-Including all required materials limited to suction nozzle only.
-The components will be delivered as separate parts and assembled by Vigor.
-The existing design will be scaled up to DN400 only; no design changes are included.
-The overall design concept and configuration will remain unchanged.',
-                    'qty'              => 1,
-                    'rate'             => 21750,
-                    'unit'             => 'unit',
-                    'taxname'          => [],
-                    'order'            => 1,
-                ],
-            ],
-            'show_quantity_as'     => 1,
-            'allow_comments'       => 1,
-        ]);
-
-        if ($tpProposalId2) {
-            $this->CI->db->where('id', $tpProposalId2);
-            $this->CI->db->update(db_prefix() . 'proposals', [
-                'status' => 3,
-            ]);
-            $this->CI->item_tracker_model->populate_from_proposal((int) $tpProposalId2);
-        }
-
-        update_option('otmain_demo_seed_marker', $this->marker);
-        update_option('otmain_demo_seed_proposal_id', (int) $proposalId);
-        update_option('otmain_demo_seed_tp_proposal_id', (int) $tpProposalId);
-
-        // Set currency conversion defaults for demo
-        if (get_option('otmain_eur_to_usd_rate') === false || get_option('otmain_eur_to_usd_rate') === '') {
-            update_option('otmain_eur_to_usd_rate', '1.09');
-        }
-        if (get_option('otmain_gold_price_eur_per_gram') === false || get_option('otmain_gold_price_eur_per_gram') === '') {
-            update_option('otmain_gold_price_eur_per_gram', '75.50');
-        }
-        $eurCurrency = $this->CI->db->where('name', 'EUR')->get(db_prefix() . 'currencies')->row();
-        if ($eurCurrency && (get_option('otmain_default_conversion_currency') === false || get_option('otmain_default_conversion_currency') === '')) {
-            $usdCurrency = $this->CI->db->where('name', 'USD')->get(db_prefix() . 'currencies')->row();
-            if ($usdCurrency) {
-                update_option('otmain_default_conversion_currency', (string) $usdCurrency->id);
-            }
-        }
 
         $ids = [
             'estimateId' => (int) $estimateId,
@@ -330,10 +136,269 @@ The overall design concept and configuration will remain unchanged.',
 
         return [
             'status'  => 'success',
-            'message' => 'Demo data created successfully (' . count($clientIdsByCompany) . ' customers).',
-            'ids'     => compact('buyerId', 'invoiceClientId', 'packingClientId', 'supplierId', 'estimateId', 'proposalId', 'invoiceId', 'packingId', 'poId'),
-            'links'   => $this->links($ids),
+            'message' => 'Production seed applied (' . count($this->clientIdsByCompany) . ' customers upserted, '
+                . count($proposalIds) . ' proposals). Only previous seed docs were replaced; other DB data kept.',
+            'ids'     => array_merge($ids, [
+                'tpClientId'  => (int) $tpClientId,
+                'proposalIds' => $proposalIds,
+                'seeded'      => $this->seededIds,
+            ]),
+            'related_registry' => $this->relatedRegistry,
+            'links'            => $this->links($ids),
         ];
+    }
+
+    /**
+     * @param string $relative Path under libraries/seed/
+     * @return mixed
+     */
+    protected function loadSeedFile($relative)
+    {
+        $path = $this->seedPath . '/' . ltrim(str_replace(['..', '\\'], '', $relative), '/');
+        if (!is_file($path)) {
+            throw new RuntimeException('Seed file not found: ' . $relative);
+        }
+
+        $data = require $path;
+        if ($data === 1) {
+            throw new RuntimeException('Seed file must return data: ' . $relative);
+        }
+
+        return $data;
+    }
+
+    /**
+     * @param array $def
+     * @param int   $eurId
+     * @param int   $usdId
+     * @return int proposal id
+     */
+    protected function seedProposal(array $def, $eurId, $usdId)
+    {
+        $company = $def['customer_company'] ?? '';
+        if ($company === '' || !isset($this->clientIdsByCompany[$company])) {
+            throw new RuntimeException('Proposal seed customer missing: ' . $company);
+        }
+
+        $clientId = $this->clientIdsByCompany[$company];
+        $row      = $this->customerByCompany($company);
+        $payload  = $this->customerToPayload($row, $eurId, $usdId);
+        $proposal = $def['proposal'] ?? [];
+
+        $useCustomerContact = !empty($proposal['use_customer_contact']);
+        unset($proposal['use_customer_contact']);
+
+        $proposal['currency'] = $eurId;
+        $proposal['assigned'] = get_staff_user_id();
+        $proposal['rel_type'] = $proposal['rel_type'] ?? 'customer';
+        $proposal['rel_id']   = $clientId;
+        $proposal['proposal_to'] = $proposal['proposal_to'] ?? $payload['company'];
+        $proposal['country']     = $proposal['country'] ?? $payload['country'];
+
+        if ($useCustomerContact) {
+            $proposal['email']   = $proposal['email'] ?? $payload['email'];
+            $proposal['phone']   = $proposal['phone'] ?? $payload['phonenumber'];
+            $proposal['address'] = $proposal['address'] ?? $payload['address'];
+            $proposal['city']    = $proposal['city'] ?? $payload['city'];
+            $proposal['zip']     = $proposal['zip'] ?? $payload['zip'];
+        }
+
+        if (($proposal['contact_person_phone'] ?? '') === '') {
+            $proposal['contact_person_phone'] = get_option('invoice_company_phonenumber') ?: '+31647239658';
+        }
+
+        $proposalId = (int) $this->CI->proposals_model->add($proposal);
+        if ($proposalId < 1) {
+            throw new RuntimeException('Failed to seed proposal: ' . ($def['key'] ?? 'unknown'));
+        }
+
+        $forceStatus = isset($def['force_status']) ? (int) $def['force_status'] : null;
+        if ($forceStatus !== null) {
+            $this->CI->db->where('id', $proposalId)->update(db_prefix() . 'proposals', [
+                'status' => $forceStatus,
+            ]);
+        }
+
+        if (!empty($def['populate_tracker'])) {
+            $this->CI->item_tracker_model->populate_from_proposal($proposalId);
+            $this->applyTrackerUpdates($proposalId, $def['tracker_updates'] ?? []);
+        }
+
+        if (!empty($def['save_option'])) {
+            update_option($def['save_option'], $proposalId);
+        }
+
+        $this->registerRelated($def, $proposalId);
+        $this->trackSeededId('proposals', $proposalId);
+
+        return $proposalId;
+    }
+
+    /**
+     * @param int   $proposalId
+     * @param array $updates
+     */
+    protected function applyTrackerUpdates($proposalId, array $updates)
+    {
+        if ($updates === []) {
+            return;
+        }
+
+        $trackerItems = $this->CI->item_tracker_model->get((int) $proposalId);
+        $needsAuto    = false;
+
+        foreach ($updates as $index => $update) {
+            if (empty($trackerItems[$index])) {
+                continue;
+            }
+
+            $itemId = (int) $trackerItems[$index]['id'];
+            $etaRaw = $update['eta_date'] ?? null;
+            unset($update['eta_date']);
+
+            if ($etaRaw !== null) {
+                $etaSql = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string) $etaRaw)
+                    ? (string) $etaRaw
+                    : date('Y-m-d', strtotime((string) $etaRaw));
+                $this->CI->db->where('id', $itemId)->update(db_prefix() . 'otmain_item_tracker', array_merge($update, [
+                    'eta_date'    => $etaSql,
+                    'updated_by'  => get_staff_user_id(),
+                    'dateupdated' => date('Y-m-d H:i:s'),
+                ]));
+                $needsAuto = true;
+                continue;
+            }
+
+            $this->CI->item_tracker_model->update_item($itemId, $update);
+        }
+
+        if ($needsAuto) {
+            $this->CI->item_tracker_model->auto_update_quotation_status((int) $proposalId);
+        }
+    }
+
+    /**
+     * Packing list definition:
+     * - customer_company
+     * - related_proposal_keys[]  → registry keys / source_quote_number / proposal key
+     * - packing                  → packing_list_model->add payload (without quote_ref_ids)
+     * - items                    → packing items (merged commercial + dims)
+     *
+     * @param array $def
+     * @param int   $eurId
+     * @return int
+     */
+    protected function seedPackingList(array $def, $eurId)
+    {
+        $company = $def['customer_company'] ?? '';
+        if ($company === '' || !isset($this->clientIdsByCompany[$company])) {
+            throw new RuntimeException('Packing seed customer missing: ' . $company);
+        }
+
+        $quoteIds = [];
+        $quoteRefLines = [];
+        foreach ($def['related_proposal_keys'] ?? [] as $key) {
+            $id = $this->resolveRelatedId($key);
+            if ($id < 1) {
+                throw new RuntimeException('Packing related proposal not in registry: ' . $key);
+            }
+            $quoteIds[] = $id;
+            if (function_exists('format_proposal_number')) {
+                $quoteRefLines[] = format_proposal_number($id);
+            }
+        }
+
+        $packing = $def['packing'] ?? [];
+        $packing['clientid']      = $this->clientIdsByCompany[$company];
+        $packing['currency']      = $packing['currency'] ?? $eurId;
+        $packing['quote_ref_ids'] = $quoteIds;
+        if (empty($packing['quote_ref']) && $quoteRefLines !== []) {
+            $packing['quote_ref'] = implode("\n", $quoteRefLines);
+        }
+        $packing['items'] = $def['items'] ?? ($packing['items'] ?? []);
+
+        $packingId = (int) $this->CI->packing_list_model->add($packing);
+        if ($packingId > 0 && !empty($def['save_option'])) {
+            update_option($def['save_option'], $packingId);
+        }
+        if ($packingId > 0) {
+            $this->trackSeededId('packing_lists', $packingId);
+        }
+
+        return $packingId;
+    }
+
+    /**
+     * @param array $def
+     * @param int   $eurId
+     * @return int
+     */
+    protected function seedPurchaseOrder(array $def, $eurId)
+    {
+        $company = $def['supplier_company'] ?? '';
+        if ($company === '' || !isset($this->clientIdsByCompany[$company])) {
+            throw new RuntimeException('PO seed supplier missing: ' . $company);
+        }
+
+        $po = $def['purchase_order'] ?? [];
+        $po['supplierid'] = $this->clientIdsByCompany[$company];
+        $po['currency']   = $po['currency'] ?? $eurId;
+        $po['items']      = $def['items'] ?? ($po['items'] ?? []);
+
+        $poId = (int) $this->CI->purchase_order_model->add($po);
+        if ($poId > 0 && !empty($def['save_option'])) {
+            update_option($def['save_option'], $poId);
+        }
+        if ($poId > 0) {
+            $this->trackSeededId('purchase_orders', $poId);
+        }
+
+        return $poId;
+    }
+
+    /**
+     * @param array $def
+     * @param int   $proposalId
+     */
+    protected function registerRelated(array $def, $proposalId)
+    {
+        $proposalId = (int) $proposalId;
+        if (!empty($def['key'])) {
+            $this->relatedRegistry[(string) $def['key']] = $proposalId;
+        }
+        if (!empty($def['source_quote_number'])) {
+            $this->relatedRegistry[(string) $def['source_quote_number']] = $proposalId;
+        }
+    }
+
+    /**
+     * @param string $key
+     * @return int
+     */
+    protected function resolveRelatedId($key)
+    {
+        $key = (string) $key;
+        if (isset($this->relatedRegistry[$key])) {
+            return (int) $this->relatedRegistry[$key];
+        }
+
+        return 0;
+    }
+
+    protected function ensureCurrencyDefaults()
+    {
+        if (get_option('otmain_eur_to_usd_rate') === false || get_option('otmain_eur_to_usd_rate') === '') {
+            update_option('otmain_eur_to_usd_rate', '1.09');
+        }
+        if (get_option('otmain_gold_price_eur_per_gram') === false || get_option('otmain_gold_price_eur_per_gram') === '') {
+            update_option('otmain_gold_price_eur_per_gram', '75.50');
+        }
+        if (get_option('otmain_default_conversion_currency') === false || get_option('otmain_default_conversion_currency') === '') {
+            $usdCurrency = $this->CI->db->where('name', 'USD')->get(db_prefix() . 'currencies')->row();
+            if ($usdCurrency) {
+                update_option('otmain_default_conversion_currency', (string) $usdCurrency->id);
+            }
+        }
     }
 
     /**
@@ -342,11 +407,15 @@ The overall design concept and configuration will remain unchanged.',
      */
     protected function links(array $ids = [])
     {
-        $estimateId = (int) ($ids['estimateId'] ?? get_option('otmain_demo_seed_estimate_id'));
-        $proposalId = (int) ($ids['proposalId'] ?? get_option('otmain_demo_seed_proposal_id'));
-        $invoiceId  = (int) ($ids['invoiceId'] ?? get_option('otmain_demo_seed_invoice_id'));
-        $packingId  = (int) ($ids['packingId'] ?? get_option('otmain_demo_seed_packing_id'));
-        $poId       = (int) ($ids['poId'] ?? get_option('otmain_demo_seed_po_id'));
+        $estimateId = (int) ($ids['estimateId'] ?? get_option('otmain_seed_estimate_id'));
+        $proposalId = (int) ($ids['proposalId'] ?? get_option('otmain_seed_proposal_id'));
+        $invoiceId  = (int) ($ids['invoiceId'] ?? get_option('otmain_seed_invoice_id'));
+        $packingId  = (int) ($ids['packingId'] ?? get_option('otmain_seed_packing_id'));
+        $poId       = (int) ($ids['poId'] ?? get_option('otmain_seed_po_id'));
+
+        if ($proposalId < 1) {
+            $proposalId = (int) get_option('otmain_seed_proposal_tp_suction_hose');
+        }
 
         if ($proposalId < 1) {
             $row = $this->CI->db
@@ -384,42 +453,6 @@ The overall design concept and configuration will remain unchanged.',
             'item_tracker_detail' => $proposalId > 0
                 ? admin_url('otmain/item_tracker/detail/' . $proposalId)
                 : admin_url('otmain/item_tracker'),
-            'item_tracker_tp'     => $proposalId > 0
-                ? admin_url('otmain/item_tracker/detail/' . (int) get_option('otmain_demo_seed_tp_proposal_id'))
-                : admin_url('otmain/item_tracker'),
-        ];
-    }
-
-    protected function demoLineItems()
-    {
-        return [
-            1 => [
-                'description'      => 'Kovako M120 Shipunloader',
-                'long_description' => 'Complete ship unloader unit, EXW Rotterdam.',
-                'qty'              => 1,
-                'rate'             => 125000,
-                'unit'             => 'unit',
-                'taxname'          => ['VAT|21'],
-                'order'            => 1,
-            ],
-            2 => [
-                'description'      => 'DN400 Rotating suction nozzle, complete assembly',
-                'long_description' => 'HS Code: 8483409090',
-                'qty'              => 1,
-                'rate'             => 2500,
-                'unit'             => 'pcs',
-                'taxname'          => ['VAT|21'],
-                'order'            => 2,
-            ],
-            3 => [
-                'description'      => 'Custom Made Suction hose DN400 x L5500mm',
-                'long_description' => 'HS Code: 400942',
-                'qty'              => 4,
-                'rate'             => 1200,
-                'unit'             => 'pcs',
-                'taxname'          => ['VAT|21'],
-                'order'            => 3,
-            ],
         ];
     }
 
@@ -431,8 +464,6 @@ The overall design concept and configuration will remain unchanged.',
     }
 
     /**
-     * Resolve country id by ISO2 or short name.
-     *
      * @param string $iso2
      * @return int
      */
@@ -468,7 +499,6 @@ The overall design concept and configuration will remain unchanged.',
 
         $existing = $this->CI->db->where('company', $company)->get(db_prefix() . 'clients')->row();
         if ($existing) {
-            // Keep address/contact fresh on reseed when company already exists.
             $update = [
                 'phonenumber'     => $data['phonenumber'] ?? '',
                 'address'         => $data['address'] ?? '',
@@ -495,7 +525,7 @@ The overall design concept and configuration will remain unchanged.',
 
     protected function customerByCompany($company)
     {
-        foreach ($this->customerCatalog() as $row) {
+        foreach ($this->loadSeedFile('customers.php') as $row) {
             if ($row['company'] === $company) {
                 return $row;
             }
@@ -516,7 +546,7 @@ The overall design concept and configuration will remain unchanged.',
         $email     = $this->normalizeEmail($row['email'], $row['nr']);
         $phone     = trim((string) ($row['phone'] ?? ''));
         $address   = trim((string) ($row['address'] ?? ''));
-        if ($address === '-' ) {
+        if ($address === '-') {
             $address = '';
         }
         $zip = trim((string) ($row['zip'] ?? ''));
@@ -563,142 +593,170 @@ The overall design concept and configuration will remain unchanged.',
     }
 
     /**
-     * Relation list provided for OT-Main demo seed.
-     *
-     * @return array<int, array{nr:int,company:string,address:string,zip:string,city:string,phone:string,email:string,country_iso:string}>
-     */
-    protected function customerCatalog()
-    {
-        return [
-            ['nr' => 1,  'company' => 'CemFlexX B.V.', 'address' => 'Pauvreweg 27', 'zip' => '4879NJ', 'city' => 'Etten-Leur', 'phone' => '+31 (0)76 850 39 04', 'email' => 'finance@cemflexx-int.org', 'country_iso' => 'NL'],
-            ['nr' => 2,  'company' => 'Suriname Shiphandling & Services NV', 'address' => 'Ds Martin Luther Kingweg 8-9', 'zip' => '', 'city' => 'Paramaribo', 'phone' => '+597-8532726', 'email' => 'jerrel@rudisa.net', 'country_iso' => 'SR'],
-            ['nr' => 3,  'company' => 'Belastingdienst', 'address' => '', 'zip' => '', 'city' => '', 'phone' => '', 'email' => '', 'country_iso' => 'NL'],
-            ['nr' => 4,  'company' => 'Yoyo Transport', 'address' => '32 Av. Villemain', 'zip' => '75014', 'city' => 'Paris', 'phone' => '', 'email' => 'yoyotransport@yahoo.com', 'country_iso' => 'FR'],
-            ['nr' => 5,  'company' => 'Bol.com', 'address' => 'Papendorpseweg 100', 'zip' => '3528 BJ', 'city' => 'Utrecht', 'phone' => '088 712 60 00', 'email' => '', 'country_iso' => 'NL'],
-            ['nr' => 6,  'company' => 'OT-Main', 'address' => 'Bajonetstraat 52', 'zip' => '3014 ZK', 'city' => 'Rotterdam', 'phone' => '+31647239658', 'email' => 'info@otmain.com', 'country_iso' => 'NL'],
-            ['nr' => 7,  'company' => 'TP Company Limited', 'address' => 'Bumbwini, P.O BOX 271', 'zip' => '', 'city' => 'Zanzibar', 'phone' => '+255242230722', 'email' => 'procurementmanager@turkyspetroleum.co.tz', 'country_iso' => 'TZ'],
-            ['nr' => 8,  'company' => 'WM Industrietechnik Isaak Öztürk & Oliver Schmidt GbR', 'address' => 'Südlohner Weg 34a', 'zip' => 'D-48703', 'city' => 'Stadtlohn', 'phone' => '+49 2563 2098550', 'email' => 'info@wm-industrietechnik.de', 'country_iso' => 'DE'],
-            ['nr' => 9,  'company' => 'Boettcher Conveying Systems & Service GmbH', 'address' => 'Theodor-Marwitz-Street 2a', 'zip' => '21337', 'city' => 'Lüneburg', 'phone' => '+49 4131 2213 100', 'email' => 'boe@power-in-motion.net', 'country_iso' => 'DE'],
-            ['nr' => 10, 'company' => 'Handelsmij SPT b.v.', 'address' => 'Rudonk 21', 'zip' => '4824 AJ', 'city' => 'Breda', 'phone' => '+31850660100', 'email' => 'info@smitspt.nl', 'country_iso' => 'NL'],
-            ['nr' => 11, 'company' => 'Doedijns b.v.', 'address' => 'Bleiswijkseweg 51', 'zip' => '2712 PB', 'city' => 'Zoetermeer', 'phone' => '+31880912600', 'email' => 'info@doedijns.com', 'country_iso' => 'NL'],
-            ['nr' => 12, 'company' => 'Projectservice Nederland B.V.', 'address' => 'Darwin 20', 'zip' => '7609RL', 'city' => 'Almelo', 'phone' => '+31854012499', 'email' => 'info@projectservice.nl', 'country_iso' => 'NL'],
-            ['nr' => 13, 'company' => 'Remote Control Parts B.V.', 'address' => 'Industrieweg 20', 'zip' => '4794 SX', 'city' => 'Heijningen', 'phone' => '+31167521228', 'email' => 'info@remotecontrolparts.nl', 'country_iso' => 'NL'],
-            ['nr' => 14, 'company' => 'Ayushman Freelancer', 'address' => 'Santoshi Mishra, E-233, Pariwar Passion apartment', 'zip' => '', 'city' => 'Bangalore', 'phone' => '+918587006726', 'email' => '', 'country_iso' => 'IN'],
-            ['nr' => 15, 'company' => 'Interfilter Industries B.V', 'address' => 'Seggeweg 2', 'zip' => '3237 MK', 'city' => 'Vierpolders', 'phone' => '+31181 - 31 11 87', 'email' => 'info@interfilter.nl', 'country_iso' => 'NL'],
-            ['nr' => 16, 'company' => 'Distrimex Pompen & Service BV', 'address' => 'Edisonstraat 12', 'zip' => '7006 RD', 'city' => 'Doetinchem', 'phone' => '+31 (0)314 36 84 44', 'email' => 'info@distrimex.nl', 'country_iso' => 'NL'],
-            ['nr' => 17, 'company' => 'Nanjing Deers Industrial Co., Ltd', 'address' => 'Hanzhong Road No. 185, Qinhuai Dist, Nanjing City', 'zip' => '', 'city' => 'Jiangsu Province', 'phone' => '+86 25 8450 7790', 'email' => 'sellers1@chinarubberfender.com', 'country_iso' => 'CN'],
-            ['nr' => 18, 'company' => 'Pov Fluid Control Technology (Wuhu) Co., Ltd', 'address' => 'No.6 Weishier Road, Yijiang Dist. Wuhu City', 'zip' => '', 'city' => 'Anhui Province', 'phone' => '+86 18616895255', 'email' => 'pov@povvalve.com', 'country_iso' => 'CN'],
-            ['nr' => 19, 'company' => 'Tanjung Agus Fastwork', 'address' => 'Karanganyar', 'zip' => '', 'city' => 'Jawa Tengah', 'phone' => '+6286921693226', 'email' => 'tanjungagus999@gmail.com', 'country_iso' => 'ID'],
-            ['nr' => 20, 'company' => 'Sylvano Fastwork', 'address' => 'Bekasi', 'zip' => '', 'city' => 'Jawa Barat', 'phone' => '+62895399399932', 'email' => '', 'country_iso' => 'ID'],
-            ['nr' => 21, 'company' => 'DHL Nederlands', 'address' => 'Amsterdam', 'zip' => '', 'city' => 'Amsterdam', 'phone' => '+3188-055 2000', 'email' => '', 'country_iso' => 'NL'],
-            ['nr' => 22, 'company' => 'B.V. VEGA', 'address' => 'Arnhemseweg-Zuid 213-2', 'zip' => '3817 CG', 'city' => 'Amersfoort', 'phone' => '(033) 450 25 02', 'email' => 'info.nl@vega.com', 'country_iso' => 'NL'],
-            ['nr' => 23, 'company' => 'Parcop s.r.l.', 'address' => 'Via filomarino III trav N 13', 'zip' => '80070', 'city' => 'Monte di Procida Napoli', 'phone' => '39 081 868 2064', 'email' => '', 'country_iso' => 'IT'],
-            ['nr' => 24, 'company' => 'LabelsDirect BV', 'address' => 'Trasmolenlaan 12', 'zip' => '3447 GZ', 'city' => 'Woerden', 'phone' => '0348 342 186', 'email' => '', 'country_iso' => 'NL'],
-            ['nr' => 25, 'company' => 'Verpakgigant.nl', 'address' => 'De Schrepel 24 B1', 'zip' => '1648 GC', 'city' => 'De Goorn', 'phone' => '', 'email' => 'support@verpakgigant.nl', 'country_iso' => 'NL'],
-            ['nr' => 26, 'company' => 'Amazon EU S.à r.l', 'address' => 'Mr. Treublaan 7', 'zip' => '1097 DP', 'city' => 'Amsterdam', 'phone' => '', 'email' => '', 'country_iso' => 'NL'],
-            ['nr' => 27, 'company' => 'Fastwork.id', 'address' => '', 'zip' => '', 'city' => '', 'phone' => '+62 821-6747-1450', 'email' => 'support@fastwork.id', 'country_iso' => 'ID'],
-            ['nr' => 28, 'company' => 'Dongguan Dxseals Technology Co.,Ltd', 'address' => '56 Dongcheng Road, Guancheng District, Dongguan', 'zip' => '', 'city' => 'Dongguan', 'phone' => '+86 15992798689', 'email' => 'sales1@dxtseals.com', 'country_iso' => 'CN'],
-            ['nr' => 29, 'company' => 'Unique Transmission Equipment (Luoyang) Co., Ltd.', 'address' => 'No.22 Binhe Road, New & High Tech Industry Development Zone', 'zip' => '471000', 'city' => 'Luoyang', 'phone' => '+86 0379 64915181', 'email' => '', 'country_iso' => 'CN'],
-            ['nr' => 30, 'company' => 'SHENZHEN WETAC TECHNOLOGY CO.,LTD', 'address' => 'ROOM 106, BUILDING 1, NO. 5 NIUXING ROAD', 'zip' => '', 'city' => 'Dongguan, Guangdong', 'phone' => '86-13530046228', 'email' => 'atlastrade@163.com', 'country_iso' => 'CN'],
-            ['nr' => 31, 'company' => 'V-Trust Inspection Service Group', 'address' => '', 'zip' => '', 'city' => '', 'phone' => '+86-20-89089938', 'email' => 'cathy.xiao@v-trust.com', 'country_iso' => 'CN'],
-            ['nr' => 32, 'company' => 'FS International Limited Cargo', 'address' => 'I/F Block C Sea View Estate, No.8 Watson Road, North Point', 'zip' => '', 'city' => 'Hong Kong', 'phone' => '85228400824', 'email' => '', 'country_iso' => 'HK'],
-            ['nr' => 33, 'company' => 'PT. Trinity Konsultan Group', 'address' => 'Jl. Gn Saputan No.1A, Pemecutan Kelod, Denpasar Barat', 'zip' => '', 'city' => 'Bali', 'phone' => '082341878520', 'email' => 'trinity.konsultangroup@gmail.com', 'country_iso' => 'ID'],
-            ['nr' => 34, 'company' => 'Rubix B.V', 'address' => '', 'zip' => '', 'city' => '', 'phone' => '', 'email' => '', 'country_iso' => 'NL'],
-            ['nr' => 35, 'company' => 'Hydrotechnik24.de', 'address' => '', 'zip' => '', 'city' => '', 'phone' => '', 'email' => '', 'country_iso' => 'DE'],
-            ['nr' => 36, 'company' => 'Automation24 GmbH', 'address' => 'Keurenplein 41', 'zip' => '1069CD', 'city' => 'Amsterdam', 'phone' => '', 'email' => '', 'country_iso' => 'NL'],
-            ['nr' => 37, 'company' => 'Jorny Product B.V', 'address' => 'Philipshoofjesweg 90', 'zip' => '3247 XS', 'city' => 'Dirksland', 'phone' => '+31 (0)6 51 95 10 96', 'email' => '', 'country_iso' => 'NL'],
-            ['nr' => 38, 'company' => 'Hydraunica B.V.', 'address' => 'Biesbosweg 2', 'zip' => '5145 PZ', 'city' => 'Waalwijk', 'phone' => '+31 318 519 837', 'email' => 'j.denhertog@hydraunica.nl', 'country_iso' => 'NL'],
-            ['nr' => 39, 'company' => 'RR Holland', 'address' => 'Energieweg 34', 'zip' => '4906CG', 'city' => 'Oosterhout', 'phone' => '+31162456397', 'email' => 'sales@rrholland.nl', 'country_iso' => 'NL'],
-            ['nr' => 40, 'company' => 'Witway Webshops B.V', 'address' => 'Tussendiepen 48', 'zip' => '9206AE', 'city' => 'Drachten', 'phone' => '0850020030', 'email' => 'klantenservice@witway.nl', 'country_iso' => 'NL'],
-            ['nr' => 41, 'company' => 'Klium N.V', 'address' => 'Ekkelgaarden 26', 'zip' => '3500', 'city' => 'Hasselt', 'phone' => '', 'email' => '', 'country_iso' => 'BE'],
-            ['nr' => 42, 'company' => 'Meuth', 'address' => '', 'zip' => '', 'city' => '', 'phone' => '', 'email' => '', 'country_iso' => 'DE'],
-            ['nr' => 43, 'company' => 'Scheepvaartcenter', 'address' => 'Krammer 8', 'zip' => '3232 HE', 'city' => 'Brielle', 'phone' => '', 'email' => '', 'country_iso' => 'NL'],
-            ['nr' => 44, 'company' => 'Shenzen Rongtai Automation Technology Co.Ltd', 'address' => 'Room 401, No. 29-1, Xintangkeng Road, Silian Community, Longgang District', 'zip' => '', 'city' => 'Shenzhen', 'phone' => '', 'email' => '', 'country_iso' => 'CN'],
-            ['nr' => 45, 'company' => 'Outletspecialist BV', 'address' => 'Zuidhollandsedijk 179', 'zip' => '5171 TM', 'city' => 'Kaatsheuvel', 'phone' => '', 'email' => '', 'country_iso' => 'NL'],
-            ['nr' => 46, 'company' => 'RS Components BV', 'address' => 'Bingerweg 19', 'zip' => '2001 HN', 'city' => 'Haarlem', 'phone' => '0235166555', 'email' => '', 'country_iso' => 'NL'],
-            ['nr' => 47, 'company' => 'PT.Agung Buana Sentosa', 'address' => 'Komp.Pengampon Square B12,B15,Jl. Semut Baru, Pabean Cantikan', 'zip' => '', 'city' => 'Surabaya', 'phone' => '(031)3550081', 'email' => '', 'country_iso' => 'ID'],
-        ];
-    }
-
-    /**
-     * Wipe demo/sales data and ALL customers before re-inserting seed.
-     * Order matters: documents first (FK / Perfex reference checks), then clients.
+     * Wipe only documents previously created by this seed (otmain_seed_document_ids).
+     * Customers and non-seed documents are preserved.
      */
     protected function cleanup()
     {
-        // Item tracker rows
-        if ($this->CI->db->table_exists(db_prefix() . 'otmain_item_tracker')) {
-            $this->CI->db->empty_table(db_prefix() . 'otmain_item_tracker');
+        $registry = $this->getSeededRegistry();
+
+        $proposalIds = $registry['proposals'];
+        $packingIds  = $registry['packing_lists'];
+        $poIds       = $registry['purchase_orders'];
+        $invoiceIds  = $registry['invoices'];
+        $estimateIds = $registry['estimates'];
+
+        if ($this->CI->db->table_exists(db_prefix() . 'otmain_item_tracker') && $proposalIds !== []) {
+            $this->CI->db
+                ->where('rel_type', 'proposal')
+                ->where_in('rel_id', $proposalIds)
+                ->delete(db_prefix() . 'otmain_item_tracker');
         }
 
-        // Packing lists
-        if ($this->CI->db->table_exists(db_prefix() . 'otmain_packing_list_items')) {
-            $this->CI->db->empty_table(db_prefix() . 'otmain_packing_list_items');
-        }
-        if ($this->CI->db->table_exists(db_prefix() . 'otmain_packing_lists')) {
-            $packingIds = $this->CI->db->select('id')->get(db_prefix() . 'otmain_packing_lists')->result_array();
-            foreach ($packingIds as $row) {
-                $this->CI->packing_list_model->delete((int) $row['id']);
-            }
+        foreach ($packingIds as $id) {
+            $this->CI->packing_list_model->delete((int) $id);
         }
 
-        // Purchase orders
-        if ($this->CI->db->table_exists(db_prefix() . 'otmain_purchase_order_items')) {
-            $this->CI->db->empty_table(db_prefix() . 'otmain_purchase_order_items');
-        }
-        if ($this->CI->db->table_exists(db_prefix() . 'otmain_purchase_orders')) {
-            $poIds = $this->CI->db->select('id')->get(db_prefix() . 'otmain_purchase_orders')->result_array();
-            foreach ($poIds as $row) {
-                $this->CI->purchase_order_model->delete((int) $row['id']);
-            }
+        foreach ($poIds as $id) {
+            $this->CI->purchase_order_model->delete((int) $id);
         }
 
-        // Proposals (also removes itemable via model)
-        $proposalIds = $this->CI->db->select('id')->get(db_prefix() . 'proposals')->result_array();
-        foreach ($proposalIds as $row) {
-            $this->CI->proposals_model->delete((int) $row['id']);
+        foreach ($proposalIds as $id) {
+            $this->CI->proposals_model->delete((int) $id);
         }
 
-        // Estimates
-        $estimateIds = $this->CI->db->select('id')->get(db_prefix() . 'estimates')->result_array();
-        foreach ($estimateIds as $row) {
-            $this->CI->estimates_model->delete((int) $row['id'], true);
+        foreach ($estimateIds as $id) {
+            $this->CI->estimates_model->delete((int) $id, true);
         }
 
-        // Invoices
-        $invoiceIds = $this->CI->db->select('id')->get(db_prefix() . 'invoices')->result_array();
-        foreach ($invoiceIds as $row) {
-            $this->CI->invoices_model->delete((int) $row['id'], true);
+        foreach ($invoiceIds as $id) {
+            $this->CI->invoices_model->delete((int) $id, true);
         }
 
-        // Credit notes (can block client delete)
-        if ($this->CI->db->table_exists(db_prefix() . 'creditnotes')) {
-            $this->CI->load->model('credit_notes_model');
-            $creditIds = $this->CI->db->select('id')->get(db_prefix() . 'creditnotes')->result_array();
-            foreach ($creditIds as $row) {
-                if (method_exists($this->CI->credit_notes_model, 'delete')) {
-                    $this->CI->credit_notes_model->delete((int) $row['id'], true);
+        $optionKeys = [
+            'otmain_seed_marker',
+            'otmain_seed_document_ids',
+            'otmain_seed_estimate_id',
+            'otmain_seed_proposal_id',
+            'otmain_seed_proposal_tp_suction_hose',
+            'otmain_seed_invoice_id',
+            'otmain_seed_packing_id',
+            'otmain_seed_po_id',
+            'otmain_demo_seed_marker',
+            'otmain_demo_seed_estimate_id',
+            'otmain_demo_seed_proposal_id',
+            'otmain_demo_seed_tp_proposal_id',
+            'otmain_demo_seed_invoice_id',
+            'otmain_demo_seed_packing_id',
+            'otmain_demo_seed_po_id',
+        ];
+        foreach ($optionKeys as $key) {
+            delete_option($key);
+        }
+    }
+
+    /**
+     * @param string $type
+     * @param int    $id
+     */
+    protected function trackSeededId($type, $id)
+    {
+        $id = (int) $id;
+        if ($id < 1 || !isset($this->seededIds[$type])) {
+            return;
+        }
+        if (!in_array($id, $this->seededIds[$type], true)) {
+            $this->seededIds[$type][] = $id;
+        }
+    }
+
+    /**
+     * @return array{proposals:int[],packing_lists:int[],purchase_orders:int[],invoices:int[],estimates:int[]}
+     */
+    protected function getSeededRegistry()
+    {
+        $empty = [
+            'proposals'       => [],
+            'packing_lists'   => [],
+            'purchase_orders' => [],
+            'invoices'        => [],
+            'estimates'       => [],
+        ];
+
+        $raw = get_option('otmain_seed_document_ids');
+        if (is_string($raw) && $raw !== '') {
+            $decoded = json_decode($raw, true);
+            if (is_array($decoded)) {
+                foreach ($empty as $key => $_) {
+                    if (!empty($decoded[$key]) && is_array($decoded[$key])) {
+                        $empty[$key] = array_values(array_unique(array_map('intval', $decoded[$key])));
+                        $empty[$key] = array_values(array_filter($empty[$key]));
+                    }
                 }
+
+                return $empty;
             }
         }
 
-        // ALL customers + contacts (after docs are gone so reference checks pass)
-        $clients = $this->CI->db->select('userid')->get(db_prefix() . 'clients')->result_array();
-        foreach ($clients as $client) {
-            $result = $this->CI->clients_model->delete((int) $client['userid']);
-            // Fallback if still referenced: hard-delete contact + client rows
-            if (is_array($result) && !empty($result['referenced'])) {
-                $uid = (int) $client['userid'];
-                $this->CI->db->where('userid', $uid)->delete(db_prefix() . 'contacts');
-                $this->CI->db->where('userid', $uid)->delete(db_prefix() . 'clients');
+        // One-time fallback: previous single-option IDs from older seed runs.
+        foreach ([
+            'otmain_seed_proposal_id',
+            'otmain_seed_proposal_tp_suction_hose',
+            'otmain_demo_seed_proposal_id',
+            'otmain_demo_seed_tp_proposal_id',
+        ] as $opt) {
+            $id = (int) get_option($opt);
+            if ($id > 0) {
+                $empty['proposals'][] = $id;
+            }
+        }
+        foreach (['otmain_seed_packing_id', 'otmain_demo_seed_packing_id'] as $opt) {
+            $id = (int) get_option($opt);
+            if ($id > 0) {
+                $empty['packing_lists'][] = $id;
+            }
+        }
+        foreach (['otmain_seed_po_id', 'otmain_demo_seed_po_id'] as $opt) {
+            $id = (int) get_option($opt);
+            if ($id > 0) {
+                $empty['purchase_orders'][] = $id;
+            }
+        }
+        foreach (['otmain_seed_invoice_id', 'otmain_demo_seed_invoice_id'] as $opt) {
+            $id = (int) get_option($opt);
+            if ($id > 0) {
+                $empty['invoices'][] = $id;
+            }
+        }
+        foreach (['otmain_seed_estimate_id', 'otmain_demo_seed_estimate_id'] as $opt) {
+            $id = (int) get_option($opt);
+            if ($id > 0) {
+                $empty['estimates'][] = $id;
             }
         }
 
-        delete_option('otmain_demo_seed_marker');
-        delete_option('otmain_demo_seed_estimate_id');
-        delete_option('otmain_demo_seed_proposal_id');
-        delete_option('otmain_demo_seed_invoice_id');
-        delete_option('otmain_demo_seed_packing_id');
-        delete_option('otmain_demo_seed_po_id');
+        foreach ($empty as $key => $ids) {
+            $empty[$key] = array_values(array_unique(array_filter($ids)));
+        }
+
+        return $empty;
+    }
+
+    /**
+     * @param array $registry
+     */
+    protected function saveSeededRegistry(array $registry)
+    {
+        $clean = [
+            'proposals'       => array_values(array_unique(array_map('intval', $registry['proposals'] ?? []))),
+            'packing_lists'   => array_values(array_unique(array_map('intval', $registry['packing_lists'] ?? []))),
+            'purchase_orders' => array_values(array_unique(array_map('intval', $registry['purchase_orders'] ?? []))),
+            'invoices'        => array_values(array_unique(array_map('intval', $registry['invoices'] ?? []))),
+            'estimates'       => array_values(array_unique(array_map('intval', $registry['estimates'] ?? []))),
+        ];
+        foreach ($clean as $key => $ids) {
+            $clean[$key] = array_values(array_filter($ids));
+        }
+        update_option('otmain_seed_document_ids', json_encode($clean));
     }
 }

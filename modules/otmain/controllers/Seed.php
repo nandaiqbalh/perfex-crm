@@ -18,7 +18,7 @@ class Seed extends AdminController
         $this->load->library('otmain/otmain_seed');
         $result = $this->otmain_seed->run($force);
 
-        $data['title']  = 'OT-Main Demo Data';
+        $data['title']  = 'OT-Main Production Seed';
         $data['result'] = $result;
         $this->load->view('seed/result', $data);
     }
