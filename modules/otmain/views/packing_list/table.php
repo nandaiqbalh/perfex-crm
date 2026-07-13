@@ -41,7 +41,7 @@ foreach ($rResult as $aRow) {
     $row[] = e(_d($aRow['date']));
     $row[] = e(get_company_name($aRow['clientid']));
     $row[] = e($aRow['vessel']);
-    $row[] = e($aRow['quote_ref']);
+    $row[] = e(strip_tags($aRow['quote_ref']));
 
     $row['DT_RowClass'] = 'has-row-options';
     $output['aaData'][] = $row;

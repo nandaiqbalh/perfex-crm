@@ -2271,7 +2271,11 @@ function otmain_pdf_packing_quote_ref_html($quoteRef)
         return '-';
     }
 
-    $lines = preg_split("/\r\n|\n|\r/", $quoteRef);
+    // Data stored already has <br /> from nl2br_save_html in packing_list_model.
+    // Strip them back before we split, so we don't double-encode.
+    $quoteRef = str_ireplace(['<br />', '<br>', '<br/>'], "\n", $quoteRef);
+
+    $lines = preg_split("/\\r\\n|\\n|\\r/", $quoteRef);
     $html  = e(array_shift($lines));
     foreach ($lines as $line) {
         $line = trim($line);
