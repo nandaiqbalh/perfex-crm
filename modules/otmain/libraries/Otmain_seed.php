@@ -552,6 +552,7 @@ class Otmain_seed
             'firstname'             => 'Primary',
             'lastname'              => 'Contact',
             'email'                 => $email,
+            'password'              => '123Password!',
             'is_primary'            => 1,
             'donotsendwelcomeemail' => 1,
         ];
