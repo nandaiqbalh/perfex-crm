@@ -35,9 +35,8 @@ class Otmain_seed
             ];
         }
 
-        if ($force) {
-            $this->cleanup();
-        }
+        // Always wipe old customers/docs first, then insert fresh seed data.
+        $this->cleanup();
 
         $eurId = $this->getCurrencyId('EUR');
         $usdId = $this->getCurrencyId('USD');
@@ -627,43 +626,77 @@ class Otmain_seed
         ];
     }
 
+    /**
+     * Wipe demo/sales data and ALL customers before re-inserting seed.
+     * Order matters: documents first (FK / Perfex reference checks), then clients.
+     */
     protected function cleanup()
     {
-        $estimateId = (int) get_option('otmain_demo_seed_estimate_id');
-        $proposalId = (int) get_option('otmain_demo_seed_proposal_id');
-        $invoiceId  = (int) get_option('otmain_demo_seed_invoice_id');
-        $packingId  = (int) get_option('otmain_demo_seed_packing_id');
-        $poId       = (int) get_option('otmain_demo_seed_po_id');
-
-        if ($proposalId > 0) {
-            $this->CI->db->where('rel_type', 'proposal');
-            $this->CI->db->where('rel_id', $proposalId);
-            $this->CI->db->delete(db_prefix() . 'otmain_item_tracker');
-
-            $this->CI->proposals_model->delete($proposalId);
-        }
-        if ($poId > 0) {
-            $this->CI->purchase_order_model->delete($poId);
-        }
-        if ($packingId > 0) {
-            $this->CI->packing_list_model->delete($packingId);
-        }
-        if ($invoiceId > 0) {
-            $this->CI->invoices_model->delete($invoiceId);
-        }
-        if ($estimateId > 0) {
-            $this->CI->estimates_model->delete($estimateId);
+        // Item tracker rows
+        if ($this->CI->db->table_exists(db_prefix() . 'otmain_item_tracker')) {
+            $this->CI->db->empty_table(db_prefix() . 'otmain_item_tracker');
         }
 
-        // Also remove legacy v1 companies if still present.
-        $companies = array_map(static function ($row) {
-            return $row['company'];
-        }, $this->customerCatalog());
+        // Packing lists
+        if ($this->CI->db->table_exists(db_prefix() . 'otmain_packing_list_items')) {
+            $this->CI->db->empty_table(db_prefix() . 'otmain_packing_list_items');
+        }
+        if ($this->CI->db->table_exists(db_prefix() . 'otmain_packing_lists')) {
+            $packingIds = $this->CI->db->select('id')->get(db_prefix() . 'otmain_packing_lists')->result_array();
+            foreach ($packingIds as $row) {
+                $this->CI->packing_list_model->delete((int) $row['id']);
+            }
+        }
 
-        foreach ($companies as $company) {
-            $client = $this->CI->db->where('company', $company)->get(db_prefix() . 'clients')->row();
-            if ($client) {
-                $this->CI->clients_model->delete($client->userid);
+        // Purchase orders
+        if ($this->CI->db->table_exists(db_prefix() . 'otmain_purchase_order_items')) {
+            $this->CI->db->empty_table(db_prefix() . 'otmain_purchase_order_items');
+        }
+        if ($this->CI->db->table_exists(db_prefix() . 'otmain_purchase_orders')) {
+            $poIds = $this->CI->db->select('id')->get(db_prefix() . 'otmain_purchase_orders')->result_array();
+            foreach ($poIds as $row) {
+                $this->CI->purchase_order_model->delete((int) $row['id']);
+            }
+        }
+
+        // Proposals (also removes itemable via model)
+        $proposalIds = $this->CI->db->select('id')->get(db_prefix() . 'proposals')->result_array();
+        foreach ($proposalIds as $row) {
+            $this->CI->proposals_model->delete((int) $row['id']);
+        }
+
+        // Estimates
+        $estimateIds = $this->CI->db->select('id')->get(db_prefix() . 'estimates')->result_array();
+        foreach ($estimateIds as $row) {
+            $this->CI->estimates_model->delete((int) $row['id'], true);
+        }
+
+        // Invoices
+        $invoiceIds = $this->CI->db->select('id')->get(db_prefix() . 'invoices')->result_array();
+        foreach ($invoiceIds as $row) {
+            $this->CI->invoices_model->delete((int) $row['id'], true);
+        }
+
+        // Credit notes (can block client delete)
+        if ($this->CI->db->table_exists(db_prefix() . 'creditnotes')) {
+            $this->CI->load->model('credit_notes_model');
+            $creditIds = $this->CI->db->select('id')->get(db_prefix() . 'creditnotes')->result_array();
+            foreach ($creditIds as $row) {
+                if (method_exists($this->CI->credit_notes_model, 'delete')) {
+                    $this->CI->credit_notes_model->delete((int) $row['id'], true);
+                }
+            }
+        }
+
+        // ALL customers + contacts (after docs are gone so reference checks pass)
+        $clients = $this->CI->db->select('userid')->get(db_prefix() . 'clients')->result_array();
+        foreach ($clients as $client) {
+            $result = $this->CI->clients_model->delete((int) $client['userid']);
+            // Fallback if still referenced: hard-delete contact + client rows
+            if (is_array($result) && !empty($result['referenced'])) {
+                $uid = (int) $client['userid'];
+                $this->CI->db->where('userid', $uid)->delete(db_prefix() . 'contacts');
+                $this->CI->db->where('userid', $uid)->delete(db_prefix() . 'clients');
             }
         }
 

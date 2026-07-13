@@ -25,7 +25,10 @@
                         </ul>
 
                         <hr />
-                        <p class="text-muted">Untuk membuat ulang data demo: <a href="<?php echo admin_url('otmain/seed?force=1'); ?>">Seed ulang (?force=1)</a></p>
+                        <p class="text-muted">
+                            Seed akan <strong>hapus semua customers + dokumen terkait</strong> lalu insert data baru.
+                            Untuk seed ulang: <a href="<?php echo admin_url('otmain/seed?force=1'); ?>">Seed ulang (?force=1)</a>
+                        </p>
                     </div>
                 </div>
             </div>
