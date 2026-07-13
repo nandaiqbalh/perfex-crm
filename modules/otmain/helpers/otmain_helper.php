@@ -1291,8 +1291,13 @@ function otmain_pdf_po_totals_column_html($po, $currencyName = 'EUR')
     $summary = otmain_pdf_po_calculate_vat_summary($po->items);
     $currencyLabel = otmain_currency_display_code($currencyName);
 
-    $usdDisplay  = isset($po->total_usd_display) ? trim((string) $po->total_usd_display) : '';
-    $goldDisplay = isset($po->total_gold_display) ? trim((string) $po->total_gold_display) : '';
+    $origUsdDisplay  = isset($po->total_usd_display) ? trim((string) $po->total_usd_display) : '';
+    $origGoldDisplay = isset($po->total_gold_display) ? trim((string) $po->total_gold_display) : '';
+    $usdDisplay      = $origUsdDisplay;
+    $goldDisplay     = $origGoldDisplay;
+    if ($goldDisplay === '0' || $goldDisplay === '0.00' || strtolower($goldDisplay) === '0') {
+        $goldDisplay = '';
+    }
 
     $rate   = otmain_get_conversion_rate($po);
     $target = otmain_get_conversion_currency($po);
@@ -1300,6 +1305,7 @@ function otmain_pdf_po_totals_column_html($po, $currencyName = 'EUR')
     $targetId = $target ? (int) $target->id : 0;
     $canConvert = ($rate > 0 && $target && $targetId > 0 && $targetId !== $docCurrencyId);
 
+    // Auto-calc only fills values; does not force rows to appear.
     if ($usdDisplay === '' && $canConvert) {
         $usdDisplay = otmain_format_money_text(((float) $summary['total']) * $rate, $target);
     }
@@ -1317,11 +1323,15 @@ function otmain_pdf_po_totals_column_html($po, $currencyName = 'EUR')
         $html .= '<tr><td align="right"><strong>VAT ' . e((string) $vatRate) . '%</strong></td><td align="right">' . otmain_pdf_format_total_amount($amount, $currencyName) . '</td></tr>';
     }
     $html .= '<tr><td align="right"><strong>TOTAL ' . e($currencyLabel) . '</strong></td><td align="right"><strong>' . otmain_pdf_format_total_amount($summary['total'], $currencyName) . '</strong></td></tr>';
-    if ($canConvert || $usdDisplay !== '') {
+
+    // Only show converted currency / gold when explicitly set on the document.
+    if ($origUsdDisplay !== '') {
         $convertedLabel = $target ? ('TOTAL ' . otmain_currency_display_code($target)) : 'TOTAL CONVERTED';
-        $html .= '<tr><td align="right"><strong>' . e($convertedLabel) . '</strong></td><td align="right">' . ($usdDisplay !== '' ? e($usdDisplay) : '-') . '</td></tr>';
+        $html .= '<tr><td align="right"><strong>' . e($convertedLabel) . '</strong></td><td align="right">' . e($usdDisplay) . '</td></tr>';
     }
-    $html .= '<tr><td align="right"><strong>TOTAL GOLD</strong></td><td align="right">' . ($goldDisplay !== '' ? e($goldDisplay) : '-') . '</td></tr>';
+    if ($origGoldDisplay !== '') {
+        $html .= '<tr><td align="right"><strong>TOTAL GOLD</strong></td><td align="right">' . e($goldDisplay) . '</td></tr>';
+    }
     $html .= '</table>';
 
     return $html;
