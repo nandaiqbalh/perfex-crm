@@ -430,9 +430,9 @@
     function otmainCurrencyDisplayCode(name) {
         name = (name || '').toString().trim().toUpperCase();
         if (!name || name === 'EUR' || name === '€' || name === 'EURO') {
-            return 'EURO';
+            return '€';
         }
-        return name.replace(/^€\s*/, '');
+        return name.replace(/^€\s*/, '').replace(/^EURO\s*/, '');
     }
 
     function otmainSelectedCurrencyName($formSelector) {

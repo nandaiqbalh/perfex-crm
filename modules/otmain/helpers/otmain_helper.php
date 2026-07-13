@@ -1060,7 +1060,7 @@ function otmain_get_eur_usd_rate($document = null)
 }
 
 /**
- * Currency code for display (no symbols). Always short system codes.
+ * Normalize a currency reference to a short display code for use in PDFs.
  * EUR → EURO; Indonesian Rupiah → IDR; US Dollar → USD.
  *
  * @param mixed $currency string name/code, currency object, or id
@@ -1091,26 +1091,35 @@ function otmain_currency_display_code($currency)
         }
     }
 
-    $name = strtoupper(trim(html_entity_decode($name, ENT_QUOTES | ENT_HTML5, 'UTF-8')));
-    $name = preg_replace('/\x{00A0}/u', ' ', $name);
-    $name = preg_replace('/[^A-Z0-9]+/', ' ', $name);
-    $name = trim(preg_replace('/\s+/', ' ', $name));
+    $name   = strtoupper(trim(html_entity_decode($name, ENT_QUOTES | ENT_HTML5, 'UTF-8')));
+    $name   = preg_replace('/\x{00A0}/u', ' ', $name);
+    $name   = preg_replace('/[^A-Z0-9]+/', ' ', $name);
+    $name   = trim(preg_replace('/\s+/', ' ', $name));
     $symbol = trim(html_entity_decode((string) $symbol, ENT_QUOTES | ENT_HTML5, 'UTF-8'));
 
-    if ($name === 'EUR' || $name === 'EURO' || $name === 'EUROPEAN EURO' || $symbol === '€') {
+    // Use symbol when available
+    if ($symbol === '€') {
+        return '€';
+    }
+    if ($symbol === '$') {
+        return '$';
+    }
+    if ($symbol !== '' && $symbol !== $name) {
+        return $symbol;
+    }
+
+    // Fallback: short text codes
+    if ($name === 'EUR' || $name === 'EURO' || $name === 'EUROPEAN EURO') {
         return 'EURO';
     }
     if ($name === 'USD' || strpos($name, 'DOLLAR') !== false || strpos($name, 'UNITED STATES') !== false) {
         return 'USD';
     }
-    if ($name === 'IDR' || strpos($name, 'RUPIAH') !== false || strpos($name, 'INDONESIA') !== false || stripos($symbol, 'rp') === 0) {
+    if ($name === 'IDR' || strpos($name, 'RUPIAH') !== false || strpos($name, 'INDONESIA') !== false) {
         return 'IDR';
     }
-    if ($name === '' && $symbol === '$') {
-        return 'USD';
-    }
     if (preg_match('/^[A-Z]{3}$/', $name)) {
-        return $name === 'EUR' ? 'EURO' : $name;
+        return $name;
     }
 
     // Never print long full names on PDFs (causes wrapping like INDONESIAN / RUPIAH)
@@ -1160,10 +1169,10 @@ function otmain_format_money_text($amount, $currency = 'EUR')
     }
 
     $code = otmain_currency_display_code($currency);
-    $symbol = otmain_currency_display_symbol($currency);
 
-    if ($symbol !== '') {
-        return $symbol . ' ' . app_format_number($amount);
+    // Symbol (€, $) goes before, text code (EURO, USD) goes after
+    if (in_array($code, ['€', '$', '£', '¥', 'Rp', '₩', '₽', '₹'])) {
+        return $code . ' ' . app_format_number($amount);
     }
 
     return app_format_number($amount) . ' ' . $code;
