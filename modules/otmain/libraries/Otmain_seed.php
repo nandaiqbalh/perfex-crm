@@ -37,6 +37,9 @@ class Otmain_seed
         'estimates'       => [],
     ];
 
+    /** Default client-area password for contacts created/synced by seed. */
+    protected $seedContactPassword = '123Password!';
+
     public function __construct()
     {
         $this->CI = &get_instance();
@@ -628,6 +631,12 @@ class Otmain_seed
                 $this->CI->db->where('userid', $existing->userid)->update(db_prefix() . 'clients', $update);
             }
 
+            // Existing clients keep master data, but seed password must stay predictable for portal login.
+            $primaryId = $this->getPrimaryContactId((int) $existing->userid);
+            if ($primaryId > 0) {
+                $this->syncSeedContactPassword($primaryId);
+            }
+
             return (int) $existing->userid;
         }
 
@@ -703,7 +712,8 @@ class Otmain_seed
     }
 
     /**
-     * Find or create contact under client. Never updates existing contact rows.
+     * Find or create contact under client. Never updates name/email/phone on existing rows.
+     * Always syncs seed portal password so login stays predictable after re-seed.
      *
      * @param int    $clientId
      * @param string $name
@@ -725,6 +735,8 @@ class Otmain_seed
                 ->get(db_prefix() . 'contacts')
                 ->row();
             if ($existing) {
+                $this->syncSeedContactPassword((int) $existing->id);
+
                 return (int) $existing->id;
             }
         }
@@ -738,6 +750,8 @@ class Otmain_seed
             foreach ($contacts as $c) {
                 $full = strtolower(preg_replace('/\s+/', ' ', trim(($c['firstname'] ?? '') . ' ' . ($c['lastname'] ?? ''))));
                 if ($full === $needle) {
+                    $this->syncSeedContactPassword((int) $c['id']);
+
                     return (int) $c['id'];
                 }
             }
@@ -763,7 +777,7 @@ class Otmain_seed
             'lastname'              => $last,
             'email'                 => $emailForDb,
             'phonenumber'           => $phone,
-            'password'              => '123Password!',
+            'password'              => $this->seedContactPassword,
             'donotsendwelcomeemail' => true,
             'invoice_emails'        => 0,
             'estimate_emails'       => 0,
@@ -779,6 +793,25 @@ class Otmain_seed
         }
 
         return $contactId;
+    }
+
+    /**
+     * Force contact portal password to the seed default (hashed). Does not change other fields.
+     *
+     * @param int $contactId
+     */
+    protected function syncSeedContactPassword($contactId)
+    {
+        $contactId = (int) $contactId;
+        if ($contactId < 1) {
+            return;
+        }
+
+        $this->CI->db->where('id', $contactId)->update(db_prefix() . 'contacts', [
+            'password'             => app_hash_password($this->seedContactPassword),
+            'last_password_change' => date('Y-m-d H:i:s'),
+            'active'               => 1,
+        ]);
     }
 
     protected function customerByCompany($company)
@@ -833,7 +866,7 @@ class Otmain_seed
             'firstname'             => 'Primary',
             'lastname'              => 'Contact',
             'email'                 => $email,
-            'password'              => '123Password!',
+            'password'              => $this->seedContactPassword,
             'is_primary'            => 1,
             'donotsendwelcomeemail' => 1,
         ];
