@@ -63,38 +63,6 @@ class Otmain_seed
         $packingClientId = $clientIdsByCompany[$packingC['company']];
         $supplierId      = $clientIdsByCompany[$supplierC['company']];
 
-        $estimateId = $this->CI->estimates_model->add([
-            'clientid'                  => $buyerId,
-            'project_id'                => 0,
-            'date'                      => '2026-07-04',
-            'currency'                  => $eurId,
-            'status'                    => 2,
-            'discount_type'             => '',
-            'discount_percent'          => 0,
-            'discount_total'            => 0,
-            'include_shipping'          => 0,
-            'show_shipping_on_estimate' => 1,
-            'show_quantity_as'          => 1,
-            'billing_street'            => $buyerPayload['address'],
-            'billing_city'              => $buyerPayload['city'],
-            'billing_zip'               => $buyerPayload['zip'],
-            'billing_country'           => $buyerPayload['country'],
-            'client_ref'                => 'Kovako Shipunload M120',
-            'quote_title'               => 'Kovako M120',
-            'expiry_days'               => 24,
-            'shipment_terms'            => 'EXW (Ex Works)',
-            'delivery_time'             => 'Immediate availability, subject to prior sale.',
-            'availability'              => 'Shipunloader is available for sale.',
-            'payment_terms_text'        => 'To be agreed.',
-            'total_usd_display'         => '$ 9,00',
-            'total_gold_display'        => '999.9 in Gram',
-            'adminnote'                 => 'Demo quotation seeded by OT-Main module.',
-            'newitems'                  => $this->demoLineItems(),
-        ]);
-
-        $estimate    = $this->CI->estimates_model->get($estimateId);
-        $quoteNumber = format_estimate_number($estimate);
-
         $proposalId = $this->CI->proposals_model->add([
             'subject'              => 'Kovako M120 - Proposal',
             'date'                 => '2026-07-04',
@@ -259,159 +227,82 @@ Hydraulic pinion drive equipped with an improved gear system',
             }
         }
 
-        $invoiceId = $this->CI->invoices_model->add([
-            'clientid'                 => $invoiceClientId,
-            'project_id'               => 0,
-            'date'                     => '2026-07-04',
-            'duedate'                  => '2026-08-03',
-            'currency'                 => $eurId,
-            'status'                   => 1,
-            'discount_type'            => '',
-            'discount_percent'         => 0,
-            'discount_total'           => 0,
-            'include_shipping'         => 0,
-            'show_shipping_on_invoice' => 1,
-            'show_quantity_as'         => 1,
-            'billing_street'           => $invoicePayload['address'],
-            'billing_city'             => $invoicePayload['city'],
-            'billing_zip'              => $invoicePayload['zip'],
-            'billing_country'          => $invoicePayload['country'],
-            'quote_ref'                => $estimateId,
-            'invoice_title'            => 'Spare Parts - Henna-T',
-            'expiry_days'              => 30,
-            'total_usd_display'        => '$ 9,00',
-            'total_gold_display'       => '999.9 in GR.',
-            'adminnote'                => 'Demo invoice linked to quotation ' . $quoteNumber,
-            'newitems'                 => [
+        $estimateId = 0;
+        $invoiceId  = 0;
+        $packingId  = 0;
+        $poId       = 0;
+
+        //
+        // TP Company Limited — Suction Nozzle DN400 (quotation)
+        //
+        $tpProposalId2 = $this->CI->proposals_model->add([
+            'subject'              => 'Suction Nozzle DN400 - Proposal',
+            'date'                 => '2026-01-07',
+            'open_till'            => '2026-02-06',
+            'currency'             => $eurId,
+            'status'               => 3,
+            'assigned'             => get_staff_user_id(),
+            'rel_type'             => 'customer',
+            'rel_id'               => $packingClientId,
+            'proposal_to'          => $packingPayload['company'],
+            'email'                => 's.ibrahim@otmain.com',
+            'phone'                => '+316****8651',
+            'address'              => 'Bumbwini',
+            'city'                 => 'Zanzibar',
+            'state'                => '',
+            'zip'                  => 'P.O BOX 271',
+            'country'              => $packingPayload['country'],
+            'client_ref'           => '',
+            'quote_title'          => 'Suction Nozzle',
+            'document_title'       => 'Quotation',
+            'terms'                => '',
+            'expiry_days'          => 30,
+            'availability'         => '',
+            'notes'                => '',
+            'contact_person_name'  => 'S.A.Ibrahim',
+            'contact_person_email' => 's.ibrahim@otmain.com',
+            'contact_person_phone' => '+316****8651',
+            'payment_terms_text'   => '50% in advance<br />50% before delivery',
+            'shipment_terms'       => 'EXW - Rotterdam sea transport can be arranged',
+            'delivery_time'        => '4 weeks',
+            'total_usd_display'    => '',
+            'total_gold_display'   => '',
+            'subtotal'             => 21750,
+            'total_tax'            => 0,
+            'total'                => 21750,
+            'discount_type'        => '',
+            'discount_percent'     => 0,
+            'discount_total'       => 0,
+            'newitems'             => [
                 1 => [
-                    'description'      => 'DN400 Rotating suction nozzle, complete assembly',
-                    'long_description' => 'HS Code: 8483409090',
+                    'description'      => 'Rotating Suction Nozzle (Raw Supply) DN400',
+                    'long_description' => 'Vigor Ship Unloader — Suction Nozzle DN400
+
+Including all required materials limited to suction nozzle only.
+The components will be delivered as separate parts and assembled by Vigor.
+The existing design will be scaled up to DN400 only; no design changes are included.
+The overall design concept and configuration will remain unchanged.',
                     'qty'              => 1,
-                    'rate'             => 2500,
-                    'unit'             => 'pcs',
-                    'taxname'          => ['VAT|21'],
+                    'rate'             => 21750,
+                    'unit'             => 'unit',
+                    'taxname'          => [],
                     'order'            => 1,
                 ],
-                2 => [
-                    'description'      => 'Compensator DN400',
-                    'long_description' => 'HS Code: 400942',
-                    'qty'              => 2,
-                    'rate'             => 450,
-                    'unit'             => 'pcs',
-                    'taxname'          => ['VAT|21'],
-                    'order'            => 2,
-                ],
             ],
+            'show_quantity_as'     => 1,
+            'allow_comments'       => 1,
         ]);
 
-        $packingId = $this->CI->packing_list_model->add([
-            'clientid'          => $packingClientId,
-            'quote_ref'         => $quoteNumber,
-            'date'              => '2026-07-05',
-            'vessel'            => 'Vigor Cement Shipunloader',
-            'consignee_name'    => $packingPayload['company'],
-            'consignee_address' => trim($packingPayload['address'] . "\n" . $packingPayload['city']),
-            'consignee_phone'   => $packingPayload['phonenumber'],
-            'consignee_email'   => $packingPayload['email'],
-            'purchaser_name'    => $packingPayload['company'],
-            'purchaser_address' => trim($packingPayload['address'] . "\n" . $packingPayload['city']),
-            'purchaser_phone'   => $packingPayload['phonenumber'],
-            'purchaser_email'   => $packingPayload['email'],
-            'currency'          => $eurId,
-            'subtotal_usd'      => 5940,
-            'adminnote'         => 'Demo packing list for cement shipunloader spare parts.',
-            'items'             => [
-                [
-                    'description'    => 'DN400 Rotating suction nozzle, complete assembly',
-                    'hs_code'        => '8483409090',
-                    'qty'            => 1,
-                    'packing_qty'    => 1,
-                    'unit_type'      => 'box',
-                    'length'         => 2630,
-                    'width'          => 860,
-                    'height'         => 1000,
-                    'unit_price'     => 2500,
-                    'packing_detail' => '1 Box: L2630 x W860 x H1000mm',
-                    'gross_weight'   => 731,
-                    'net_weight'     => 661,
-                    'volume'         => '2.262 CBM',
-                ],
-                [
-                    'description'    => 'Custom Made Suction hose DN400 x L5500mm',
-                    'hs_code'        => '400942',
-                    'qty'            => 4,
-                    'packing_qty'    => 4,
-                    'unit_type'      => 'box',
-                    'length'         => 5500,
-                    'width'          => 600,
-                    'height'         => 600,
-                    'unit_price'     => 1200,
-                    'packing_detail' => '4 Box: L5500 x W600 x H600mm',
-                    'gross_weight'   => 2360,
-                    'net_weight'     => 2360,
-                    'volume'         => '7.920 CBM',
-                ],
-                [
-                    'description'    => 'Compensator DN400',
-                    'hs_code'        => '400942',
-                    'qty'            => 2,
-                    'packing_qty'    => 1,
-                    'unit_type'      => 'box',
-                    'length'         => 340,
-                    'width'          => 600,
-                    'height'         => 600,
-                    'unit_price'     => 450,
-                    'packing_detail' => '1 Box: L340 x W600 x H600mm',
-                    'gross_weight'   => 220,
-                    'net_weight'     => 220,
-                    'volume'         => '0.122 CBM',
-                ],
-            ],
-        ]);
-
-        $poId = $this->CI->purchase_order_model->add([
-            'document_title'         => 'Purchase Order',
-            'supplierid'             => $supplierId,
-            'date'                   => '2026-07-05',
-            'supplier_quote_ref'     => '2451625',
-            'contact_person'         => 'RR Holland Sales',
-            'email'                  => $supplierPayload['email'],
-            'phone'                  => $supplierPayload['phonenumber'],
-            'company_name'           => 'OT-MAIN',
-            'company_address'        => 'Bajonetstraat 52',
-            'company_postal_code'    => '3014ZK',
-            'company_city'           => 'Rotterdam',
-            'company_country'        => 'The Netherlands',
-            'company_phone'          => '+31647239658',
-            'company_email_invoices' => 'inv@otmain.com',
-            'company_website'        => 'www.otmain.com',
-            'company_vat'            => 'NL004830818B51',
-            'company_coc'            => '90597427',
-            'iban'                   => 'NL34ABNA0548504303',
-            'currency'               => $eurId,
-            'adminnote'              => 'Demo purchase order to supplier RR Holland.',
-            'items'                  => [
-                [
-                    'description' => 'Hydraulic pump assembly for shipunloader',
-                    'qty'         => 1,
-                    'unit_price'  => 3200,
-                    'taxrate'     => 21,
-                ],
-                [
-                    'description' => 'Seal kit DN400 rotating nozzle',
-                    'qty'         => 2,
-                    'unit_price'  => 185,
-                    'taxrate'     => 21,
-                ],
-            ],
-        ]);
+        if ($tpProposalId2) {
+            $this->CI->db->where('id', $tpProposalId2);
+            $this->CI->db->update(db_prefix() . 'proposals', [
+                'status' => 3,
+            ]);
+            $this->CI->item_tracker_model->populate_from_proposal((int) $tpProposalId2);
+        }
 
         update_option('otmain_demo_seed_marker', $this->marker);
-        update_option('otmain_demo_seed_estimate_id', (int) $estimateId);
         update_option('otmain_demo_seed_proposal_id', (int) $proposalId);
-        update_option('otmain_demo_seed_invoice_id', (int) $invoiceId);
-        update_option('otmain_demo_seed_packing_id', (int) $packingId);
-        update_option('otmain_demo_seed_po_id', (int) $poId);
         update_option('otmain_demo_seed_tp_proposal_id', (int) $tpProposalId);
 
         // Set currency conversion defaults for demo
