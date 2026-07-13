@@ -51,7 +51,7 @@ $isEdit = !empty($pl);
                                     <p><strong><?php echo _l('client'); ?>:</strong> <?php echo e(get_company_name($pl->clientid)); ?></p>
                                     <p><strong><?php echo _l('currency'); ?>:</strong> <?php echo e(otmain_packing_currency_name($pl)); ?></p>
                                     <p><strong><?php echo _l('otmain_vessel'); ?>:</strong> <?php echo e($pl->vessel); ?></p>
-                                    <p><strong><?php echo _l('otmain_quote_reference'); ?>:</strong> <?php echo e($pl->quote_ref); ?></p>
+                                    <p><strong><?php echo _l('otmain_quote_reference'); ?>:</strong> <?php echo process_text_content_for_display($pl->quote_ref); ?></p>
                                 </div>
                                 <div class="col-md-6">
                                     <p class="bold"><?php echo _l('otmain_consignee'); ?></p>
