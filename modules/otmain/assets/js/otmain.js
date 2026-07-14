@@ -750,6 +750,35 @@
                 otmainCalculateExpiryDate('input[name="date"]', '#expiry_days', 'input[name="open_till"]');
             });
 
+            /** Company/client name for proposal To (contact person lives in Contact section). */
+            function otmainGetProposalCompanyName() {
+                var help = ($('#use_company_help').text() || '').trim();
+                if (help) {
+                    return help;
+                }
+                if ($('#rel_type').val() !== 'customer' || !$('#rel_id').val()) {
+                    return '';
+                }
+                var name = ($('#rel_id option:selected').text() || '').trim();
+                if (name) {
+                    return name;
+                }
+                return ($('[data-id="rel_id"] .filter-option-inner-inner').first().text() || '').trim();
+            }
+
+            function otmainFillProposalToCompany() {
+                var company = otmainGetProposalCompanyName();
+                if (!company) {
+                    return;
+                }
+                $('input[name="proposal_to"]').val(company);
+            }
+
+            // Click/focus To → fill company name (instead of primary contact).
+            $('body').on('focus click', 'input[name="proposal_to"]', function() {
+                otmainFillProposalToCompany();
+            });
+
             function proposalMaybeLoadContacts() {
                 var relType = $('#rel_type').val();
                 var relId = $('#rel_id').val();
@@ -761,6 +790,15 @@
 
             $('body').on('change', '#rel_type,#rel_id', proposalMaybeLoadContacts);
             proposalMaybeLoadContacts();
+
+            // After customer AJAX fills primary contact into To, prefer company name.
+            $('body').on('change', '#rel_id', function() {
+                if ($('#rel_type').val() !== 'customer') {
+                    return;
+                }
+                setTimeout(otmainFillProposalToCompany, 250);
+                setTimeout(otmainFillProposalToCompany, 700);
+            });
 
             $('body').on('change', '#otmain_contact_id', function() {
                 var $opt = $(this).find('option:selected');
