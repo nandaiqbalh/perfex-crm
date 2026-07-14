@@ -480,10 +480,10 @@ function otmain_format_proposal_number($format, $id)
     $row = $CI->db->get(db_prefix() . 'proposals')->row();
 
     $year = $row && !empty($row->date) ? date('Y', strtotime($row->date)) : date('Y');
-    $prefix = trim((string) (get_option('proposal_number_prefix') ?: 'OTPSQ'));
+    $prefix = trim((string) (get_option('proposal_number_prefix') ?: 'OTMSQ'));
     $title = $row && !empty($row->quote_title) ? (' - ' . trim((string) $row->quote_title)) : '';
 
-    // Example target: "20 - 2026 - OTPSQ - 120 - Kovako M120"
+    // Example target: "20 - 2026 - OTMSQ - 120 - Kovako M120"
     $offerCount = (int) $id;
     $counter1xx = (int) $id + 100;
 
