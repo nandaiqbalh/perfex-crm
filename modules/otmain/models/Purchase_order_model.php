@@ -172,6 +172,17 @@ class Purchase_order_model extends App_Model
             $data['proposal_id'] = (int) $data['proposal_id'];
         }
 
+        if (!empty($data['supplierid']) && function_exists('otmain_supplier_address_needs_client_refresh')) {
+            $companyAddr = $data['company_address']
+                ?? (get_option('invoice_company_address') ?: 'Bajonetstraat 52');
+            if (otmain_supplier_address_needs_client_refresh($data['supplier_address'] ?? '', $companyAddr)) {
+                $fromClient = otmain_format_client_address_lines($data['supplierid']);
+                if ($fromClient !== '') {
+                    $data['supplier_address'] = nl2br_save_html($fromClient);
+                }
+            }
+        }
+
         $data = otmain_normalize_conversion_fields($data);
 
         return $data;

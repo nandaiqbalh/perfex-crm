@@ -71,7 +71,10 @@ $poNumber = isset($po) ? $po->formatted_number : ($next_po_number ?? otmain_prev
             <div class="col-md-6 otmain-col-right">
                 <?php
                 $supplierAddress = isset($po) ? clear_textarea_breaks($po->supplier_address ?? '') : '';
-                echo render_textarea('supplier_address', 'otmain_supplier_address', $supplierAddress, ['rows' => 4]);
+                echo render_textarea('supplier_address', 'otmain_supplier_address', $supplierAddress, [
+                    'rows'         => 4,
+                    'autocomplete' => 'off',
+                ]);
                 ?>
             </div>
         </div>

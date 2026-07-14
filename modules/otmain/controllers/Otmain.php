@@ -209,15 +209,9 @@ class Otmain extends AdminController
         $phone   = $contact['phonenumber'] ?? ($client->phonenumber ?? '');
         $email   = $contact['email'] ?? '';
 
-        $address = trim(implode("\n", array_filter([
-            $client->billing_street ?? '',
-            trim(($client->billing_zip ?? '') . ' ' . ($client->billing_city ?? '')),
-            $client->billing_state ?? '',
-        ])));
-
         echo json_encode([
             'company'           => $client->company,
-            'address'           => $address,
+            'address'           => otmain_format_client_address_lines($clientid),
             'phone'             => $phone,
             'email'             => $email,
             'default_currency'  => !empty($client->default_currency) ? (int) $client->default_currency : 0,

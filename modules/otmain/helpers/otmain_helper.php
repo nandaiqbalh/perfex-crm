@@ -860,20 +860,74 @@ function otmain_format_client_address_lines($clientid)
         return '';
     }
 
-    $lines = array_filter([
-        $client->billing_street ?? '',
-        trim(($client->billing_zip ?? '') . ' ' . ($client->billing_city ?? '')),
-        $client->billing_state ?? '',
-    ]);
+    $street = trim(clear_textarea_breaks((string) ($client->billing_street ?? '')));
+    $zip    = trim((string) ($client->billing_zip ?? ''));
+    $city   = trim((string) ($client->billing_city ?? ''));
+    $state  = trim((string) ($client->billing_state ?? ''));
+    $countryId = (int) ($client->billing_country ?? 0);
 
-    if (!empty($client->billing_country)) {
-        $countryName = get_country_short_name($client->billing_country);
+    // Customer profile "Address / City / Zip / Country" live on address/city/... —
+    // billing_* is often left empty. Fall back so PO/packing get the real address.
+    if ($street === '' && $zip === '' && $city === '' && $state === '') {
+        $street = trim(clear_textarea_breaks((string) ($client->address ?? '')));
+        $zip    = trim((string) ($client->zip ?? ''));
+        $city   = trim((string) ($client->city ?? ''));
+        $state  = trim((string) ($client->state ?? ''));
+        $countryId = (int) ($client->country ?? 0);
+    }
+
+    $lines = array_filter([
+        $street,
+        trim($zip . ' ' . $city),
+        $state,
+    ], static function ($line) {
+        return $line !== '';
+    });
+
+    if ($countryId > 0) {
+        $countryName = get_country_short_name($countryId);
         if ($countryName) {
             $lines[] = $countryName;
         }
     }
 
     return implode("\n", $lines);
+}
+
+/**
+ * Collapse address text for comparison (ignore breaks / spacing).
+ */
+function otmain_normalize_address_compare($text)
+{
+    $text = clear_textarea_breaks((string) $text);
+    $text = html_entity_decode($text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+    $text = strtolower(preg_replace('/\s+/u', '', $text));
+
+    return $text !== null ? $text : '';
+}
+
+/**
+ * True when $address is empty or looks like the PO issuer (OT-MAIN) address.
+ */
+function otmain_supplier_address_needs_client_refresh($address, $companyAddress = '')
+{
+    $current = trim(clear_textarea_breaks((string) $address));
+    if ($current === '') {
+        return true;
+    }
+
+    $companyAddress = trim((string) $companyAddress);
+    if ($companyAddress === '') {
+        $companyAddress = (string) (get_option('invoice_company_address') ?: 'Bajonetstraat 52');
+    }
+
+    $a = otmain_normalize_address_compare($current);
+    $b = otmain_normalize_address_compare($companyAddress);
+    if ($a !== '' && $b !== '' && ($a === $b || strpos($a, $b) !== false || strpos($b, $a) !== false)) {
+        return true;
+    }
+
+    return false;
 }
 
 function otmain_po_apply_missing_defaults($po)
@@ -892,8 +946,14 @@ function otmain_po_apply_missing_defaults($po)
         $po->document_title = 'Purchase Order';
     }
 
-    if (empty($po->supplier_address) && !empty($po->supplierid)) {
-        $po->supplier_address = nl2br_save_html(otmain_format_client_address_lines($po->supplierid));
+    if (!empty($po->supplierid)) {
+        $fromClient = otmain_format_client_address_lines($po->supplierid);
+        if ($fromClient !== '' && otmain_supplier_address_needs_client_refresh(
+            $po->supplier_address ?? '',
+            $po->company_address ?? ''
+        )) {
+            $po->supplier_address = nl2br_save_html($fromClient);
+        }
     }
 
     return $po;
@@ -1180,6 +1240,9 @@ function otmain_currency_display_code($currency)
     if ($symbol === '€') {
         return '€';
     }
+    if ($symbol === '£') {
+        return '£';
+    }
     if ($symbol === '$') {
         return '$';
     }
@@ -1190,6 +1253,9 @@ function otmain_currency_display_code($currency)
     // Fallback: short text codes
     if ($name === 'EUR' || $name === 'EURO' || $name === 'EUROPEAN EURO') {
         return 'EURO';
+    }
+    if ($name === 'GBP' || strpos($name, 'POUND') !== false || strpos($name, 'STERLING') !== false) {
+        return 'GBP';
     }
     if ($name === 'USD' || strpos($name, 'DOLLAR') !== false || strpos($name, 'UNITED STATES') !== false) {
         return 'USD';

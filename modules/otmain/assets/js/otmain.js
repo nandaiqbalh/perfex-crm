@@ -459,12 +459,34 @@
         $row.find('.otmain-packing-line-total').val((qty * rate).toFixed(2));
     }
 
-    function otmainCurrencyDisplayCode(name) {
+    function otmainCurrencyDisplayCode(name, symbol) {
         name = (name || '').toString().trim().toUpperCase();
-        if (!name || name === 'EUR' || name === '€' || name === 'EURO') {
+        name = name.replace(/\u00A0/g, ' ').replace(/[^A-Z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
+        symbol = (symbol || '').toString().trim();
+
+        if (symbol === '€' || name === 'EUR' || name === 'EURO' || name === '€') {
             return '€';
         }
-        return name.replace(/^€\s*/, '').replace(/^EURO\s*/, '');
+        if (symbol === '£' || name === 'GBP' || name.indexOf('POUND') !== -1 || name.indexOf('STERLING') !== -1) {
+            return symbol === '£' ? '£' : 'GBP';
+        }
+        if (name === 'USD' || name.indexOf('DOLLAR') !== -1 || name.indexOf('UNITED STATES') !== -1) {
+            return 'USD';
+        }
+        if (name === 'IDR' || name.indexOf('RUPIAH') !== -1 || name.indexOf('INDONESIA') !== -1) {
+            return 'IDR';
+        }
+        if (symbol && symbol !== name && symbol.length <= 4) {
+            return symbol;
+        }
+        if (/^[A-Z]{3}$/.test(name)) {
+            return name;
+        }
+        var first = name.split(/\s+/)[0] || '';
+        if (/^[A-Z]{3}$/.test(first)) {
+            return first;
+        }
+        return name.replace(/^€\s*/, '').replace(/^EURO\s*/, '') || symbol;
     }
 
     function otmainSelectedCurrencyName($formSelector) {
@@ -473,14 +495,27 @@
             return '';
         }
         var $opt = $select.find('option:selected');
-        var name = ($opt.data('subtext') || $opt.text() || '').toString().trim();
-        // Prefer currency code from option text like "USD" or "Euro"
+        // Perfex: option text = currency name, data-subtext = symbol
         var raw = ($opt.text() || '').toString().trim();
-        if (raw) {
-            // Perfex options usually: name in text, symbol in subtext
-            name = raw.split(/\s|\(/)[0];
+        var symbol = ($opt.attr('data-subtext') || '').toString().trim();
+        return otmainCurrencyDisplayCode(raw, symbol);
+    }
+
+    function otmainRefreshSelectpickersIn($container) {
+        var $root = $($container);
+        if (!$root.length) {
+            return;
         }
-        return otmainCurrencyDisplayCode(name);
+        $root.find('select.selectpicker, select.ajax-search').each(function() {
+            var $select = $(this);
+            if ($select.data('selectpicker') || $select.parent().hasClass('bootstrap-select') || $select.hasClass('selectpicker')) {
+                try {
+                    $select.selectpicker('refresh');
+                } catch (e) {
+                    // ignore
+                }
+            }
+        });
     }
 
     function otmainUpdateCurrencyLabels($form, subtotalLabelId, totalLabelId) {
@@ -535,7 +570,10 @@
         var targetName = '';
         var $targetOpt = $('#otmain-packing-list-form select[name="conversion_currency"] option:selected');
         if ($targetOpt.length) {
-            targetName = otmainCurrencyDisplayCode(($targetOpt.text() || '').toString().trim().split(/\s|\(/)[0]);
+            targetName = otmainCurrencyDisplayCode(
+                ($targetOpt.text() || '').toString().trim(),
+                ($targetOpt.attr('data-subtext') || '').toString().trim()
+            );
         }
         var showConverted = targetCurrencyId !== '' && docCurrencyId !== '' && targetCurrencyId !== docCurrencyId && !isNaN(rate) && rate > 0;
         var subtotalConverted = showConverted ? subtotal * rate : 0;
@@ -621,10 +659,18 @@
         if (!$currency.length) {
             return;
         }
-        $currency.prop('disabled', false);
-        if ($currency.hasClass('selectpicker') || $currency.parent().hasClass('bootstrap-select')) {
-            $currency.selectpicker('refresh');
-        }
+        $currency.each(function() {
+            var $el = $(this);
+            $el.prop('disabled', false);
+            // Refreshing bootstrap-select while it sits in an inactive tab
+            // leaves the control visually stuck (options open, value doesn't update).
+            if ($el.closest('.tab-pane:not(.active)').length) {
+                return;
+            }
+            if ($el.hasClass('selectpicker') || $el.parent().hasClass('bootstrap-select')) {
+                $el.selectpicker('refresh');
+            }
+        });
     }
 
     function otmainCalcSellingRate(purchaseAmount, profitPercent) {
@@ -677,6 +723,18 @@
 
     $(function() {
         otmainEnsureCurrencySelectable();
+
+        // bootstrap-select inside inactive Edit tabs needs a refresh once visible
+        $('a[data-toggle="tab"][href="#tab_edit"]').on('shown.bs.tab', function() {
+            otmainRefreshSelectpickersIn('#tab_edit');
+            otmainEnsureCurrencySelectable();
+            if ($('#otmain-purchase-order-form').length) {
+                otmainRecalcPoTotals();
+            }
+            if ($('#otmain-packing-list-form').length) {
+                otmainRecalculatePackingTotals();
+            }
+        });
 
         // Client change may refresh currency selectpicker; keep it editable.
         $('body').on('changed.bs.select change', '.f_client_id select[name="clientid"], #clientid, #rel_type, #rel_id', function() {
@@ -948,8 +1006,8 @@
             $('body').on('change', '#otmain-packing-list-form .otmain-packing-unit-type', function() {
                 otmainTogglePackingUnitLabel($(this).closest('tr'));
             });
-            $('#otmain-packing-list-form select[name="currency"], #otmain-packing-list-form select[name="conversion_currency"]').on('change', otmainRecalculatePackingTotals);
-            $('#otmain-packing-list-form select[name="currency"]').on('change', otmainRecalculatePackingTotals);
+            $('#otmain-packing-list-form select[name="currency"], #otmain-packing-list-form select[name="conversion_currency"]').on('changed.bs.select change', otmainRecalculatePackingTotals);
+            $('#otmain-packing-list-form select[name="currency"]').on('changed.bs.select change', otmainRecalculatePackingTotals);
 
             otmainRecalculatePackingTotals();
         }
@@ -967,7 +1025,7 @@
         otmainRecalculatePackingTotals();
     });
 
-    function otmainLoadPoContacts(clientId, selectedId) {
+    function otmainLoadPoContacts(clientId, selectedId, forceAddress) {
         if (!clientId) {
             return;
         }
@@ -977,8 +1035,21 @@
                 return;
             }
 
-            var $address = $('textarea[name="supplier_address"]');
-            if (!$address.val()) {
+            var $address = $('#otmain-purchase-order-form textarea[name="supplier_address"]');
+            var currentAddress = ($address.val() || '').toString().trim();
+            var companyAddress = ($('#otmain-purchase-order-form input[name="company_address"]').val() || '').toString().trim();
+            var normalize = function(text) {
+                return (text || '').toString().toLowerCase().replace(/\s+/g, '');
+            };
+            var looksLikeIssuer = !currentAddress
+                || (companyAddress && (
+                    normalize(currentAddress) === normalize(companyAddress)
+                    || normalize(currentAddress).indexOf(normalize(companyAddress)) !== -1
+                    || normalize(companyAddress).indexOf(normalize(currentAddress)) !== -1
+                ));
+
+            // Always refresh on supplier change; also fix empty / issuer-address mistakes on load.
+            if (forceAddress || looksLikeIssuer) {
                 $address.val(data.address || '');
             }
 
@@ -1063,11 +1134,11 @@
         var poSelectedContact = $('#otmain_po_contact_id').val();
 
         $('#supplierid').on('change', function() {
-            otmainLoadPoContacts($(this).val());
+            otmainLoadPoContacts($(this).val(), null, true);
         });
 
         if ($('#supplierid').val()) {
-            otmainLoadPoContacts($('#supplierid').val(), poSelectedContact);
+            otmainLoadPoContacts($('#supplierid').val(), poSelectedContact, false);
         }
 
         $('body').on('change', '#otmain_po_contact_id', function() {
@@ -1088,7 +1159,7 @@
         });
 
         $('body').on('input change', '.otmain-po-qty, .otmain-po-rate, .otmain-po-tax', otmainRecalcPoTotals);
-        $('#otmain-purchase-order-form select[name="currency"]').on('change', otmainRecalcPoTotals);
+        $('#otmain-purchase-order-form select[name="currency"]').on('changed.bs.select change', otmainRecalcPoTotals);
 
         $('#otmain-add-po-row').on('click', function() {
             var i = $('#otmain-po-items tbody tr').length;
