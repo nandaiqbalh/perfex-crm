@@ -7,18 +7,19 @@ defined('BASEPATH') or exit('No direct script access allowed');
  * Source PDF: 2025-SQ-109- Vigor Shipunloader - Vacuum Pump Electrical Panel (22-11-2025)
  */
 return [
-    'key'                 => 'tp_sq_109_vacuum_panel',
+    'key'                 => '10_2025_sq_109_vigor_vacuum_panel',
     'source_quote_number' => '2025-SQ-109- Vigor Shipunloader - Vacuum Pump Electrical Panel',
     'aliases'             => [
         '2025-SQ-109- Vigor Shipunloader - Vacuum Pump Electrical Panel',
         '2025-SQ-109',
         '2025-SQ-109-Vacuum Pump Electrical Panel',
-        '2025-SQ-109-Vacuum Pump Electrical Panel',
+        '10.2025-SQ-109- Vigor Shipunloader - Vacuum Pump Electrical Panel',
+        'tp_sq_109_vacuum_panel',
     ],
     'customer_company'    => 'TP Company Limited',
     'force_status'        => 3,
     'populate_tracker'    => true,
-    'save_option'         => 'otmain_seed_proposal_tp_sq_109_vacuum_panel',
+    'save_option'         => 'otmain_seed_proposal_10_2025_sq_109_vigor_vacuum_panel',
     'tracker_updates'     => [
         0 => ['item_status' => 'pending', 'notes' => '', 'admin_notes' => ''],
     ],

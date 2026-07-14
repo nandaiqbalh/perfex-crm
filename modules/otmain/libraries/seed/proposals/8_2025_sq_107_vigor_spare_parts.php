@@ -4,23 +4,26 @@ defined('BASEPATH') or exit('No direct script access allowed');
 
 /**
  * Production quotation — TP Company Limited (2025)
- * Source PDF: 2025-PQ-107- Vigor Shipunloader - Spare Parts (21-11-2025)
+ * Source folder: 8.2025-SQ-107- Vigor Shipunloader - Spare Parts
+ * PDF OCR sometimes says PQ-107 — folder/official prefix is SQ-107.
  *
  * Full quotation €10.570,86 (VAT 0%). Later commercial invoices may revise compensator mix.
  */
 return [
-    'key'                 => 'tp_pq_107_spare',
-    'source_quote_number' => '2025-PQ-107- Vigor Shipunloader - Spare Parts',
+    'key'                 => '8_2025_sq_107_vigor_spare_parts',
+    'source_quote_number' => '2025-SQ-107- Vigor Shipunloader - Spare Parts',
     'aliases'             => [
-        '2025-PQ-107- Vigor Shipunloader - Spare Parts',
+        '2025-SQ-107- Vigor Shipunloader - Spare Parts',
+        '2025-SQ-107',
+        '2025-PQ-107- Vigor Shipunloader - Spare Parts', // OCR/invoice variant
         '2025-PQ-107',
-        '2025-PQ-107-Vigor Shipunloader - Spare Parts',
-        '2025-PQ-107-Vigor Shipunloader - Spare Parts',
+        '8.2025-SQ-107- Vigor Shipunloader - Spare Parts',
+        'tp_pq_107_spare',
     ],
     'customer_company'    => 'TP Company Limited',
     'force_status'        => 3,
     'populate_tracker'    => true,
-    'save_option'         => 'otmain_seed_proposal_tp_pq_107_spare',
+    'save_option'         => 'otmain_seed_proposal_8_2025_sq_107_vigor_spare_parts',
     'tracker_updates'     => array_fill(0, 14, ['item_status' => 'pending', 'notes' => '', 'admin_notes' => '']),
     'proposal' => [
         'subject'              => 'Vigor Shipunloader - Spare Parts - Quotation',

@@ -10,17 +10,19 @@ defined('BASEPATH') or exit('No direct script access allowed');
  * open_till set to end of service window 15-12-2025.
  */
 return [
-    'key'                 => 'tp_pq_106_service',
+    'key'                 => '7_2025_pq_106_vigor_service_trip',
     'source_quote_number' => '2025-PQ-106- Vigor Shipunloader - Service Trip',
     'aliases'             => [
         '2025-PQ-106- Vigor Shipunloader - Service Trip',
         '2025-PQ-106',
         '2025-PQ-106-Vigor Shipunloader - Service Trip',
+        '7.2025 - PQ - 106 - Vigor Shipunloader - Service Trip',
+        'tp_pq_106_service',
     ],
     'customer_company'    => 'TP Company Limited',
     'force_status'        => 3,
     'populate_tracker'    => true,
-    'save_option'         => 'otmain_seed_proposal_tp_pq_106_service',
+    'save_option'         => 'otmain_seed_proposal_7_2025_pq_106_vigor_service_trip',
     'tracker_updates'     => array_fill(0, 2, ['item_status' => 'pending', 'notes' => '', 'admin_notes' => '']),
     'proposal' => [
         'subject'              => 'Vigor Shipunloader Service Trip Nov-Dec - Quotation',

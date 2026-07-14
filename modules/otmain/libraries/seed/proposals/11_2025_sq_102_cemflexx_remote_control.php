@@ -4,21 +4,24 @@ defined('BASEPATH') or exit('No direct script access allowed');
 
 /**
  * Production quotation — CemFlexX B.V. (2025)
+ * Source folder: 11.2025-SQ-102-CemflexX-Remote Control
  * Source PDF: 2025-SQ-102 (29-4-2025)
  *
  * Back-up Afstandsbediening / Scanreco — Optie 1 + Optie 2 listed (subtotal = sum).
- * Distinct from 2025-PQ-102 rev.1 (Kovako inspection).
+ * Distinct from 2025-PQ-102 (Kovako inspection).
  */
 return [
-    'key'                 => 'cx_sq_102',
+    'key'                 => '11_2025_sq_102_cemflexx_remote_control',
     'source_quote_number' => '2025-SQ-102',
     'aliases'             => [
         '2025-SQ-102',
+        '11.2025-SQ-102-CemflexX-Remote Control',
+        'cx_sq_102',
     ],
     'customer_company'    => 'CemFlexX B.V.',
     'force_status'        => 3,
     'populate_tracker'    => true,
-    'save_option'         => 'otmain_seed_proposal_cx_sq_102',
+    'save_option'         => 'otmain_seed_proposal_11_2025_sq_102_cemflexx_remote_control',
     'tracker_updates'     => array_fill(0, 2, ['item_status' => 'pending', 'notes' => '', 'admin_notes' => '']),
     'proposal' => [
         'subject'              => 'Back-up Afstandsbediening Vigor Shipunloader - Quotation',

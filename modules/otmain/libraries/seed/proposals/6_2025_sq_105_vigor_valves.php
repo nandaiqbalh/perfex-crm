@@ -7,17 +7,19 @@ defined('BASEPATH') or exit('No direct script access allowed');
  * Source PDF: 2025-SQ-105- Vigor Shipunloader - Valves (25-10-2025)
  */
 return [
-    'key'                 => 'tp_sq_105_valves',
+    'key'                 => '6_2025_sq_105_vigor_valves',
     'source_quote_number' => '2025-SQ-105- Vigor Shipunloader - Valves',
     'aliases'             => [
         '2025-SQ-105- Vigor Shipunloader - Valves',
         '2025-SQ-105',
         '2025-SQ-105-Vigor Shipunloader - Valves',
+        '6.2025-SQ-105- Vigor Shipunloader - Valves',
+        'tp_sq_105_valves',
     ],
     'customer_company'    => 'TP Company Limited',
     'force_status'        => 3,
     'populate_tracker'    => true,
-    'save_option'         => 'otmain_seed_proposal_tp_sq_105_valves',
+    'save_option'         => 'otmain_seed_proposal_6_2025_sq_105_vigor_valves',
     'tracker_updates'     => array_fill(0, 10, ['item_status' => 'pending', 'notes' => '', 'admin_notes' => '']),
     'proposal' => [
         'subject'              => 'Valves - Vigor Shipunloader - Quotation',

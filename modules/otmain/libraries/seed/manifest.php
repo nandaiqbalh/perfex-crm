@@ -4,18 +4,28 @@ defined('BASEPATH') or exit('No direct script access allowed');
 
 /**
  * Production seed load order.
- * Quotation 2025 first, then 2026 catalog. Invoices empty until quotes complete.
+ *
+ * 2025 proposal file naming (mirror sales-quotation folders):
+ *   {seq}_2025_{pq|sq}_{nnn}_{short_slug}.php
+ * Example folder: "3.2025-PQ - 102 - CemflexX Kovako Waterford Inspection"
+ *   → 3_2025_pq_102_cemflexx_kovako_waterford.php
+ *
+ * Missing seq 9 only (SQ-108 Flow Meter) — add when PDF seeded.
+ * Invoices empty until 2025/2026 quotations complete.
  */
 return [
     'proposals' => [
-        // —— 2025 ——
-        'proposals/cx_pq_102.php',
-        'proposals/cx_sq_102.php',
-        'proposals/tp_pq_104_service.php',
-        'proposals/tp_sq_105_valves.php',
-        'proposals/tp_pq_106_service.php',
-        'proposals/tp_pq_107_spare.php',
-        'proposals/tp_sq_109_vacuum_panel.php',
+        // —— 2025 (by folder sequence 1–11; missing only 9 SQ-108 Flow Meter) ——
+        'proposals/1_2025_pq_100_cemflexx_vigor_delivery.php',
+        'proposals/2_2025_pq_101_vigor_extension.php',
+        'proposals/3_2025_pq_102_cemflexx_kovako_waterford.php',
+        'proposals/4_2025_pq_103_cemflexx_service_trip.php',
+        'proposals/5_2025_pq_104_vigor_service_trip.php',
+        'proposals/6_2025_sq_105_vigor_valves.php',
+        'proposals/7_2025_pq_106_vigor_service_trip.php',
+        'proposals/8_2025_sq_107_vigor_spare_parts.php',
+        'proposals/10_2025_sq_109_vigor_vacuum_panel.php',
+        'proposals/11_2025_sq_102_cemflexx_remote_control.php',
         // —— 2026 catalog ——
         'proposals/tp_suction_hose.php',
         'proposals/tp_suction_nozzle_101.php',

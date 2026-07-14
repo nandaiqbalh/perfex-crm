@@ -10,17 +10,20 @@ defined('BASEPATH') or exit('No direct script access allowed');
  * Buyer = TP Company Zanzibar; OT-MAIN block = issuer noise.
  */
 return [
-    'key'                 => 'tp_pq_104_service',
+    'key'                 => '5_2025_pq_104_vigor_service_trip',
     'source_quote_number' => '2025-PQ-104- Vigor Shipunloader - Service Trip',
     'aliases'             => [
         '2025-PQ-104- Vigor Shipunloader - Service Trip',
         '2025-PQ-104',
         '2025-PQ-104-Vigor Shipunloader - Service Trip',
+        '5.2025 - PQ - 104 - Vigor Shipunloader - Service Trip',
+        '2025 - PQ - 104 - Vigor Shipunloader - Service Trip',
+        'tp_pq_104_service',
     ],
     'customer_company'    => 'TP Company Limited',
     'force_status'        => 3,
     'populate_tracker'    => true,
-    'save_option'         => 'otmain_seed_proposal_tp_pq_104_service',
+    'save_option'         => 'otmain_seed_proposal_5_2025_pq_104_vigor_service_trip',
     'tracker_updates'     => array_fill(0, 2, ['item_status' => 'pending', 'notes' => '', 'admin_notes' => '']),
     'proposal' => [
         'subject'              => 'Vigor Shipunloader Service Trip - Quotation',

@@ -10,16 +10,18 @@ defined('BASEPATH') or exit('No direct script access allowed');
  * Issuer OT-MAIN block on PDF right is noise; buyer = CemFlexX.
  */
 return [
-    'key'                 => 'cx_pq_102',
+    'key'                 => '3_2025_pq_102_cemflexx_kovako_waterford',
     'source_quote_number' => '2025-PQ-102 rev.1',
     'aliases'             => [
         '2025-PQ-102 rev.1',
         '2025-PQ-102',
+        '3.2025-PQ - 102 - CemflexX Kovako Waterford Inspection',
+        'cx_pq_102',
     ],
     'customer_company'    => 'CemFlexX B.V.',
     'force_status'        => 3, // Accepted
     'populate_tracker'    => true,
-    'save_option'         => 'otmain_seed_proposal_cx_pq_102',
+    'save_option'         => 'otmain_seed_proposal_3_2025_pq_102_cemflexx_kovako_waterford',
     'tracker_updates'     => [
         0 => [
             'item_status' => 'pending',

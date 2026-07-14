@@ -13,7 +13,7 @@ class Otmain_seed
     protected $CI;
 
     /** Bump when seed dataset structure changes so next /admin/otmain/seed recreates. */
-    protected $marker = 'otmain_prod_v11';
+    protected $marker = 'otmain_prod_v13';
 
     /** @var string Absolute path to libraries/seed */
     protected $seedPath;
