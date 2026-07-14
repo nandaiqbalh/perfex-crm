@@ -16,7 +16,7 @@ defined('BASEPATH') or exit('No direct script access allowed');
  */
 return [
     'proposals' => [
-        // —— 2025 (by folder sequence 1–11; missing only 9 SQ-108 Flow Meter) ——
+        // —— 2025 (folder seq 1–11; missing only 9 SQ-108 Flow Meter) ——
         'proposals/1.2025-PQ-100-cemflexx-vigor-delivery.php',
         'proposals/2.2025-PQ-101-vigor-extension.php',
         'proposals/3.2025-PQ-102-cemflexx-kovako-waterford.php',

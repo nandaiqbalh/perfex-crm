@@ -590,6 +590,10 @@ function otmain_format_proposal_number($format, $id)
  * Sort Proposal # by PDF number (year DESC, sequence follows DataTables dir), not DB id.
  * Default desc → largest seq on top within year; newer years always above older years.
  *
+ * Supports:
+ * - Modern: "11 - 2025 - SQ - 102 - Title" / "21 - 2026 - OTMSQ - 121" (folder seq first)
+ * - Legacy: "2025-PQ-100" / "2025-SQ-109- …" (PQ/SQ digits as seq proxy)
+ *
  * DataTables appends ASC/DESC after this expression, so year stays fixed DESC
  * and the direction applies to the sequence number.
  *
@@ -614,15 +618,28 @@ function otmain_proposals_datatables_order_column($columnName, $sTable)
         return $columnName;
     }
 
-    $src = $proposalsTable . '.source_quote_number';
-    // "3 - 2026 - OTMSQ - 103 - Title" → seq=3, year=2026
+    $src    = $proposalsTable . '.source_quote_number';
+    $trimmed = 'TRIM(COALESCE(' . $src . ', \'\'))';
+    // Spaced catalog format: "SEQ - YEAR - TYPE - NNN - …"
+    $isSpaced = '(' . $trimmed . ' LIKE \'% - %\')';
+
+    $yearSpaced = 'CAST(SUBSTRING_INDEX(SUBSTRING_INDEX(' . $trimmed . ', \' - \', 2), \' - \', -1) AS UNSIGNED)';
+    $seqSpaced  = 'CAST(SUBSTRING_INDEX(' . $trimmed . ', \' - \', 1) AS UNSIGNED)';
+
+    // Legacy "2025-PQ-100" / "2025-SQ-109- Title" → year from leftmost 4 digits,
+    // seq = PQ/SQ number so DESC still puts largest offer on top before reseed.
+    $compact = 'REPLACE(REPLACE(REPLACE(' . $trimmed . ', \' rev.1\', \'\'), \' \', \'\'), \'--\', \'-\')';
+    $yearLegacy = 'CAST(LEFT(' . $trimmed . ', 4) AS UNSIGNED)';
+    $seqLegacy  = 'CAST(SUBSTRING_INDEX(SUBSTRING_INDEX(' . $compact . ', \'-\', 3), \'-\', -1) AS UNSIGNED)';
+
     $yearExpr = 'COALESCE('
-        . 'NULLIF(CAST(SUBSTRING_INDEX(SUBSTRING_INDEX(TRIM(' . $src . '), \' - \', 2), \' - \', -1) AS UNSIGNED), 0),'
+        . 'NULLIF(CASE WHEN ' . $isSpaced . ' THEN ' . $yearSpaced . ' ELSE ' . $yearLegacy . ' END, 0),'
         . 'YEAR(' . $proposalsTable . '.date),'
         . 'YEAR(' . $proposalsTable . '.datecreated)'
         . ')';
+    // DataTables dir applies to this expression; year stays DESC (newer years above).
     $seqExpr = 'COALESCE('
-        . 'NULLIF(CAST(SUBSTRING_INDEX(TRIM(' . $src . '), \' - \', 1) AS UNSIGNED), 0),'
+        . 'NULLIF(CASE WHEN ' . $isSpaced . ' THEN ' . $seqSpaced . ' ELSE ' . $seqLegacy . ' END, 0),'
         . $proposalsTable . '.id'
         . ')';
 
