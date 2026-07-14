@@ -17,7 +17,7 @@ return [
     'save_option'           => 'otmain_seed_packing_suriname_106',
     'packing' => [
         'document_title'       => 'Packing List & Invoice',
-        'date'                 => '',
+        'date'                 => '2026-02-15',
         'vessel'               => 'Henna-T',
         // contact PDF — ensure di tblcontacts (tanpa replace)
         'contact_person_name'  => 'Jerrel',

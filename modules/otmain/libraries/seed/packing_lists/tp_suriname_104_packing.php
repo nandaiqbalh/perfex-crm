@@ -17,8 +17,7 @@ return [
     'save_option'           => 'otmain_seed_packing_suriname_104',
     'packing' => [
         'document_title'       => 'Packing List & Invoice',
-        'date'                 => '',
-        'vessel'               => '',
+        'date'                 => '2026-03-20',
         // consignee/purchaser dari tblclients; contact PDF tidak jelas — biar orchestrator pakai primary contact
         'contact_person_name'  => '',
         'contact_person_email' => '',

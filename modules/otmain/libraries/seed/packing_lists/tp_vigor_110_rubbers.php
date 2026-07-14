@@ -16,7 +16,7 @@ return [
     'save_option'           => 'otmain_seed_packing_vigor_110_rubbers',
     'packing' => [
         'document_title'       => 'Packing List & Invoice',
-        'date'                 => '',
+        'date'                 => '2026-03-25',
         'vessel'               => 'Vigor Cement Shipunloader',
         // contact PDF — ensure di tblcontacts (tanpa replace)
         'contact_person_name'  => 'Dheeraj',
