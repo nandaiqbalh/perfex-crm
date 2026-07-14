@@ -9,6 +9,7 @@ $lang['otmain_purchase_orders']     = 'Purchase Orders';
 $lang['otmain_purchase_order']      = 'Purchase Order';
 $lang['otmain_new_purchase_order']  = 'New Purchase Order';
 $lang['otmain_quote_reference']     = 'Quote Reference';
+$lang['otmain_optional']            = 'optional';
 $lang['otmain_client_ref']          = 'Client Ref.';
 $lang['otmain_quote_title']         = 'Quote Title (suffix)';
 $lang['otmain_invoice_title']       = 'Invoice Title (suffix)';

@@ -30,8 +30,14 @@
                             (<code>source_quote_number</code> / subject catalog seed / ID tracked).
                         </p>
                         <p class="text-muted">
-                            <code>?force=1</code> — ganti seed + bersihkan orphan seed lama (duplikat reseed).
-                            Seed ulang: <a href="<?php echo admin_url('otmain/seed?force=1'); ?>">?force=1</a>
+                            Endpoint: <code><?php echo admin_url('otmain/seed'); ?></code>
+                        </p>
+                        <p class="text-muted">
+                            <code>?force=1</code> — recreate seed docs + bersihkan orphan
+                            (<a href="<?php echo admin_url('otmain/seed?force=1'); ?>">jalankan</a>).
+                            <br />
+                            <code>?repair=1</code> — hanya re-link packing/invoice/PO → proposal (tanpa hapus)
+                            (<a href="<?php echo admin_url('otmain/seed?repair=1'); ?>">jalankan</a>).
                         </p>
                     </div>
                 </div>

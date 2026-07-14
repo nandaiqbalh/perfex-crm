@@ -26,10 +26,18 @@ hooks()->add_action('otmain_invoice_form_fields', 'otmain_render_invoice_fields'
 hooks()->add_action('otmain_estimate_form_fields', 'otmain_render_estimate_fields');
 hooks()->add_action('otmain_proposal_form_fields', 'otmain_render_proposal_fields');
 
+// Hide Perfex Estimates from navigation — OT-Main quotations use Proposals.
+hooks()->add_filter('sidebar_menu_child_items', 'otmain_hide_estimates_nav_child', 10, 2);
+hooks()->add_filter('customer_profile_tabs', 'otmain_hide_estimates_customer_tab');
+hooks()->add_filter('project_tabs_child_items', 'otmain_hide_estimates_nav_child', 10, 2);
+hooks()->add_filter('theme_menu_items', 'otmain_hide_estimates_theme_menu');
+
 // Item Tracker hooks
 hooks()->add_action('proposal_accepted', 'otmain_item_tracker_on_accepted');
 hooks()->add_action('after_proposal_staff_status_changed', 'otmain_item_tracker_on_staff_status');
 hooks()->add_action('after_proposal_converted_to_invoice', 'otmain_item_tracker_link_invoice');
+hooks()->add_action('after_invoice_added', 'otmain_sync_invoice_proposal_backlink');
+hooks()->add_action('invoice_updated', 'otmain_sync_invoice_proposal_backlink_on_update');
 hooks()->add_action('clients_init', 'otmain_item_tracker_client_menu');
 
 hooks()->add_filter('sales_number_format', 'otmain_sales_number_format', 10, 2);
@@ -155,11 +163,14 @@ function otmain_filter_settings_updated($data)
 function otmain_module_activation_hook()
 {
     $CI = &get_instance();
-    require_once __DIR__ . '/install.php';
+    // Full install: additive DDL + reset OT-Main default prefixes/terms
+    $GLOBALS['OTMAIN_APPLY_FORCED_OPTIONS'] = true;
+    require __DIR__ . '/install.php';
 }
 
 /**
- * Apply additive schema upgrades without requiring module re-activation.
+ * Apply additive DDL on admin requests (safety net after code deploy).
+ * Forced option resets (prefixes/terms) run only on Activate — see activation hook.
  */
 function otmain_ensure_schema()
 {
@@ -170,7 +181,10 @@ function otmain_ensure_schema()
     $done = true;
 
     $CI = &get_instance();
-    require_once __DIR__ . '/install.php';
+    if (!isset($GLOBALS['OTMAIN_APPLY_FORCED_OPTIONS'])) {
+        $GLOBALS['OTMAIN_APPLY_FORCED_OPTIONS'] = false;
+    }
+    require __DIR__ . '/install.php';
 }
 
 function otmain_permissions()
@@ -207,6 +221,7 @@ function otmain_init_menu()
             'name'     => _l('otmain_packing_lists'),
             'href'     => admin_url('otmain/packing_list'),
             'position' => 26,
+            'badge'    => [],
         ]);
     }
 
@@ -216,6 +231,7 @@ function otmain_init_menu()
             'name'     => _l('otmain_purchase_orders'),
             'href'     => admin_url('otmain/purchase_order'),
             'position' => 27,
+            'badge'    => [],
         ]);
     }
 
@@ -225,6 +241,7 @@ function otmain_init_menu()
             'name'     => _l('otmain_item_tracker'),
             'href'     => admin_url('otmain/item_tracker'),
             'position' => 28,
+            'badge'    => [],
         ]);
     }
 
@@ -234,6 +251,63 @@ function otmain_init_menu()
         'position' => 36,
         'icon'     => 'fa fa-university',
     ]);
+}
+
+/**
+ * Remove Estimates from Sales / Project sales children nav.
+ *
+ * @param array       $children
+ * @param string|null $parentSlug
+ * @return array
+ */
+function otmain_hide_estimates_nav_child($children, $parentSlug = null)
+{
+    if (!is_array($children)) {
+        return $children;
+    }
+
+    // Sidebar: parent sales. Project tabs: parent sales (child slug project_estimates).
+    if ($parentSlug !== null && $parentSlug !== 'sales') {
+        return $children;
+    }
+
+    return array_values(array_filter($children, static function ($item) {
+        $slug = $item['slug'] ?? '';
+
+        return $slug !== 'estimates' && $slug !== 'project_estimates';
+    }));
+}
+
+/**
+ * Hide Estimates tab on customer profile.
+ *
+ * @param array $tabs
+ * @return array
+ */
+function otmain_hide_estimates_customer_tab($tabs)
+{
+    if (!is_array($tabs)) {
+        return $tabs;
+    }
+    unset($tabs['estimates']);
+
+    return $tabs;
+}
+
+/**
+ * Hide Estimates in client-area theme menu.
+ *
+ * @param array $items
+ * @return array
+ */
+function otmain_hide_estimates_theme_menu($items)
+{
+    if (!is_array($items)) {
+        return $items;
+    }
+    unset($items['estimates']);
+
+    return $items;
 }
 
 function otmain_admin_footer_assets()
@@ -251,7 +325,7 @@ function otmain_admin_footer_assets()
         || strpos($uri, 'otmain/item_tracker') !== false
     ) {
         echo '<link rel="stylesheet" href="' . module_dir_url(OTMAIN_MODULE_NAME, 'assets/css/otmain-forms.css') . '?v=1.0.2" />';
-        echo '<script src="' . module_dir_url(OTMAIN_MODULE_NAME, 'assets/js/otmain.js') . '?v=1.3.0"></script>';
+        echo '<script src="' . module_dir_url(OTMAIN_MODULE_NAME, 'assets/js/otmain.js') . '?v=1.4.1"></script>';
     }
 
     if (strpos($uri, 'otmain/item_tracker') !== false) {
@@ -409,6 +483,17 @@ function otmain_before_invoice_save($hookData)
 
     if (isset($data['quote_ref']) && $data['quote_ref'] === '') {
         $data['quote_ref'] = null;
+    }
+
+    if (array_key_exists('proposal_id', $data)) {
+        if ($data['proposal_id'] === '' || $data['proposal_id'] === null) {
+            $data['proposal_id'] = null;
+        } else {
+            $data['proposal_id'] = (int) $data['proposal_id'];
+            if ($data['proposal_id'] < 1) {
+                $data['proposal_id'] = null;
+            }
+        }
     }
 
     if (!empty($data['invoice_title'])) {
@@ -624,7 +709,7 @@ function otmain_item_tracker_on_staff_status($data)
 }
 
 /**
- * Link invoice_id on tracker rows after proposal → invoice conversion.
+ * After proposal → invoice conversion: link tracker + set invoices.proposal_id.
  *
  * @param array $data
  */
@@ -637,8 +722,56 @@ function otmain_item_tracker_link_invoice($data)
     }
 
     $CI = &get_instance();
+    if ($CI->db->field_exists('proposal_id', db_prefix() . 'invoices')) {
+        $CI->db->where('id', $invoice_id)->update(db_prefix() . 'invoices', [
+            'proposal_id' => $proposal_id,
+        ]);
+    }
+
     $CI->load->model('otmain/item_tracker_model');
     $CI->item_tracker_model->link_invoice($proposal_id, $invoice_id);
+}
+
+/**
+ * When invoice has proposal_id, back-link proposals.invoice_id + tracker.
+ *
+ * @param int $invoiceId
+ */
+function otmain_sync_invoice_proposal_backlink($invoiceId)
+{
+    $invoiceId = (int) $invoiceId;
+    if ($invoiceId < 1) {
+        return;
+    }
+
+    $CI = &get_instance();
+    if (!$CI->db->field_exists('proposal_id', db_prefix() . 'invoices')) {
+        return;
+    }
+
+    $row = $CI->db->select('proposal_id')->where('id', $invoiceId)->get(db_prefix() . 'invoices')->row();
+    $proposalId = $row ? (int) $row->proposal_id : 0;
+    if ($proposalId < 1) {
+        return;
+    }
+
+    $CI->db->where('id', $proposalId)->update(db_prefix() . 'proposals', [
+        'invoice_id' => $invoiceId,
+    ]);
+
+    $CI->load->model('otmain/item_tracker_model');
+    $CI->item_tracker_model->link_invoice($proposalId, $invoiceId);
+}
+
+/**
+ * @param array $hookData
+ */
+function otmain_sync_invoice_proposal_backlink_on_update($hookData)
+{
+    $invoiceId = (int) ($hookData['id'] ?? 0);
+    if ($invoiceId > 0) {
+        otmain_sync_invoice_proposal_backlink($invoiceId);
+    }
 }
 
 /**

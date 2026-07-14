@@ -34,6 +34,8 @@ foreach ($estimateColumns as $column => $definition) {
 
 $invoiceColumns = [
     'quote_ref'              => "INT(11) NULL DEFAULT NULL",
+    // OT-Main quotation (proposal) linked as Invoice Quote Ref
+    'proposal_id'            => "INT(11) NULL DEFAULT NULL",
     'invoice_title'          => "VARCHAR(191) NULL DEFAULT NULL",
     'expiry_days'            => "INT(11) NULL DEFAULT NULL",
     'document_title'         => "VARCHAR(191) NULL DEFAULT NULL",
@@ -62,6 +64,13 @@ foreach ($invoiceColumns as $column => $definition) {
     if (!$CI->db->field_exists($column, db_prefix() . 'invoices')) {
         $CI->db->query('ALTER TABLE `' . db_prefix() . 'invoices` ADD `' . $column . '` ' . $definition);
     }
+}
+
+// Index for invoice → proposal lookups
+$tableInvoices = db_prefix() . 'invoices';
+$idxCheck = $CI->db->query("SHOW INDEX FROM `{$tableInvoices}` WHERE Key_name = 'proposal_id'")->num_rows();
+if ($idxCheck < 1 && $CI->db->field_exists('proposal_id', $tableInvoices)) {
+    $CI->db->query("ALTER TABLE `{$tableInvoices}` ADD INDEX `proposal_id` (`proposal_id`)");
 }
 
 $proposalColumns = [
@@ -211,6 +220,7 @@ if (!$CI->db->table_exists(db_prefix() . 'otmain_purchase_orders')) {
         `date` date NOT NULL,
         `supplierid` int(11) NOT NULL DEFAULT 0,
         `supplier_quote_ref` varchar(191) DEFAULT NULL,
+        `proposal_id` int(11) DEFAULT NULL,
         `contact_person` varchar(191) DEFAULT NULL,
         `email` varchar(100) DEFAULT NULL,
         `phone` varchar(50) DEFAULT NULL,
@@ -223,7 +233,8 @@ if (!$CI->db->table_exists(db_prefix() . 'otmain_purchase_orders')) {
         `addedfrom` int(11) NOT NULL DEFAULT 0,
         `datecreated` datetime NOT NULL,
         PRIMARY KEY (`id`),
-        KEY `supplierid` (`supplierid`)
+        KEY `supplierid` (`supplierid`),
+        KEY `proposal_id` (`proposal_id`)
     ) ENGINE=InnoDB DEFAULT CHARSET=" . $CI->db->char_set . ';');
 }
 
@@ -231,6 +242,8 @@ $poColumns = [
     'document_title'         => "VARCHAR(191) NULL DEFAULT 'Purchase Order'",
     'supplier_address'       => 'TEXT NULL',
     'otmain_contact_id'      => 'INT(11) NULL DEFAULT NULL',
+    // Optional link to OT-Main quotation (proposal)
+    'proposal_id'            => 'INT(11) NULL DEFAULT NULL',
     'company_name'           => "VARCHAR(191) NULL DEFAULT 'OT-MAIN'",
     'company_address'        => "VARCHAR(191) NULL DEFAULT 'Bajonetstraat 52'",
     'company_postal_code'    => "VARCHAR(50) NULL DEFAULT '3014ZK'",
@@ -250,6 +263,14 @@ $poColumns = [
 foreach ($poColumns as $column => $definition) {
     if ($CI->db->table_exists(db_prefix() . 'otmain_purchase_orders') && !$CI->db->field_exists($column, db_prefix() . 'otmain_purchase_orders')) {
         $CI->db->query('ALTER TABLE `' . db_prefix() . 'otmain_purchase_orders` ADD `' . $column . '` ' . $definition);
+    }
+}
+
+$tablePo = db_prefix() . 'otmain_purchase_orders';
+if ($CI->db->table_exists($tablePo) && $CI->db->field_exists('proposal_id', $tablePo)) {
+    $poIdx = $CI->db->query("SHOW INDEX FROM `{$tablePo}` WHERE Key_name = 'proposal_id'")->num_rows();
+    if ($poIdx < 1) {
+        $CI->db->query("ALTER TABLE `{$tablePo}` ADD INDEX `proposal_id` (`proposal_id`)");
     }
 }
 
@@ -334,10 +355,13 @@ foreach ($options as $name => $value) {
     }
 }
 
-update_option('estimate_prefix', 'OTMSQ-');
-update_option('invoice_prefix', 'INV-');
-update_option('proposal_number_prefix', 'OTPSQ');
-update_option('estimate_number_format', '5');
-update_option('invoice_number_format', '6');
-update_option('predefined_terms_estimate', otmain_get_quotation_terms());
-update_option('predefined_terms_invoice', otmain_get_invoice_terms());
+// Prefixes / terms: only on Activate (Deactivate → Activate). Additive DDL always runs.
+if (!empty($GLOBALS['OTMAIN_APPLY_FORCED_OPTIONS'])) {
+    update_option('estimate_prefix', 'OTMSQ-');
+    update_option('invoice_prefix', 'INV-');
+    update_option('proposal_number_prefix', 'OTPSQ');
+    update_option('estimate_number_format', '5');
+    update_option('invoice_number_format', '6');
+    update_option('predefined_terms_estimate', otmain_get_quotation_terms());
+    update_option('predefined_terms_invoice', otmain_get_invoice_terms());
+}

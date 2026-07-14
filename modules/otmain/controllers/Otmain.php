@@ -131,6 +131,67 @@ class Otmain extends AdminController
         ]);
     }
 
+    /**
+     * Proposal data shaped for invoice Quote Ref fill (mirrors get_estimate_data).
+     */
+    public function get_proposal_invoice_data($id)
+    {
+        if (!$id) {
+            echo json_encode([]);
+            die;
+        }
+
+        $this->load->model('proposals_model');
+        $proposal = $this->proposals_model->get($id);
+
+        if (!$proposal) {
+            echo json_encode([]);
+            die;
+        }
+
+        $items = [];
+        foreach ($proposal->items as $item) {
+            $taxes   = get_proposal_item_taxes($item['id']);
+            $taxname = [];
+            foreach ($taxes as $tax) {
+                $taxname[] = $tax['taxname'] . '|' . $tax['taxrate'];
+            }
+
+            $row = [
+                'description'      => $item['description'],
+                'long_description' => $item['long_description'] ?? '',
+                'qty'              => $item['qty'],
+                'rate'             => $item['rate'],
+                'unit'             => $item['unit'] ?? '',
+                'taxname'          => $taxname,
+            ];
+            if (array_key_exists('profit_percent', $item)) {
+                $row['profit_percent'] = $item['profit_percent'];
+            }
+            if (array_key_exists('purchase_amount', $item)) {
+                $row['purchase_amount'] = $item['purchase_amount'];
+            }
+            $items[] = $row;
+        }
+
+        $clientId = $proposal->rel_type === 'customer' ? (int) $proposal->rel_id : 0;
+
+        echo json_encode([
+            'clientid'             => $clientId,
+            'currency'             => $proposal->currency ?? null,
+            'items'                => $items,
+            'proposal_number'      => format_proposal_number($proposal->id),
+            'invoice_title'        => $proposal->quote_title ?? '',
+            'payment_terms_text'   => clear_textarea_breaks($proposal->payment_terms_text ?? ''),
+            'delivery_time'        => clear_textarea_breaks($proposal->delivery_time ?? ''),
+            'availability'         => clear_textarea_breaks($proposal->availability ?? ''),
+            'shipment_terms'       => clear_textarea_breaks($proposal->shipment_terms ?? ''),
+            'contact_person_name'  => $proposal->contact_person_name ?? '',
+            'contact_person_email' => $proposal->contact_person_email ?? '',
+            'contact_person_phone' => $proposal->contact_person_phone ?? '',
+        ]);
+    }
+
     public function get_client_packing_data($clientid)
     {
         if (!$clientid) {

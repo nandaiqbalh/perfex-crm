@@ -56,6 +56,17 @@ $poNumber = isset($po) ? $po->formatted_number : ($next_po_number ?? otmain_prev
                     </select>
                 </div>
                 <?php echo render_input('supplier_quote_ref', 'otmain_supplier_quote_ref', isset($po) ? ($po->supplier_quote_ref ?? '') : ''); ?>
+                <div class="form-group select-placeholder">
+                    <label class="control-label"><?php echo _l('otmain_quote_reference'); ?> <small class="text-muted">(<?php echo _l('otmain_optional'); ?>)</small></label>
+                    <select name="proposal_id" id="po_proposal_id" class="ajax-search" data-width="100%" data-live-search="true" data-allow-clear="true" data-none-selected-text="<?php echo _l('otmain_select_quote'); ?>">
+                        <option value=""></option>
+                        <?php
+                        if (isset($po) && !empty($po->proposal_id)) {
+                            echo '<option value="' . (int) $po->proposal_id . '" selected>' . e(format_proposal_number((int) $po->proposal_id)) . '</option>';
+                        }
+                        ?>
+                    </select>
+                </div>
             </div>
             <div class="col-md-6 otmain-col-right">
                 <?php

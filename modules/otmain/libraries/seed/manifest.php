@@ -4,10 +4,19 @@ defined('BASEPATH') or exit('No direct script access allowed');
 
 /**
  * Production seed load order.
- * Add new PDF-migrated files here — one document per file under proposals/, packing_lists/, etc.
+ * Quotation 2025 first, then 2026 catalog. Invoices empty until quotes complete.
  */
 return [
     'proposals' => [
+        // —— 2025 ——
+        'proposals/cx_pq_102.php',
+        'proposals/cx_sq_102.php',
+        'proposals/tp_pq_104_service.php',
+        'proposals/tp_sq_105_valves.php',
+        'proposals/tp_pq_106_service.php',
+        'proposals/tp_pq_107_spare.php',
+        'proposals/tp_sq_109_vacuum_panel.php',
+        // —— 2026 catalog ——
         'proposals/tp_suction_hose.php',
         'proposals/tp_suction_nozzle_101.php',
         'proposals/tp_otmsq_104.php',

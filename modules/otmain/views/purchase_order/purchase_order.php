@@ -58,6 +58,13 @@ $currency = $isEdit ? $this->currencies_model->get($po->currency) : null;
                                     <p><strong><?php echo _l('client_email'); ?>:</strong> <?php echo e($po->email); ?></p>
                                     <p><strong><?php echo _l('client_phonenumber'); ?>:</strong> <?php echo e($po->phone); ?></p>
                                     <p><strong><?php echo _l('otmain_supplier_quote_ref'); ?>:</strong> <?php echo e($po->supplier_quote_ref); ?></p>
+                                    <?php if (!empty($po->proposal_id)) { ?>
+                                    <p><strong><?php echo _l('otmain_quote_reference'); ?>:</strong>
+                                        <a href="<?php echo admin_url('proposals/list_proposals/' . (int) $po->proposal_id); ?>">
+                                            <?php echo e(format_proposal_number((int) $po->proposal_id)); ?>
+                                        </a>
+                                    </p>
+                                    <?php } ?>
                                 </div>
                                 <div class="col-md-6">
                                     <p class="bold"><?php echo _l('otmain_po_issuer'); ?></p>

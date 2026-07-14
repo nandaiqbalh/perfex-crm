@@ -12,8 +12,8 @@ class Otmain_seed
 {
     protected $CI;
 
-    /** Bump when seed dataset structure changes so force reseed is clearer. */
-    protected $marker = 'otmain_prod_v3';
+    /** Bump when seed dataset structure changes so next /admin/otmain/seed recreates. */
+    protected $marker = 'otmain_prod_v11';
 
     /** @var string Absolute path to libraries/seed */
     protected $seedPath;
@@ -66,7 +66,8 @@ class Otmain_seed
         if (!$force && get_option('otmain_seed_marker') === $this->marker) {
             return [
                 'status'  => 'skipped',
-                'message' => 'Production seed already applied. Add ?force=1 to recreate tracked seed docs only (never wipes all documents).',
+                'message' => 'Production seed already applied (marker ' . $this->marker . '). '
+                    . 'Use ?force=1 to recreate seed docs, or ?repair=1 to re-link packing/invoice/PO → proposal without wipe.',
                 'links'   => $this->links(),
             ];
         }
@@ -111,7 +112,7 @@ class Otmain_seed
 
         $invoiceId = 0;
         foreach ($manifest['invoices'] ?? [] as $relative) {
-            $this->loadSeedFile($relative);
+            $invoiceId = $this->seedInvoice($this->loadSeedFile($relative), $eurId) ?: $invoiceId;
         }
 
         $poId = 0;
@@ -125,6 +126,9 @@ class Otmain_seed
         update_option('otmain_seed_proposal_id', (int) $proposalId);
         if ($packingId > 0) {
             update_option('otmain_seed_packing_id', (int) $packingId);
+        }
+        if ($invoiceId > 0) {
+            update_option('otmain_seed_invoice_id', (int) $invoiceId);
         }
         if ($poId > 0) {
             update_option('otmain_seed_po_id', (int) $poId);
@@ -146,7 +150,9 @@ class Otmain_seed
         return [
             'status'  => 'success',
             'message' => 'Production seed applied (' . count($this->clientIdsByCompany) . ' customers upserted, '
-                . count($proposalIds) . ' proposals). Replaced seed-stamped docs only; manual proposals kept.',
+                . count($proposalIds) . ' proposals'
+                . ($invoiceId > 0 ? ', invoice(s) seeded' : '')
+                . '). Replaced seed-stamped docs only; manual proposals kept.',
             'ids'     => array_merge($ids, [
                 'tpClientId'  => (int) $tpClientId,
                 'proposalIds' => $proposalIds,
@@ -420,6 +426,138 @@ class Otmain_seed
     /**
      * @param array $def
      * @param int   $eurId
+     * @return int invoice id
+     */
+    protected function seedInvoice(array $def, $eurId)
+    {
+        $company = $def['customer_company'] ?? '';
+        if ($company === '' || !isset($this->clientIdsByCompany[$company])) {
+            throw new RuntimeException('Invoice seed customer missing: ' . $company);
+        }
+
+        $clientId = $this->clientIdsByCompany[$company];
+        $master   = $this->getClientMasterData($clientId);
+        $invoice  = $def['invoice'] ?? [];
+
+        $invoice['clientid']  = $clientId;
+        $invoice['currency']  = $invoice['currency'] ?? $eurId;
+        $invoice['number']    = isset($invoice['number']) ? (int) $invoice['number'] : (int) get_option('next_invoice_number');
+        $invoice['date']      = $invoice['date'] ?? date('Y-m-d');
+        $invoice['duedate']   = $invoice['duedate'] ?? null;
+        $invoice['status']    = isset($invoice['status']) ? (int) $invoice['status'] : 1;
+
+        // Billing from client master (never overwrite company address from PDF OCR mess).
+        $invoice['billing_street']  = $master['address'];
+        $invoice['billing_city']    = $master['city'];
+        $invoice['billing_state']   = $invoice['billing_state'] ?? '';
+        $invoice['billing_zip']     = $master['zip'];
+        $invoice['billing_country'] = $master['country'];
+
+        if (!empty($invoice['include_shipping'])) {
+            $invoice['include_shipping'] = 1;
+            $invoice['show_shipping_on_invoice'] = $invoice['show_shipping_on_invoice'] ?? 1;
+        }
+
+        $contact = $this->resolveDocumentContact($clientId, [
+            'name'  => $invoice['contact_person_name'] ?? '',
+            'email' => $invoice['contact_person_email'] ?? '',
+            'phone' => $invoice['contact_person_phone'] ?? '',
+        ], $master);
+        $invoice['otmain_contact_id']      = $contact['id'];
+        $invoice['contact_person_name']    = $contact['doc_name'];
+        $invoice['contact_person_email']   = $contact['doc_email'];
+        $invoice['contact_person_phone']   = $contact['doc_phone'];
+
+        if (array_key_exists('quote_ref', $invoice) && ($invoice['quote_ref'] === '' || $invoice['quote_ref'] === null)) {
+            unset($invoice['quote_ref']);
+        }
+
+        // Resolve related proposal → invoices.proposal_id (Quote Ref).
+        $proposalId = 0;
+        $relatedKeys = [];
+        if (!empty($def['related_proposal_key'])) {
+            $relatedKeys[] = (string) $def['related_proposal_key'];
+        }
+        if (!empty($def['related_proposal_keys']) && is_array($def['related_proposal_keys'])) {
+            foreach ($def['related_proposal_keys'] as $k) {
+                $relatedKeys[] = (string) $k;
+            }
+        }
+        if (!empty($def['source_quote_ref'])) {
+            $relatedKeys[] = (string) $def['source_quote_ref'];
+        }
+        foreach (array_unique($relatedKeys) as $key) {
+            $resolved = $this->resolveRelatedId($key);
+            if ($resolved > 0) {
+                $proposalId = $resolved;
+                break;
+            }
+        }
+        if ($proposalId > 0 && $this->CI->db->field_exists('proposal_id', db_prefix() . 'invoices')) {
+            $invoice['proposal_id'] = $proposalId;
+        } elseif (array_key_exists('proposal_id', $invoice) && empty($invoice['proposal_id'])) {
+            unset($invoice['proposal_id']);
+        }
+
+        $invoiceId = (int) $this->CI->invoices_model->add($invoice);
+        if ($invoiceId < 1) {
+            throw new RuntimeException('Failed to seed invoice: ' . ($def['key'] ?? 'unknown'));
+        }
+
+        $postUpdate = [];
+        if (isset($def['force_status'])) {
+            $postUpdate['status'] = (int) $def['force_status'];
+        }
+        // Keep PDF number / title consistent after add recalculation.
+        if (!empty($def['source_invoice_number']) && empty($invoice['invoice_title'])) {
+            $postUpdate['invoice_title'] = trim((string) $def['source_invoice_number']);
+        }
+        if ($proposalId > 0 && $this->CI->db->field_exists('proposal_id', db_prefix() . 'invoices')) {
+            $postUpdate['proposal_id'] = $proposalId;
+        }
+        if ($postUpdate !== []) {
+            $this->CI->db->where('id', $invoiceId)->update(db_prefix() . 'invoices', $postUpdate);
+        }
+
+        // Back-link proposal + item tracker (same as convert path).
+        if ($proposalId > 0) {
+            $this->CI->db->where('id', $proposalId)->update(db_prefix() . 'proposals', [
+                'invoice_id' => $invoiceId,
+            ]);
+            if ($this->CI->db->table_exists(db_prefix() . 'otmain_item_tracker')) {
+                $this->CI->item_tracker_model->link_invoice($proposalId, $invoiceId);
+            }
+        }
+
+        if (!empty($def['save_option'])) {
+            update_option($def['save_option'], $invoiceId);
+        }
+
+        if (!empty($def['key'])) {
+            $this->relatedRegistry[(string) $def['key']] = $invoiceId;
+        }
+        if (!empty($def['source_invoice_number'])) {
+            $this->relatedRegistry[(string) $def['source_invoice_number']] = $invoiceId;
+        }
+        if (!empty($def['source_quote_ref'])) {
+            $this->relatedRegistry['invoice_quote_ref:' . (string) $def['source_quote_ref']] = $invoiceId;
+        }
+
+        $this->trackSeededId('invoices', $invoiceId);
+
+        // Advance next number past seeded sequence when needed.
+        $usedNumber = (int) ($invoice['number'] ?? 0);
+        $next       = (int) get_option('next_invoice_number');
+        if ($usedNumber >= $next) {
+            update_option('next_invoice_number', $usedNumber + 1);
+        }
+
+        return $invoiceId;
+    }
+
+    /**
+     * @param array $def
+     * @param int   $eurId
      * @return int
      */
     protected function seedPurchaseOrder(array $def, $eurId)
@@ -452,7 +590,39 @@ class Otmain_seed
             $po['supplier_address'] = $this->formatClientAddressBlock($master);
         }
 
+        // Optional proposal link (FK).
+        $proposalId = 0;
+        $relatedKeys = [];
+        if (!empty($def['related_proposal_key'])) {
+            $relatedKeys[] = (string) $def['related_proposal_key'];
+        }
+        if (!empty($def['related_proposal_keys']) && is_array($def['related_proposal_keys'])) {
+            foreach ($def['related_proposal_keys'] as $k) {
+                $relatedKeys[] = (string) $k;
+            }
+        }
+        foreach (array_unique($relatedKeys) as $key) {
+            $resolved = $this->resolveRelatedId($key);
+            if ($resolved > 0) {
+                $proposalId = $resolved;
+                break;
+            }
+        }
+        if ($proposalId > 0) {
+            $po['proposal_id'] = $proposalId;
+            if (empty($po['supplier_quote_ref'])) {
+                $po['supplier_quote_ref'] = format_proposal_number($proposalId);
+            }
+        } elseif (array_key_exists('proposal_id', $po) && empty($po['proposal_id'])) {
+            unset($po['proposal_id']);
+        }
+
         $poId = (int) $this->CI->purchase_order_model->add($po);
+        if ($poId > 0 && $proposalId > 0) {
+            $this->CI->db->where('id', $poId)->update(db_prefix() . 'otmain_purchase_orders', [
+                'proposal_id' => $proposalId,
+            ]);
+        }
         if ($poId > 0 && !empty($def['save_option'])) {
             update_option($def['save_option'], $poId);
         }
@@ -464,17 +634,163 @@ class Otmain_seed
     }
 
     /**
+     * Re-link packing / invoice / PO FK to proposals without deleting documents.
+     * Uses seed manifest keys + existing DB `source_quote_number` / save_option IDs.
+     *
+     * @return array
+     */
+    public function repairRelations()
+    {
+        $this->relatedRegistry    = [];
+        $this->clientIdsByCompany = [];
+        $eurId                    = $this->getCurrencyId('EUR');
+        $usdId                    = $this->getCurrencyId('USD');
+
+        foreach ($this->loadSeedFile('customers.php') as $row) {
+            $payload = $this->customerToPayload($row, $eurId, $usdId);
+            $this->clientIdsByCompany[$row['company']] = $this->ensureClient($payload);
+        }
+
+        $this->hydrateRelatedRegistryFromDatabase();
+
+        $manifest = $this->loadSeedFile('manifest.php');
+        foreach ($manifest['proposals'] ?? [] as $relative) {
+            $def = $this->loadSeedFile($relative);
+            $id  = $this->resolveRelatedId($def['key'] ?? '');
+            if ($id < 1 && !empty($def['source_quote_number'])) {
+                $id = $this->resolveRelatedId((string) $def['source_quote_number']);
+            }
+            if ($id < 1 && !empty($def['save_option'])) {
+                $id = (int) get_option($def['save_option']);
+            }
+            if ($id > 0) {
+                $this->registerRelated($def, $id);
+            }
+        }
+
+        $stats = [
+            'packing_updated'  => 0,
+            'invoice_updated'  => 0,
+            'po_updated'       => 0,
+            'missing_proposals'=> [],
+        ];
+
+        foreach ($manifest['packing_lists'] ?? [] as $relative) {
+            $def = $this->loadSeedFile($relative);
+            $quoteIds = [];
+            $quoteRefLines = [];
+            foreach ($def['related_proposal_keys'] ?? [] as $key) {
+                $id = $this->resolveRelatedId($key);
+                if ($id < 1) {
+                    $stats['missing_proposals'][] = (string) $key;
+                    continue;
+                }
+                $quoteIds[] = $id;
+                if (function_exists('format_proposal_number')) {
+                    $quoteRefLines[] = format_proposal_number($id);
+                }
+            }
+            $packingId = $this->findExistingPackingId($def);
+            if ($packingId > 0 && $quoteIds !== []) {
+                $this->CI->db->where('id', $packingId)->update(db_prefix() . 'otmain_packing_lists', [
+                    'quote_ref_ids' => implode(',', $quoteIds),
+                    'quote_ref'     => implode("\n", $quoteRefLines),
+                ]);
+                $stats['packing_updated']++;
+            }
+        }
+
+        foreach ($manifest['invoices'] ?? [] as $relative) {
+            $def = $this->loadSeedFile($relative);
+            $proposalId = 0;
+            foreach ($this->invoiceRelatedKeys($def) as $key) {
+                $proposalId = $this->resolveRelatedId($key);
+                if ($proposalId > 0) {
+                    break;
+                }
+            }
+            $invoiceId = $this->findExistingInvoiceId($def);
+            if ($invoiceId > 0 && $proposalId > 0 && $this->CI->db->field_exists('proposal_id', db_prefix() . 'invoices')) {
+                $this->CI->db->where('id', $invoiceId)->update(db_prefix() . 'invoices', [
+                    'proposal_id' => $proposalId,
+                ]);
+                $this->CI->db->where('id', $proposalId)->update(db_prefix() . 'proposals', [
+                    'invoice_id' => $invoiceId,
+                ]);
+                if ($this->CI->db->table_exists(db_prefix() . 'otmain_item_tracker')) {
+                    $this->CI->item_tracker_model->link_invoice($proposalId, $invoiceId);
+                }
+                $stats['invoice_updated']++;
+            } elseif ($proposalId < 1) {
+                foreach ($this->invoiceRelatedKeys($def) as $key) {
+                    $stats['missing_proposals'][] = (string) $key;
+                }
+            }
+        }
+
+        foreach ($manifest['purchase_orders'] ?? [] as $relative) {
+            $def = $this->loadSeedFile($relative);
+            $proposalId = 0;
+            if (!empty($def['related_proposal_key'])) {
+                $proposalId = $this->resolveRelatedId((string) $def['related_proposal_key']);
+            }
+            if ($proposalId < 1) {
+                foreach ($def['related_proposal_keys'] ?? [] as $key) {
+                    $proposalId = $this->resolveRelatedId((string) $key);
+                    if ($proposalId > 0) {
+                        break;
+                    }
+                }
+            }
+            $poId = 0;
+            if (!empty($def['save_option'])) {
+                $poId = (int) get_option($def['save_option']);
+            }
+            if ($poId > 0 && $proposalId > 0 && $this->CI->db->field_exists('proposal_id', db_prefix() . 'otmain_purchase_orders')) {
+                $this->CI->db->where('id', $poId)->update(db_prefix() . 'otmain_purchase_orders', [
+                    'proposal_id' => $proposalId,
+                ]);
+                $stats['po_updated']++;
+            }
+        }
+
+        $stats['missing_proposals'] = array_values(array_unique($stats['missing_proposals']));
+
+        return [
+            'status'  => 'success',
+            'message' => 'Relations repaired: packing ' . $stats['packing_updated']
+                . ', invoice ' . $stats['invoice_updated']
+                . ', PO ' . $stats['po_updated']
+                . (empty($stats['missing_proposals'])
+                    ? '.'
+                    : '. Missing proposals (seed ?force=1 if needed): ' . implode(', ', $stats['missing_proposals'])),
+            'stats'   => $stats,
+            'related_registry' => $this->relatedRegistry,
+            'links'   => $this->links(),
+        ];
+    }
+
+    /**
      * @param array $def
      * @param int   $proposalId
      */
     protected function registerRelated(array $def, $proposalId)
     {
         $proposalId = (int) $proposalId;
+        if ($proposalId < 1) {
+            return;
+        }
         if (!empty($def['key'])) {
             $this->relatedRegistry[(string) $def['key']] = $proposalId;
         }
         if (!empty($def['source_quote_number'])) {
-            $this->relatedRegistry[(string) $def['source_quote_number']] = $proposalId;
+            $this->relatedRegistry[trim((string) $def['source_quote_number'])] = $proposalId;
+        }
+        foreach ($def['aliases'] ?? [] as $alias) {
+            $alias = trim((string) $alias);
+            if ($alias !== '') {
+                $this->relatedRegistry[$alias] = $proposalId;
+            }
         }
     }
 
@@ -484,12 +800,119 @@ class Otmain_seed
      */
     protected function resolveRelatedId($key)
     {
-        $key = (string) $key;
+        $key = trim((string) $key);
+        if ($key === '') {
+            return 0;
+        }
         if (isset($this->relatedRegistry[$key])) {
             return (int) $this->relatedRegistry[$key];
         }
 
+        // DB fallback (repair / partial seed runs).
+        $table = db_prefix() . 'proposals';
+        if ($this->CI->db->field_exists('source_quote_number', $table)) {
+            $row = $this->CI->db
+                ->select('id')
+                ->where('source_quote_number', $key)
+                ->order_by('id', 'DESC')
+                ->limit(1)
+                ->get($table)
+                ->row();
+            if ($row) {
+                $this->relatedRegistry[$key] = (int) $row->id;
+
+                return (int) $row->id;
+            }
+        }
+
         return 0;
+    }
+
+    /**
+     * Prefill registry from existing proposals.source_quote_number.
+     */
+    protected function hydrateRelatedRegistryFromDatabase()
+    {
+        $table = db_prefix() . 'proposals';
+        if (!$this->CI->db->field_exists('source_quote_number', $table)) {
+            return;
+        }
+        $rows = $this->CI->db
+            ->select('id, source_quote_number')
+            ->where('source_quote_number IS NOT NULL', null, false)
+            ->where('source_quote_number !=', '')
+            ->get($table)
+            ->result_array();
+        foreach ($rows as $row) {
+            $num = trim((string) ($row['source_quote_number'] ?? ''));
+            if ($num !== '') {
+                $this->relatedRegistry[$num] = (int) $row['id'];
+            }
+        }
+    }
+
+    /**
+     * @param array $def
+     * @return string[]
+     */
+    protected function invoiceRelatedKeys(array $def)
+    {
+        $keys = [];
+        if (!empty($def['related_proposal_key'])) {
+            $keys[] = (string) $def['related_proposal_key'];
+        }
+        foreach ($def['related_proposal_keys'] ?? [] as $k) {
+            $keys[] = (string) $k;
+        }
+        if (!empty($def['source_quote_ref'])) {
+            $keys[] = (string) $def['source_quote_ref'];
+        }
+
+        return array_values(array_unique(array_filter(array_map('trim', $keys))));
+    }
+
+    /**
+     * @param array $def
+     * @return int
+     */
+    protected function findExistingPackingId(array $def)
+    {
+        if (!empty($def['save_option'])) {
+            $id = (int) get_option($def['save_option']);
+            if ($id > 0) {
+                return $id;
+            }
+        }
+
+        return 0;
+    }
+
+    /**
+     * @param array $def
+     * @return int
+     */
+    protected function findExistingInvoiceId(array $def)
+    {
+        if (!empty($def['save_option'])) {
+            $id = (int) get_option($def['save_option']);
+            if ($id > 0) {
+                return $id;
+            }
+        }
+
+        $number = (int) ($def['invoice']['number'] ?? 0);
+        $title  = (string) ($def['invoice']['invoice_title'] ?? '');
+        if ($number < 1) {
+            return 0;
+        }
+
+        $this->CI->db->select('id')->where('number', $number);
+        if ($title !== '' && $this->CI->db->field_exists('invoice_title', db_prefix() . 'invoices')) {
+            $this->CI->db->where('invoice_title', $title);
+        }
+        $row = $this->CI->db->order_by('id', 'DESC')->limit(1)->get(db_prefix() . 'invoices')->row();
+
+        return $row ? (int) $row->id : 0;
     }
 
     protected function ensureCurrencyDefaults()
@@ -968,9 +1391,9 @@ class Otmain_seed
         $catalog  = $this->loadSeedCatalog();
 
         $proposalIds = $this->resolveSeedProposalIdsToDelete($registry['proposals'], $catalog);
-        $packingIds  = $registry['packing_lists'];
+        $packingIds  = $this->resolveSeedPackingIdsToDelete($registry['packing_lists'], $proposalIds);
         $poIds       = $registry['purchase_orders'];
-        $invoiceIds  = $registry['invoices'];
+        $invoiceIds  = $this->resolveSeedInvoiceIdsToDelete($registry['invoices']);
         $estimateIds = $registry['estimates'];
 
         if ($this->CI->db->table_exists(db_prefix() . 'otmain_item_tracker') && $proposalIds !== []) {
@@ -1001,6 +1424,78 @@ class Otmain_seed
         }
 
         $this->clearSeedOptions();
+    }
+
+    /**
+     * @param int[] $trackedIds
+     * @param int[] $proposalIdsBeingDeleted
+     * @return int[]
+     */
+    protected function resolveSeedPackingIdsToDelete(array $trackedIds, array $proposalIdsBeingDeleted)
+    {
+        $ids = array_map('intval', $trackedIds);
+        $manifest = $this->loadSeedFile('manifest.php');
+        foreach ($manifest['packing_lists'] ?? [] as $relative) {
+            $def = $this->loadSeedFile($relative);
+            if (!empty($def['save_option'])) {
+                $optId = (int) get_option($def['save_option']);
+                if ($optId > 0) {
+                    $ids[] = $optId;
+                }
+            }
+        }
+
+        $table = db_prefix() . 'otmain_packing_lists';
+        if ($this->CI->db->table_exists($table) && $proposalIdsBeingDeleted !== []) {
+            $propSet = array_fill_keys(array_map('intval', $proposalIdsBeingDeleted), true);
+            $rows = $this->CI->db->select('id, quote_ref_ids')->get($table)->result_array();
+            foreach ($rows as $row) {
+                $raw = trim((string) ($row['quote_ref_ids'] ?? ''));
+                if ($raw === '') {
+                    continue;
+                }
+                foreach (preg_split('/\s*,\s*/', $raw) as $piece) {
+                    $pid = (int) $piece;
+                    if ($pid > 0 && isset($propSet[$pid])) {
+                        $ids[] = (int) $row['id'];
+                        break;
+                    }
+                }
+            }
+        }
+
+        $ids = array_values(array_unique(array_filter($ids)));
+        sort($ids);
+
+        return $ids;
+    }
+
+    /**
+     * @param int[] $trackedIds
+     * @return int[]
+     */
+    protected function resolveSeedInvoiceIdsToDelete(array $trackedIds)
+    {
+        $ids = array_map('intval', $trackedIds);
+        $manifest = $this->loadSeedFile('manifest.php');
+        foreach ($manifest['invoices'] ?? [] as $relative) {
+            $def = $this->loadSeedFile($relative);
+            if (!empty($def['save_option'])) {
+                $optId = (int) get_option($def['save_option']);
+                if ($optId > 0) {
+                    $ids[] = $optId;
+                }
+            }
+            $found = $this->findExistingInvoiceId($def);
+            if ($found > 0) {
+                $ids[] = $found;
+            }
+        }
+
+        $ids = array_values(array_unique(array_filter($ids)));
+        sort($ids);
+
+        return $ids;
     }
 
     /**

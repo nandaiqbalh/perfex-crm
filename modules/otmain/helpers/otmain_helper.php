@@ -1261,6 +1261,19 @@ function otmain_pdf_po_left_block_html($po)
 {
     $poNumber = $po->formatted_number ?: otmain_format_purchase_order_number($po->id);
 
+    $quoteRefDisplay = trim((string) ($po->supplier_quote_ref ?? ''));
+    if ($quoteRefDisplay === '' && !empty($po->proposal_id)) {
+        $quoteRefDisplay = format_proposal_number((int) $po->proposal_id);
+    }
+    if ($quoteRefDisplay === '') {
+        $quoteRefDisplay = '-';
+    }
+
+    $ourQuoteHtml = '';
+    if (!empty($po->proposal_id)) {
+        $ourQuoteHtml = '<strong>Our Quote Ref.:</strong> ' . e(format_proposal_number((int) $po->proposal_id)) . '<br />';
+    }
+
     return '<div style="' . otmain_pdf_meta_text_style() . '">'
         . '<strong>P.O. to:</strong><br />'
         . e(get_company_name($po->supplierid)) . '<br />'
@@ -1268,7 +1281,8 @@ function otmain_pdf_po_left_block_html($po)
         . '<br />'
         . '<strong>Order Date:</strong> <span style="font-weight:bold;">' . e(otmain_pdf_format_document_date($po->date ?? '')) . '</span><br />'
         . '<strong>P.O. Number:</strong> <span style="font-weight:bold;">' . e($poNumber) . '</span><br />'
-        . '<strong>Supplier Quote Ref.:</strong> ' . e($po->supplier_quote_ref ?? '-') . '<br />'
+        . '<strong>Supplier Quote Ref.:</strong> ' . e($quoteRefDisplay) . '<br />'
+        . $ourQuoteHtml
         . '<br />'
         . '<strong>Contact Person:</strong> ' . e($po->contact_person ?? '-') . '<br />'
         . '<strong>Email Address:</strong> ' . e($po->email ?? '-') . '<br />'
@@ -1559,7 +1573,13 @@ function otmain_pdf_invoice_left_block_html($invoice, $invoiceNumber)
         $contactPhone = '-';
     }
 
-    $quoteRef = !empty($invoice->quote_ref) ? format_estimate_number($invoice->quote_ref) : '-';
+    $quoteRef = '-';
+    if (!empty($invoice->proposal_id)) {
+        $quoteRef = format_proposal_number((int) $invoice->proposal_id);
+    } elseif (!empty($invoice->quote_ref)) {
+        // Legacy estimate link (pre–proposal Quote Ref)
+        $quoteRef = format_estimate_number($invoice->quote_ref);
+    }
 
     return '<div style="font-size:10px;color:#424242;line-height:1.6;">'
         . '<strong>Invoice to:</strong><br />'

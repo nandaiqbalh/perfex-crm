@@ -291,6 +291,42 @@
         $(selector).val(otmainPlainText(value)).trigger('change');
     }
 
+    function otmainFillInvoiceFromProposal(data) {
+        if (!data) {
+            return;
+        }
+
+        otmainSetFieldValue('input[name="invoice_title"]', data.invoice_title);
+        otmainSetFieldValue('textarea[name="payment_terms_text"]', data.payment_terms_text);
+        otmainSetFieldValue('input[name="lead_time"]', data.delivery_time);
+        otmainSetFieldValue('input[name="availability"]', data.availability);
+        otmainSetFieldValue('input[name="delivery_terms"]', data.shipment_terms);
+
+        if (data.contact_person_name) {
+            otmainSetFieldValue('input[name="contact_person_name"]', data.contact_person_name);
+        }
+        if (data.contact_person_email) {
+            otmainSetFieldValue('input[name="contact_person_email"]', data.contact_person_email);
+        }
+        if (data.contact_person_phone) {
+            otmainSetFieldValue('input[name="contact_person_phone"]', data.contact_person_phone);
+        }
+
+        if (data.items && data.items.length) {
+            otmainFillItemsFromEstimate(data.items);
+        }
+
+        if (data.clientid) {
+            var $client = $('.f_client_id #clientid');
+            if ($client.length && (!$client.val() || $client.val() === '')) {
+                $client.selectpicker('val', data.clientid);
+                $client.trigger('change');
+            } else if ($client.val() == data.clientid) {
+                otmainLoadContacts(data.clientid, '#otmain_contact_id');
+            }
+        }
+    }
+
     function otmainFillInvoiceFromEstimate(data) {
         if (!data) {
             return;
@@ -744,22 +780,22 @@
         }
 
         if ($('body').find('.invoice-form').length) {
-            init_ajax_search('estimate', '#quote_ref.ajax-search', undefined, admin_url + 'misc/get_relation_data');
+            init_ajax_search('proposal', '#proposal_id.ajax-search', undefined, admin_url + 'misc/get_relation_data');
 
             $('#expiry_days, input[name="date"]').on('change keyup', function() {
                 otmainCalculateExpiryDate('input[name="date"]', '#expiry_days', 'input[name="duedate"]');
             });
 
-            $('#quote_ref').on('change', function() {
-                var estimateId = $(this).val();
-                if (!estimateId) {
+            $('#proposal_id').on('change', function() {
+                var proposalId = $(this).val();
+                if (!proposalId) {
                     return;
                 }
-                $.get(admin_url + 'otmain/get_estimate_data/' + estimateId, function(data) {
-                    if (!data || !data.clientid) {
+                $.get(admin_url + 'otmain/get_proposal_invoice_data/' + proposalId, function(data) {
+                    if (!data) {
                         return;
                     }
-                    otmainFillInvoiceFromEstimate(data);
+                    otmainFillInvoiceFromProposal(data);
                 }, 'json');
             });
 
@@ -984,6 +1020,7 @@
 
     if ($('#otmain-purchase-order-form').length) {
         init_ajax_search('customer', '#supplierid.ajax-search');
+        init_ajax_search('proposal', '#po_proposal_id.ajax-search', undefined, admin_url + 'misc/get_relation_data');
 
         var poSelectedContact = $('#otmain_po_contact_id').val();
 
@@ -1000,6 +1037,16 @@
             $('input[name="contact_person"]').val($opt.data('name') || '');
             $('input[name="email"]').val($opt.data('email') || '');
             $('input[name="phone"]').val($opt.data('phone') || '');
+        });
+
+        // Optional: fill Supplier Quote Ref text from proposal number when empty
+        $('#po_proposal_id').on('change', function() {
+            var $sel = $(this);
+            var text = ($sel.find('option:selected').text() || '').toString().trim();
+            var $ref = $('input[name="supplier_quote_ref"]');
+            if (text && $ref.length && !$ref.val()) {
+                $ref.val(text);
+            }
         });
 
         $('body').on('input change', '.otmain-po-qty, .otmain-po-rate, .otmain-po-tax', otmainRecalcPoTotals);

@@ -14,10 +14,16 @@ class Seed extends AdminController
 
     public function index()
     {
-        $force = (bool) $this->input->get('force');
+        $force  = (bool) $this->input->get('force');
+        $repair = (bool) $this->input->get('repair');
 
         $this->load->library('otmain/otmain_seed');
-        $result = $this->otmain_seed->run($force);
+
+        if ($repair && !$force) {
+            $result = $this->otmain_seed->repairRelations();
+        } else {
+            $result = $this->otmain_seed->run($force);
+        }
 
         $data['title']  = 'OT-Main Production Seed';
         $data['result'] = $result;

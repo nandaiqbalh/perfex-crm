@@ -17,15 +17,15 @@ $invoice = $invoice ?? null;
     </div>
     <div class="col-md-12">
         <div class="form-group select-placeholder">
-            <label for="quote_ref" class="control-label"><?php echo _l('otmain_quote_reference'); ?></label>
-            <select name="quote_ref" id="quote_ref" class="ajax-search" data-width="100%" data-live-search="true" data-none-selected-text="<?php echo _l('otmain_select_quote'); ?>">
+            <label for="proposal_id" class="control-label"><?php echo _l('otmain_quote_reference'); ?></label>
+            <select name="proposal_id" id="proposal_id" class="ajax-search" data-width="100%" data-live-search="true" data-none-selected-text="<?php echo _l('otmain_select_quote'); ?>">
                 <?php
-                if (isset($invoice) && !empty($invoice->quote_ref)) {
+                if (isset($invoice) && !empty($invoice->proposal_id)) {
                     $CI = &get_instance();
-                    $CI->load->model('estimates_model');
-                    $estimate = $CI->estimates_model->get($invoice->quote_ref);
-                    if ($estimate) {
-                        echo '<option value="' . $estimate->id . '" selected>' . format_estimate_number($estimate) . '</option>';
+                    $CI->load->model('proposals_model');
+                    $linkedProposal = $CI->proposals_model->get((int) $invoice->proposal_id);
+                    if ($linkedProposal) {
+                        echo '<option value="' . (int) $linkedProposal->id . '" selected>' . e(format_proposal_number($linkedProposal->id)) . '</option>';
                     }
                 }
                 ?>

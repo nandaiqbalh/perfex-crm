@@ -107,6 +107,7 @@ class Purchase_order_model extends App_Model
             'supplierid',
             'supplier_address',
             'supplier_quote_ref',
+            'proposal_id',
             'otmain_contact_id',
             'contact_person',
             'email',
@@ -163,6 +164,12 @@ class Purchase_order_model extends App_Model
 
         if (empty($data['otmain_contact_id'])) {
             $data['otmain_contact_id'] = null;
+        }
+
+        if (!isset($data['proposal_id']) || $data['proposal_id'] === '' || (int) $data['proposal_id'] < 1) {
+            $data['proposal_id'] = null;
+        } else {
+            $data['proposal_id'] = (int) $data['proposal_id'];
         }
 
         $data = otmain_normalize_conversion_fields($data);
