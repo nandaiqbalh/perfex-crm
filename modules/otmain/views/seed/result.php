@@ -25,10 +25,12 @@
 
                         <hr />
                         <p class="text-muted">
-                            Seed <strong>tidak pernah</strong> menghapus semua data di database. Customers di-upsert; dokumen client/manual tidak disentuh.
+                            Seed <strong>tidak pernah</strong> menghapus semua data di database. Customers di-upsert.
+                            Proposal manual aman: seed hanya menghapus dokumen bertanda seed
+                            (<code>source_quote_number</code> / subject catalog seed / ID tracked).
                         </p>
                         <p class="text-muted">
-                            <code>?force=1</code> — ganti hanya dokumen yang pernah di-seed (tracked di <code>otmain_seed_document_ids</code>).
+                            <code>?force=1</code> — ganti seed + bersihkan orphan seed lama (duplikat reseed).
                             Seed ulang: <a href="<?php echo admin_url('otmain/seed?force=1'); ?>">?force=1</a>
                         </p>
                     </div>

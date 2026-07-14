@@ -71,7 +71,7 @@ class Otmain_seed
             ];
         }
 
-        // Only remove documents previously created by this seed — never wipe real client data.
+        // Only remove seed-stamped / previously tracked docs — never wipe manual proposals.
         $this->cleanup();
 
         $this->relatedRegistry    = [];
@@ -146,7 +146,7 @@ class Otmain_seed
         return [
             'status'  => 'success',
             'message' => 'Production seed applied (' . count($this->clientIdsByCompany) . ' customers upserted, '
-                . count($proposalIds) . ' proposals). Only previous tracked seed docs were replaced; other DB data kept.',
+                . count($proposalIds) . ' proposals). Replaced seed-stamped docs only; manual proposals kept.',
             'ids'     => array_merge($ids, [
                 'tpClientId'  => (int) $tpClientId,
                 'proposalIds' => $proposalIds,
@@ -953,14 +953,21 @@ class Otmain_seed
     }
 
     /**
-     * Wipe only documents previously created by this seed (otmain_seed_document_ids).
-     * Customers and non-seed documents are preserved.
+     * Wipe seed documents only. Manual / client proposals stay untouched.
+     *
+     * Safety rules (any match → considered seed, eligible for delete):
+     * 1. ID listed in otmain_seed_document_ids (last successful seed run)
+     * 2. source_quote_number matches a number from the seed catalog (explicit stamp)
+     * 3. Legacy orphans: empty source_quote_number AND subject exact-match a seed subject
+     *
+     * Manual proposals: no source_quote_number + subject not in seed catalog → never deleted.
      */
     protected function cleanup()
     {
         $registry = $this->getSeededRegistry();
+        $catalog  = $this->loadSeedCatalog();
 
-        $proposalIds = $registry['proposals'];
+        $proposalIds = $this->resolveSeedProposalIdsToDelete($registry['proposals'], $catalog);
         $packingIds  = $registry['packing_lists'];
         $poIds       = $registry['purchase_orders'];
         $invoiceIds  = $registry['invoices'];
@@ -994,6 +1001,81 @@ class Otmain_seed
         }
 
         $this->clearSeedOptions();
+    }
+
+    /**
+     * Collect identifiers from seed PHP defs used to recognize seed rows in DB.
+     *
+     * @return array{source_quote_numbers:string[],subjects:string[]}
+     */
+    protected function loadSeedCatalog()
+    {
+        $catalog = [
+            'source_quote_numbers' => [],
+            'subjects'             => [],
+        ];
+
+        $manifest = $this->loadSeedFile('manifest.php');
+        foreach ($manifest['proposals'] ?? [] as $relative) {
+            $def = $this->loadSeedFile($relative);
+            if (!empty($def['source_quote_number'])) {
+                $catalog['source_quote_numbers'][] = trim((string) $def['source_quote_number']);
+            }
+            $subject = trim((string) ($def['proposal']['subject'] ?? ''));
+            if ($subject !== '') {
+                $catalog['subjects'][] = $subject;
+            }
+        }
+
+        $catalog['source_quote_numbers'] = array_values(array_unique($catalog['source_quote_numbers']));
+        $catalog['subjects']             = array_values(array_unique($catalog['subjects']));
+
+        return $catalog;
+    }
+
+    /**
+     * @param int[] $trackedIds
+     * @param array{source_quote_numbers:string[],subjects:string[]} $catalog
+     * @return int[]
+     */
+    protected function resolveSeedProposalIdsToDelete(array $trackedIds, array $catalog)
+    {
+        $ids = array_map('intval', $trackedIds);
+        $table = db_prefix() . 'proposals';
+
+        // Stamp: source_quote_number set by seed (manual UI never writes this column).
+        if ($this->CI->db->field_exists('source_quote_number', $table)
+            && !empty($catalog['source_quote_numbers'])) {
+            $rows = $this->CI->db
+                ->select('id')
+                ->where_in('source_quote_number', $catalog['source_quote_numbers'])
+                ->get($table)
+                ->result_array();
+            foreach ($rows as $row) {
+                $ids[] = (int) $row['id'];
+            }
+        }
+
+        // Legacy orphans from older force-reseeds (before source_quote_number existed).
+        // Only exact subject match from seed catalog — manual quotes with other subjects stay.
+        if (!empty($catalog['subjects'])) {
+            $this->CI->db->select('id')->where_in('subject', $catalog['subjects']);
+            if ($this->CI->db->field_exists('source_quote_number', $table)) {
+                $this->CI->db->group_start()
+                    ->where('source_quote_number IS NULL', null, false)
+                    ->or_where('source_quote_number', '')
+                    ->group_end();
+            }
+            $rows = $this->CI->db->get($table)->result_array();
+            foreach ($rows as $row) {
+                $ids[] = (int) $row['id'];
+            }
+        }
+
+        $ids = array_values(array_unique(array_filter($ids)));
+        sort($ids);
+
+        return $ids;
     }
 
     /**
