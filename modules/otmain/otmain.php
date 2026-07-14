@@ -26,7 +26,7 @@ hooks()->add_action('otmain_invoice_form_fields', 'otmain_render_invoice_fields'
 hooks()->add_action('otmain_estimate_form_fields', 'otmain_render_estimate_fields');
 hooks()->add_action('otmain_proposal_form_fields', 'otmain_render_proposal_fields');
 
-// Hide Perfex Estimates from navigation — OT-Main quotations use Proposals.
+// Hide unused Sales nav — OT-Main quotations use Proposals; no catalog/credit-note flow.
 hooks()->add_filter('sidebar_menu_child_items', 'otmain_hide_estimates_nav_child', 10, 2);
 hooks()->add_filter('customer_profile_tabs', 'otmain_hide_estimates_customer_tab');
 hooks()->add_filter('project_tabs_child_items', 'otmain_hide_estimates_nav_child', 10, 2);
@@ -254,7 +254,7 @@ function otmain_init_menu()
 }
 
 /**
- * Remove Estimates from Sales / Project sales children nav.
+ * Remove unused items from Sales / Project sales children nav.
  *
  * @param array       $children
  * @param string|null $parentSlug
@@ -266,20 +266,28 @@ function otmain_hide_estimates_nav_child($children, $parentSlug = null)
         return $children;
     }
 
-    // Sidebar: parent sales. Project tabs: parent sales (child slug project_estimates).
+    // Sidebar: parent sales. Project tabs: parent sales (child slug project_*).
     if ($parentSlug !== null && $parentSlug !== 'sales') {
         return $children;
     }
 
-    return array_values(array_filter($children, static function ($item) {
+    $hidden = [
+        'estimates',
+        'project_estimates',
+        'credit_notes',
+        'project_credit_notes',
+        'items',
+    ];
+
+    return array_values(array_filter($children, static function ($item) use ($hidden) {
         $slug = $item['slug'] ?? '';
 
-        return $slug !== 'estimates' && $slug !== 'project_estimates';
+        return !in_array($slug, $hidden, true);
     }));
 }
 
 /**
- * Hide Estimates tab on customer profile.
+ * Hide unused tabs on customer profile.
  *
  * @param array $tabs
  * @return array
@@ -289,7 +297,7 @@ function otmain_hide_estimates_customer_tab($tabs)
     if (!is_array($tabs)) {
         return $tabs;
     }
-    unset($tabs['estimates']);
+    unset($tabs['estimates'], $tabs['credit_notes']);
 
     return $tabs;
 }
