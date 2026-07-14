@@ -15,14 +15,9 @@ class Seed extends AdminController
     public function index()
     {
         $force = (bool) $this->input->get('force');
-        $reset = (bool) $this->input->get('reset');
-        // reset=1 implies force (wipe documents, then seed)
-        if ($reset) {
-            $force = true;
-        }
 
         $this->load->library('otmain/otmain_seed');
-        $result = $this->otmain_seed->run($force, $reset);
+        $result = $this->otmain_seed->run($force);
 
         $data['title']  = 'OT-Main Production Seed';
         $data['result'] = $result;

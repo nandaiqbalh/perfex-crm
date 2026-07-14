@@ -58,25 +58,21 @@ class Otmain_seed
     }
 
     /**
-     * @param bool $force Recreate when marker already applied (tracked docs only, unless $reset)
-     * @param bool $reset Wipe ALL proposals / packing / PO / item tracker first (customers kept)
+     * @param bool $force Recreate when marker already applied (tracked seed docs only)
      * @return array
      */
-    public function run($force = false, $reset = false)
+    public function run($force = false)
     {
-        if (!$force && !$reset && get_option('otmain_seed_marker') === $this->marker) {
+        if (!$force && get_option('otmain_seed_marker') === $this->marker) {
             return [
                 'status'  => 'skipped',
-                'message' => 'Production seed already applied. Add ?force=1 to recreate tracked docs, or ?reset=1 to wipe all OT-Main docs then seed.',
+                'message' => 'Production seed already applied. Add ?force=1 to recreate tracked seed docs only (never wipes all documents).',
                 'links'   => $this->links(),
             ];
         }
 
-        if ($reset) {
-            $this->resetDocuments();
-        } else {
-            $this->cleanup();
-        }
+        // Only remove documents previously created by this seed — never wipe real client data.
+        $this->cleanup();
 
         $this->relatedRegistry    = [];
         $this->clientIdsByCompany = [];
@@ -147,15 +143,10 @@ class Otmain_seed
             'poId'       => (int) $poId,
         ];
 
-        $modeMsg = $reset
-            ? 'Reset all OT-Main documents first (customers kept), then seeded.'
-            : 'Only previous seed docs were replaced; other DB data kept.';
-
         return [
             'status'  => 'success',
             'message' => 'Production seed applied (' . count($this->clientIdsByCompany) . ' customers upserted, '
-                . count($proposalIds) . ' proposals). ' . $modeMsg,
-            'reset'   => (bool) $reset,
+                . count($proposalIds) . ' proposals). Only previous tracked seed docs were replaced; other DB data kept.',
             'ids'     => array_merge($ids, [
                 'tpClientId'  => (int) $tpClientId,
                 'proposalIds' => $proposalIds,
@@ -990,57 +981,6 @@ class Otmain_seed
         }
 
         $this->clearSeedOptions();
-    }
-
-    /**
-     * Full document reset for dirty DB / development:
-     * deletes ALL proposals, packing lists, purchase orders, item tracker rows.
-     * Customers / contacts are NOT touched. Perfex invoices/estimates are NOT wiped.
-     */
-    protected function resetDocuments()
-    {
-        $db = $this->CI->db;
-        $p  = db_prefix();
-
-        if ($db->table_exists($p . 'otmain_item_tracker')) {
-            $db->empty_table($p . 'otmain_item_tracker');
-        }
-
-        if ($db->table_exists($p . 'otmain_packing_list_items')) {
-            $db->empty_table($p . 'otmain_packing_list_items');
-        }
-        if ($db->table_exists($p . 'otmain_packing_lists')) {
-            $db->empty_table($p . 'otmain_packing_lists');
-        }
-
-        if ($db->table_exists($p . 'otmain_purchase_order_items')) {
-            $db->empty_table($p . 'otmain_purchase_order_items');
-        }
-        if ($db->table_exists($p . 'otmain_purchase_orders')) {
-            $db->empty_table($p . 'otmain_purchase_orders');
-        }
-
-        // Proposal items then proposals (Perfex core tables)
-        if ($db->table_exists($p . 'itemable')) {
-            $db->where('rel_type', 'proposal')->delete($p . 'itemable');
-        }
-        if ($db->table_exists($p . 'proposal_comments')) {
-            $db->empty_table($p . 'proposal_comments');
-        }
-        if ($db->table_exists($p . 'proposals')) {
-            $proposalIds = $db->select('id')->get($p . 'proposals')->result_array();
-            foreach ($proposalIds as $row) {
-                $this->CI->proposals_model->delete((int) $row['id']);
-            }
-            // Fallback if model left orphans
-            $db->empty_table($p . 'proposals');
-        }
-
-        $this->clearSeedOptions();
-
-        // Restart OT-Main document numbering for a clean seed run
-        update_option('next_otmain_packing_list_number', '1');
-        update_option('next_otmain_purchase_order_number', '100');
     }
 
     /**
