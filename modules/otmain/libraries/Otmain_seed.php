@@ -13,7 +13,7 @@ class Otmain_seed
     protected $CI;
 
     /** Bump when seed dataset structure changes so force reseed is clearer. */
-    protected $marker = 'otmain_prod_v2';
+    protected $marker = 'otmain_prod_v3';
 
     /** @var string Absolute path to libraries/seed */
     protected $seedPath;
@@ -219,16 +219,29 @@ class Otmain_seed
         $proposal['contact_person_email']   = $contact['doc_email'];
         $proposal['contact_person_phone']   = $contact['doc_phone'];
 
+        // Persist original PDF quotation number for list/PDF display (not DB auto-id format).
+        if ($this->CI->db->field_exists('source_quote_number', db_prefix() . 'proposals')
+            && !empty($def['source_quote_number'])) {
+            $proposal['source_quote_number'] = trim((string) $def['source_quote_number']);
+        }
+
         $proposalId = (int) $this->CI->proposals_model->add($proposal);
         if ($proposalId < 1) {
             throw new RuntimeException('Failed to seed proposal: ' . ($def['key'] ?? 'unknown'));
         }
 
+        $postUpdate = [];
         $forceStatus = isset($def['force_status']) ? (int) $def['force_status'] : null;
         if ($forceStatus !== null) {
-            $this->CI->db->where('id', $proposalId)->update(db_prefix() . 'proposals', [
-                'status' => $forceStatus,
-            ]);
+            $postUpdate['status'] = $forceStatus;
+        }
+        // Safety: ensure source number is set even if insert stripped an unknown column on older schema.
+        if ($this->CI->db->field_exists('source_quote_number', db_prefix() . 'proposals')
+            && !empty($def['source_quote_number'])) {
+            $postUpdate['source_quote_number'] = trim((string) $def['source_quote_number']);
+        }
+        if ($postUpdate !== []) {
+            $this->CI->db->where('id', $proposalId)->update(db_prefix() . 'proposals', $postUpdate);
         }
 
         if (!empty($def['populate_tracker'])) {

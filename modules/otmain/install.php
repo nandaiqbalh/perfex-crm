@@ -83,6 +83,8 @@ $proposalColumns = [
     'total_gold_display'   => "VARCHAR(191) NULL DEFAULT NULL",
     'conversion_rate'      => "DECIMAL(15,6) NULL DEFAULT NULL",
     'conversion_currency'  => "INT(11) NULL DEFAULT NULL",
+    // Original PDF quotation number for display (seed + optional manual override)
+    'source_quote_number'  => "VARCHAR(191) NULL DEFAULT NULL",
 ];
 
 foreach ($proposalColumns as $column => $definition) {

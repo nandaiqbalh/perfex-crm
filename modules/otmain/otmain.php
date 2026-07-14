@@ -476,14 +476,24 @@ function otmain_filter_pdf_logo_url($logoImage)
 function otmain_format_proposal_number($format, $id)
 {
     $CI = &get_instance();
-    $CI->db->select('date, quote_title')->where('id', $id);
+    $select = 'date, quote_title';
+    if ($CI->db->field_exists('source_quote_number', db_prefix() . 'proposals')) {
+        $select .= ', source_quote_number';
+    }
+    $CI->db->select($select)->where('id', $id);
     $row = $CI->db->get(db_prefix() . 'proposals')->row();
+
+    // Prefer original PDF / seed number when present (e.g. "3 - 2026 - OTMSQ - 103 - Suction Hose").
+    if ($row && !empty($row->source_quote_number)) {
+        return trim((string) $row->source_quote_number);
+    }
 
     $year = $row && !empty($row->date) ? date('Y', strtotime($row->date)) : date('Y');
     $prefix = trim((string) (get_option('proposal_number_prefix') ?: 'OTMSQ'));
     $title = $row && !empty($row->quote_title) ? (' - ' . trim((string) $row->quote_title)) : '';
 
-    // Example target: "20 - 2026 - OTMSQ - 120 - Kovako M120"
+    // Fallback for manually created proposals (no source number):
+    // Example: "20 - 2026 - OTPSQ - 120 - Kovako M120"
     $offerCount = (int) $id;
     $counter1xx = (int) $id + 100;
 
