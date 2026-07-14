@@ -36,7 +36,7 @@ return [
         'terms'                => '',
         'expiry_days'          => 14,
         'availability'         => '',
-        'notes'                => "Agenda: 7 t/m 14 april, 16 mei t/m 23 juni staan al geboekt voor andere werkzaamheden.\nTarief voor een ekstra werkdag: €600 inclusief bovengenoemde kosten.",
+        'notes'                => "Tarieven voor Extra Diensten:\nTarief voor een ekstra werkdag: €600 inclusief bovengenoemde kosten.\nAgenda: 7 t/m 14 april, 16 mei t/m 23 juni staan al geboekt voor andere werkzaamheden.",
         'contact_person_name'  => 'S.A.Ibrahim',
         'contact_person_email' => 'sales@otmain.com',
         'contact_person_phone' => '+31618228651',
@@ -56,7 +56,7 @@ return [
         'newitems'             => [
             1 => [
                 'description'      => 'Optie 1: Maandverblijf in Zanzibar',
-                'long_description' => "Vigor Shipunloader Delivery\nScope van Werkzaamheden:\n• Assistentie en monitoring tijdens de lossingen\n• Fijnregeling en optimalisatie van het systeem\n• Afhandeling van openstaande punten en spesifikke klantwensen\n\nVolledige maand in Zanzibar. Pakket: arbeidskosten, reisdocumenten, maaltijden, grondtransport en overige verblijfskosten.\nDetails: Aantal nachten: 31; Aantal werkdagen: 11 (5 + 3 + 3 bij lossingen).",
+                'long_description' => "Vigor Shipunloader Delivery\nScope van Werkzaamheden:\n• Assistentie en monitoring tijdens de lossingen\n• Fijnregeling en optimalisatie van het systeem\n• Afhandeling van openstaande punten en specifieke klantwensen\n\nBij deze optie verblijf ik een volledige maand in Zanzibar. Het pakket omvat alle arbeidskosten, reisdocumenten, maaltijden, grondtransport en overige verblijfskosten.\nDetails van het pakket:\nAantal nachten: 31\nAantal werkdagen: 11 (verdeeld over de maand)\n5 werkdagen bij de eerste lossing\n3 werkdagen bij de tweede lossing\n3 werkdagen bij de laatste lossing.",
                 'qty'              => 1,
                 'rate'             => 12836.00,
                 'unit'             => '',
@@ -65,7 +65,7 @@ return [
             ],
             2 => [
                 'description'      => 'Optie 2: Optie Flexibel, aanbieding Eerste Lossing',
-                'long_description' => "Voor de eerste lossing. Voor volgende lossingen aparte offertes.\nPakket: arbeidskosten, reisdocumenten, maaltijden, grondtransport en overige verblijfskosten.\nDetails: Aantal nachten: 7; Aantal werkdagen: 5.",
+                'long_description' => "Deze optie is voor de eerste lossing. Voor de volgende lossingen worden aparte offertes gestuurd, zodat je vrij staat om te kiezen in welke maand deze plaatsvinden. Dit pakket omvat eveneens alle arbeidskosten, reisdocumenten, maaltijden, grondtransport en overige verblijfskosten.\nDetails van het pakket:\nAantal nachten: 7\nAantal werkdagen: 5",
                 'qty'              => 1,
                 'rate'             => 5431.00,
                 'unit'             => '',

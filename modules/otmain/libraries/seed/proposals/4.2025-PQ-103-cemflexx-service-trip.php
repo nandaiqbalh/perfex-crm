@@ -35,7 +35,7 @@ return [
         'terms'                => '',
         'expiry_days'          => 3,
         'availability'         => '',
-        'notes'                => "Tarieven untuk ekstra werkzaamheden:\n• Extra werkdag: €400,- per dag\n• Werk tijdens wachtdag per dagdeel: 30% van dagtarief = €120,- per dagdeel",
+        'notes'                => "Tarieven voor ekstra werkzaamheden:\n• Extra werkdag: €400,- per dag\n• Werk tijdens wachtdag per dagdeel: 30% van dagtarief = €120,- per dagdeel",
         'contact_person_name'  => 'S.A.Ibrahim',
         'contact_person_email' => 'sales@otmain.com',
         'contact_person_phone' => '+31618228651',
@@ -55,7 +55,7 @@ return [
         'newitems'             => [
             1 => [
                 'description'      => 'Vigor Shipunloader – Levering en Ondersteuning',
-                'long_description' => "• Assistentie en monitoring tijdens losoperaties\n• Fijnregeling en optimalisatie van het systeem\nAantal werkdagen: 5\nPakket: arbeidskosten, reisdokumenten, maaltijden, lucht en grondtransport, logies en overige verblijfskosten",
+                'long_description' => "• Assistentie en monitoring tijdens losoperaties\n• Fijnregeling en optimalisatie van het systeem\nAantal werkdagen: 5\nHet pakket omvat: arbeidskosten, reisdocumenten, maaltijden, lucht en grondtransport en logies en overige verblijfskosten",
                 'qty'              => 1,
                 'rate'             => 5431.00,
                 'unit'             => '',

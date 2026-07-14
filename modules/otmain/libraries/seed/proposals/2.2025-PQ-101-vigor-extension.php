@@ -55,7 +55,7 @@ return [
         'newitems'             => [
             1 => [
                 'description'      => 'Travel and Hotel Rescheduling Costs',
-                'long_description' => "Additional costs expected for rescheduling travel and accommodation:\nZanzibar → Amsterdam\nAmsterdam → Jakarta\nJakarta → Padang\nPadang → Jakarta\nJakarta → Amsterdam\nHotel bookings may incur ekstra charges. Estimated costs; price differences recalculated / refunded or invoiced.",
+                'long_description' => "Additional costs are expected for rescheduling following travel and accommodation\nZanzibar → Amsterdam\nAmsterdam → Jakarta\nJakarta → Padang\nPadang → Jakarta\nJakarta → Amsterdam\nHotel bookings will also need to be adjusted, which may incur extra charges. Please note that these are estimated costs and subject to change. Any price differences will be recalculated and either refunded or invoiced accordingly.",
                 'qty'              => 1,
                 'rate'             => 3000.00,
                 'unit'             => '',
@@ -64,7 +64,7 @@ return [
             ],
             2 => [
                 'description'      => 'Extension Package (until 27 May 2025)',
-                'long_description' => "Includes Day Rate, Meals & Accommodation.\nPackage Details:\nTotal duration: 10 nights\nWorking days: 3\nWaiting days: 6",
+                'long_description' => "This package includes Day Rate, Meals & Accommodation.\nPackage Details:\nTotal duration: 10 nights\nWorking days: 3\nWaiting days: 6",
                 'qty'              => 1,
                 'rate'             => 3460.00,
                 'unit'             => '',
