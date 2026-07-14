@@ -11,9 +11,10 @@ defined('BASEPATH') or exit('No direct script access allowed');
  * Two options listed; subtotal = sum of options.
  */
 return [
-    'key'                 => '1_2025_pq_100_cemflexx_vigor_delivery',
-    'source_quote_number' => '2025-PQ-100',
+    'key'                 => '1.2025-PQ-100-cemflexx-vigor-delivery',
+    'source_quote_number' => '1 - 2025 - PQ - 100 - CemflexX - Vigor - Delivery',
     'aliases'             => [
+        '1 - 2025 - PQ - 100 - CemflexX - Vigor - Delivery',
         '2025-PQ-100',
         '1.2025-PQ- 100 - CemflexX - Vigor - Delivery',
         '2025-PQ- 100',

@@ -11,9 +11,10 @@ defined('BASEPATH') or exit('No direct script access allowed');
  * Distinct from 2025-PQ-102 (Kovako inspection).
  */
 return [
-    'key'                 => '11_2025_sq_102_cemflexx_remote_control',
-    'source_quote_number' => '2025-SQ-102',
+    'key'                 => '11.2025-SQ-102-cemflexx-remote-control',
+    'source_quote_number' => '11 - 2025 - SQ - 102 - CemflexX-Remote Control',
     'aliases'             => [
+        '11 - 2025 - SQ - 102 - CemflexX-Remote Control',
         '2025-SQ-102',
         '11.2025-SQ-102-CemflexX-Remote Control',
         'cx_sq_102',

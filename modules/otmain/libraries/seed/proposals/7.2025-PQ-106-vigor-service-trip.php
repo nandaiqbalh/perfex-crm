@@ -10,9 +10,10 @@ defined('BASEPATH') or exit('No direct script access allowed');
  * open_till set to end of service window 15-12-2025.
  */
 return [
-    'key'                 => '7_2025_pq_106_vigor_service_trip',
-    'source_quote_number' => '2025-PQ-106- Vigor Shipunloader - Service Trip',
+    'key'                 => '7.2025-PQ-106-vigor-service-trip',
+    'source_quote_number' => '7 - 2025 - PQ - 106 - Vigor Shipunloader - Service Trip',
     'aliases'             => [
+        '7 - 2025 - PQ - 106 - Vigor Shipunloader - Service Trip',
         '2025-PQ-106- Vigor Shipunloader - Service Trip',
         '2025-PQ-106',
         '2025-PQ-106-Vigor Shipunloader - Service Trip',

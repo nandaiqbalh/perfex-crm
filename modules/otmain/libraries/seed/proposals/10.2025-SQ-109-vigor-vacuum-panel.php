@@ -7,9 +7,10 @@ defined('BASEPATH') or exit('No direct script access allowed');
  * Source PDF: 2025-SQ-109- Vigor Shipunloader - Vacuum Pump Electrical Panel (22-11-2025)
  */
 return [
-    'key'                 => '10_2025_sq_109_vigor_vacuum_panel',
-    'source_quote_number' => '2025-SQ-109- Vigor Shipunloader - Vacuum Pump Electrical Panel',
+    'key'                 => '10.2025-SQ-109-vigor-vacuum-panel',
+    'source_quote_number' => '10 - 2025 - SQ - 109 - Vigor Shipunloader - Vacuum Pump Electrical Panel',
     'aliases'             => [
+        '10 - 2025 - SQ - 109 - Vigor Shipunloader - Vacuum Pump Electrical Panel',
         '2025-SQ-109- Vigor Shipunloader - Vacuum Pump Electrical Panel',
         '2025-SQ-109',
         '2025-SQ-109-Vacuum Pump Electrical Panel',

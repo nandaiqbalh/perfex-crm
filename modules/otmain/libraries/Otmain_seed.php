@@ -13,7 +13,7 @@ class Otmain_seed
     protected $CI;
 
     /** Bump when seed dataset structure changes so next /admin/otmain/seed recreates. */
-    protected $marker = 'otmain_prod_v13';
+    protected $marker = 'otmain_prod_v15';
 
     /** @var string Absolute path to libraries/seed */
     protected $seedPath;
@@ -1515,6 +1515,13 @@ class Otmain_seed
             $def = $this->loadSeedFile($relative);
             if (!empty($def['source_quote_number'])) {
                 $catalog['source_quote_numbers'][] = trim((string) $def['source_quote_number']);
+            }
+            // Aliases / prior stamps so force-reseed still finds renamed source_quote_number rows.
+            foreach ($def['aliases'] ?? [] as $alias) {
+                $alias = trim((string) $alias);
+                if ($alias !== '') {
+                    $catalog['source_quote_numbers'][] = $alias;
+                }
             }
             $subject = trim((string) ($def['proposal']['subject'] ?? ''));
             if ($subject !== '') {

@@ -7,9 +7,10 @@ defined('BASEPATH') or exit('No direct script access allowed');
  * Source PDF: 2025-SQ-105- Vigor Shipunloader - Valves (25-10-2025)
  */
 return [
-    'key'                 => '6_2025_sq_105_vigor_valves',
-    'source_quote_number' => '2025-SQ-105- Vigor Shipunloader - Valves',
+    'key'                 => '6.2025-SQ-105-vigor-valves',
+    'source_quote_number' => '6 - 2025 - SQ - 105 - Vigor Shipunloader - Valves',
     'aliases'             => [
+        '6 - 2025 - SQ - 105 - Vigor Shipunloader - Valves',
         '2025-SQ-105- Vigor Shipunloader - Valves',
         '2025-SQ-105',
         '2025-SQ-105-Vigor Shipunloader - Valves',

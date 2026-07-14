@@ -6,9 +6,10 @@ defined('BASEPATH') or exit('No direct script access allowed');
  * Production seed load order.
  *
  * 2025 proposal file naming (mirror sales-quotation folders):
- *   {seq}_2025_{pq|sq}_{nnn}_{short_slug}.php
+ *   {seq}.{YYYY}-{PQ|SQ}-{nnn}-{short_slug}.php
  * Example folder: "3.2025-PQ - 102 - CemflexX Kovako Waterford Inspection"
- *   → 3_2025_pq_102_cemflexx_kovako_waterford.php
+ *   → 3.2025-PQ-102-cemflexx-kovako-waterford.php
+ * key = basename without .php; save_option uses underscored form.
  *
  * Missing seq 9 only (SQ-108 Flow Meter) — add when PDF seeded.
  * Invoices empty until 2025/2026 quotations complete.
@@ -16,16 +17,16 @@ defined('BASEPATH') or exit('No direct script access allowed');
 return [
     'proposals' => [
         // —— 2025 (by folder sequence 1–11; missing only 9 SQ-108 Flow Meter) ——
-        'proposals/1_2025_pq_100_cemflexx_vigor_delivery.php',
-        'proposals/2_2025_pq_101_vigor_extension.php',
-        'proposals/3_2025_pq_102_cemflexx_kovako_waterford.php',
-        'proposals/4_2025_pq_103_cemflexx_service_trip.php',
-        'proposals/5_2025_pq_104_vigor_service_trip.php',
-        'proposals/6_2025_sq_105_vigor_valves.php',
-        'proposals/7_2025_pq_106_vigor_service_trip.php',
-        'proposals/8_2025_sq_107_vigor_spare_parts.php',
-        'proposals/10_2025_sq_109_vigor_vacuum_panel.php',
-        'proposals/11_2025_sq_102_cemflexx_remote_control.php',
+        'proposals/1.2025-PQ-100-cemflexx-vigor-delivery.php',
+        'proposals/2.2025-PQ-101-vigor-extension.php',
+        'proposals/3.2025-PQ-102-cemflexx-kovako-waterford.php',
+        'proposals/4.2025-PQ-103-cemflexx-service-trip.php',
+        'proposals/5.2025-PQ-104-vigor-service-trip.php',
+        'proposals/6.2025-SQ-105-vigor-valves.php',
+        'proposals/7.2025-PQ-106-vigor-service-trip.php',
+        'proposals/8.2025-SQ-107-vigor-spare-parts.php',
+        'proposals/10.2025-SQ-109-vigor-vacuum-panel.php',
+        'proposals/11.2025-SQ-102-cemflexx-remote-control.php',
         // —— 2026 catalog ——
         'proposals/tp_suction_hose.php',
         'proposals/tp_suction_nozzle_101.php',

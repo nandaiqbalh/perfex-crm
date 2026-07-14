@@ -10,9 +10,10 @@ defined('BASEPATH') or exit('No direct script access allowed');
  * Issuer OT-MAIN block on PDF right is noise; buyer = CemFlexX.
  */
 return [
-    'key'                 => '3_2025_pq_102_cemflexx_kovako_waterford',
-    'source_quote_number' => '2025-PQ-102 rev.1',
+    'key'                 => '3.2025-PQ-102-cemflexx-kovako-waterford',
+    'source_quote_number' => '3 - 2025 - PQ - 102 - CemflexX Kovako Waterford Inspection',
     'aliases'             => [
+        '3 - 2025 - PQ - 102 - CemflexX Kovako Waterford Inspection',
         '2025-PQ-102 rev.1',
         '2025-PQ-102',
         '3.2025-PQ - 102 - CemflexX Kovako Waterford Inspection',

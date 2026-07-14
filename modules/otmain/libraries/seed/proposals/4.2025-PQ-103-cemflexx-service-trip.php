@@ -8,9 +8,10 @@ defined('BASEPATH') or exit('No direct script access allowed');
  * Quote Number: 2025-PQ-103- Vigor Shipunloader (26-6-2025)
  */
 return [
-    'key'                 => '4_2025_pq_103_cemflexx_service_trip',
-    'source_quote_number' => '2025-PQ-103- Vigor Shipunloader',
+    'key'                 => '4.2025-PQ-103-cemflexx-service-trip',
+    'source_quote_number' => '4 - 2025 - PQ - 103 - CemflexX - Service Trip - Vigor Shipunloader',
     'aliases'             => [
+        '4 - 2025 - PQ - 103 - CemflexX - Service Trip - Vigor Shipunloader',
         '2025-PQ-103- Vigor Shipunloader',
         '2025-PQ-103',
         '4.2025-PQ-103 - CemflexX - Service Trip - Vigor Shipunloader',

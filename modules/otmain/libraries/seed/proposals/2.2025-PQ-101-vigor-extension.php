@@ -10,9 +10,10 @@ defined('BASEPATH') or exit('No direct script access allowed');
  * Buyer = TP Company Zanzibar; OT-MAIN = issuer noise.
  */
 return [
-    'key'                 => '2_2025_pq_101_vigor_extension',
-    'source_quote_number' => '2025-PQ-101',
+    'key'                 => '2.2025-PQ-101-vigor-extension',
+    'source_quote_number' => '2 - 2025 - PQ - 101 - Vigor Extension',
     'aliases'             => [
+        '2 - 2025 - PQ - 101 - Vigor Extension',
         '2025-PQ-101',
         '2.2025-PQ- 101-Vigor Extension',
         '2025-PQ- 101',

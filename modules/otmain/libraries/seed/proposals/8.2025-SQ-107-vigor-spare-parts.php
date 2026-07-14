@@ -10,9 +10,10 @@ defined('BASEPATH') or exit('No direct script access allowed');
  * Full quotation €10.570,86 (VAT 0%). Later commercial invoices may revise compensator mix.
  */
 return [
-    'key'                 => '8_2025_sq_107_vigor_spare_parts',
-    'source_quote_number' => '2025-SQ-107- Vigor Shipunloader - Spare Parts',
+    'key'                 => '8.2025-SQ-107-vigor-spare-parts',
+    'source_quote_number' => '8 - 2025 - SQ - 107 - Vigor Shipunloader - Spare Parts',
     'aliases'             => [
+        '8 - 2025 - SQ - 107 - Vigor Shipunloader - Spare Parts',
         '2025-SQ-107- Vigor Shipunloader - Spare Parts',
         '2025-SQ-107',
         '2025-PQ-107- Vigor Shipunloader - Spare Parts', // OCR/invoice variant
