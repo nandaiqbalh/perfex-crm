@@ -9,6 +9,7 @@ defined('BASEPATH') or exit('No direct script access allowed');
 return [
     'proposals' => [
         'proposals/tp_suction_hose.php',
+        'proposals/tp_suction_nozzle_101.php',
         'proposals/tp_otmsq_104.php',
         'proposals/tp_otmsq_111.php',
         'proposals/tp_otmsq_112.php',
