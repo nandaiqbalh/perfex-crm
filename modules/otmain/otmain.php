@@ -333,7 +333,7 @@ function otmain_admin_footer_assets()
         || strpos($uri, 'otmain/item_tracker') !== false
     ) {
         echo '<link rel="stylesheet" href="' . module_dir_url(OTMAIN_MODULE_NAME, 'assets/css/otmain-forms.css') . '?v=1.0.2" />';
-        echo '<script src="' . module_dir_url(OTMAIN_MODULE_NAME, 'assets/js/otmain.js') . '?v=1.4.4"></script>';
+        echo '<script src="' . module_dir_url(OTMAIN_MODULE_NAME, 'assets/js/otmain.js') . '?v=1.4.5"></script>';
     }
 
     if (strpos($uri, 'otmain/item_tracker') !== false) {

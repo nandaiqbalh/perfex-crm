@@ -662,6 +662,10 @@
         $currency.each(function() {
             var $el = $(this);
             $el.prop('disabled', false);
+            // Native currency selects on PO need no selectpicker handling
+            if ($el.hasClass('otmain-native-currency-select')) {
+                return;
+            }
             // Refreshing bootstrap-select while it sits in an inactive tab
             // leaves the control visually stuck (options open, value doesn't update).
             if ($el.closest('.tab-pane:not(.active)').length) {
@@ -1159,7 +1163,8 @@
         });
 
         $('body').on('input change', '.otmain-po-qty, .otmain-po-rate, .otmain-po-tax', otmainRecalcPoTotals);
-        $('#otmain-purchase-order-form select[name="currency"]').on('changed.bs.select change', otmainRecalcPoTotals);
+        // Native <select> (no bootstrap-select) — change is enough
+        $('#otmain-purchase-order-form').on('change', 'select[name="currency"], select[name="conversion_currency"]', otmainRecalcPoTotals);
 
         $('#otmain-add-po-row').on('click', function() {
             var i = $('#otmain-po-items tbody tr').length;

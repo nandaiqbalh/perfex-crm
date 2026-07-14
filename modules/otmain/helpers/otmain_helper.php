@@ -1077,25 +1077,50 @@ function otmain_render_conversion_fields_html($document = null, array $options =
     }
 
     $convCurrency = otmain_get_conversion_currency_id($document);
+    $nativeSelect = !empty($options['native_select']);
 
     ob_start();
     ?>
     <div class="<?php echo e($colClass); ?>">
-        <?php
-        echo render_select(
-            'conversion_currency',
-            $currencies,
-            ['id', 'name', 'symbol'],
-            _l('otmain_conversion_currency'),
-            $convCurrency,
-            // Do NOT pass "id" here: Perfex render_select uses select_attrs["id"] as the input NAME.
-            ['data-show-subtext' => true],
-            [],
-            '',
-            '',
-            false
-        );
-        ?>
+        <?php if ($nativeSelect) { ?>
+        <div class="form-group" app-field-wrapper="conversion_currency">
+            <label for="<?php echo e($idPrefix); ?>-conversion-currency" class="control-label"><?php echo _l('otmain_conversion_currency'); ?></label>
+            <select name="conversion_currency" id="<?php echo e($idPrefix); ?>-conversion-currency" class="form-control otmain-native-currency-select">
+                <?php foreach ($currencies as $currencyOption) {
+                    $cid = (int) ($currencyOption['id'] ?? 0);
+                    if ($cid < 1) {
+                        continue;
+                    }
+                    $cname   = (string) ($currencyOption['name'] ?? '');
+                    $csymbol = trim((string) ($currencyOption['symbol'] ?? ''));
+                    $label   = $cname;
+                    if ($csymbol !== '' && strcasecmp($csymbol, $cname) !== 0) {
+                        $label .= ' (' . $csymbol . ')';
+                    }
+                    ?>
+                    <option value="<?php echo $cid; ?>"
+                        data-subtext="<?php echo e($csymbol); ?>"
+                        <?php echo ((int) $convCurrency === $cid) ? 'selected' : ''; ?>>
+                        <?php echo e($label); ?>
+                    </option>
+                <?php } ?>
+            </select>
+        </div>
+        <?php } else {
+            echo render_select(
+                'conversion_currency',
+                $currencies,
+                ['id', 'name', 'symbol'],
+                _l('otmain_conversion_currency'),
+                $convCurrency,
+                // Do NOT pass "id" here: Perfex render_select uses select_attrs["id"] as the input NAME.
+                ['data-show-subtext' => true],
+                [],
+                '',
+                '',
+                false
+            );
+        } ?>
     </div>
     <div class="<?php echo e($colClass); ?>">
         <?php

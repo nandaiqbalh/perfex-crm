@@ -20,19 +20,30 @@ $poNumber = isset($po) ? $po->formatted_number : ($next_po_number ?? otmain_prev
                 $selectedPoCurrency = isset($po) && !empty($po->currency)
                     ? (int) $po->currency
                     : (get_base_currency() ? (int) get_base_currency()->id : '');
-                echo render_select(
-                    'currency',
-                    $currencies,
-                    ['id', 'name', 'symbol'],
-                    'currency',
-                    $selectedPoCurrency,
-                    ['data-show-subtext' => true],
-                    [],
-                    '',
-                    '',
-                    false
-                );
                 ?>
+                <div class="form-group" app-field-wrapper="currency">
+                    <label for="otmain_po_currency" class="control-label"><?php echo _l('currency'); ?></label>
+                    <select name="currency" id="otmain_po_currency" class="form-control otmain-native-currency-select">
+                        <?php foreach ($currencies as $currencyOption) {
+                            $cid = (int) ($currencyOption['id'] ?? 0);
+                            if ($cid < 1) {
+                                continue;
+                            }
+                            $cname  = (string) ($currencyOption['name'] ?? '');
+                            $csymbol = trim((string) ($currencyOption['symbol'] ?? ''));
+                            $label  = $cname;
+                            if ($csymbol !== '' && strcasecmp($csymbol, $cname) !== 0) {
+                                $label .= ' (' . $csymbol . ')';
+                            }
+                            ?>
+                            <option value="<?php echo $cid; ?>"
+                                data-subtext="<?php echo e($csymbol); ?>"
+                                <?php echo $selectedPoCurrency === $cid ? 'selected' : ''; ?>>
+                                <?php echo e($label); ?>
+                            </option>
+                        <?php } ?>
+                    </select>
+                </div>
             </div>
             <div class="col-md-6 otmain-col-right">
                 <div class="form-group">
@@ -161,7 +172,10 @@ $poNumber = isset($po) ? $po->formatted_number : ($next_po_number ?? otmain_prev
         <div class="row">
             <div class="col-md-6 otmain-col-left">
                 <div class="row">
-                    <?php echo otmain_render_conversion_fields_html(isset($po) ? $po : null, ['id_prefix' => 'otmain-po']); ?>
+                    <?php echo otmain_render_conversion_fields_html(isset($po) ? $po : null, [
+                        'id_prefix'     => 'otmain-po',
+                        'native_select' => true,
+                    ]); ?>
                 </div>
                 <div class="row">
                     <div class="col-md-12">
