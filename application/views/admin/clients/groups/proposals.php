@@ -43,7 +43,7 @@
 
     render_datatable($table_data, 'proposals-client-profile', [], [
         'data-last-order-identifier' => 'proposals-relation',
-        'data-default-order'         => htmlentities('[[0,"asc"]]'),
+        'data-default-order'         => htmlentities('[[0,"desc"]]'),
     ]);
     ?>
 <?php } ?>

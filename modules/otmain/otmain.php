@@ -502,8 +502,8 @@ function otmain_format_proposal_number($format, $id)
 }
 
 /**
- * Sort Proposal # by PDF number (year DESC, sequence ASC), not DB id.
- * Example: 1…21 for 2026 first, then any 2025 rows below.
+ * Sort Proposal # by PDF number (year DESC, sequence follows DataTables dir), not DB id.
+ * Default desc → largest seq on top within year; newer years always above older years.
  *
  * DataTables appends ASC/DESC after this expression, so year stays fixed DESC
  * and the direction applies to the sequence number.

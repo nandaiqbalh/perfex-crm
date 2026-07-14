@@ -169,12 +169,12 @@ $(function() {
         'undefined',
         'undefined', [6, 'desc']);
 
-    /* Customer profile proposals table — Proposal # (year DESC, seq ASC) */
+    /* Customer profile proposals table — Proposal # (year DESC, seq DESC) */
     initDataTable('.table-proposals-client-profile',
         admin_url + 'proposals/proposal_relations/' + customer_id + '/customer',
         'undefined',
         'undefined',
-        'undefined', [0, 'asc']);
+        'undefined', [0, 'desc']);
 
     /* Custome profile projects table */
     initDataTable('.table-projects-single-client', admin_url + 'projects/table/' + customer_id, undefined,
