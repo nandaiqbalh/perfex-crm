@@ -12,8 +12,8 @@ return [
     'key'                   => 'tp_vigor_109_packing',
     'customer_company'      => 'TP Company Limited',
     'related_proposal_keys' => [
-        '9 - 2026 - OTMSQ - 109',
-        '10 - 2026 - OTMSQ - 110',
+        '9 - 2026 - OTMSQ - 109 - Vigor Ship Unloader',
+        '10 - 2026 - OTMSQ - 110 - Vigor Ship Unloader',
     ],
     'save_option'           => 'otmain_seed_packing_vigor_109',
     'packing' => [

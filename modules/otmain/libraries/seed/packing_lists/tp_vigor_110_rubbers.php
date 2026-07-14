@@ -11,7 +11,7 @@ return [
     'key'                   => 'tp_vigor_110_rubbers',
     'customer_company'      => 'TP Company Limited',
     'related_proposal_keys' => [
-        '10 - 2026 - OTMSQ - 110',
+        '10 - 2026 - OTMSQ - 110 - Vigor Ship Unloader',
     ],
     'save_option'           => 'otmain_seed_packing_vigor_110_rubbers',
     'packing' => [
