@@ -22,8 +22,9 @@
         $.each($('._hidden_inputs._filters input'), function() {
             Proposals_ServerParams[$(this).attr('name')] = '[name="' + $(this).attr('name') + '"]';
         });
+        // Default: Proposal # by source year DESC + sequence ASC (1–21), via otmain order hook.
         initDataTable('.table-proposals', admin_url + 'proposals/table', ['undefined'], ['undefined'],
-            Proposals_ServerParams, [8, 'desc']);
+            Proposals_ServerParams, [0, 'asc']);
         init_proposal();
     });
 </script>

@@ -83,7 +83,8 @@ foreach ($custom_fields as $field) {
 $table_data = hooks()->apply_filters('proposals_table_columns', $table_data);
 render_datatable($table_data, $class ?? 'proposals', [], [
     'data-last-order-identifier' => 'proposals',
-    'data-default-order'         => get_table_last_order('proposals'),
+    // Always default to Proposal # sort (otmain: year DESC, seq ASC); click headers to re-sort.
+    'data-default-order'         => '[[0,"asc"]]',
     'id'                         => $table_id ?? 'proposals',
 ]);
 ?>

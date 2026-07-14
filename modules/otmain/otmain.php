@@ -36,6 +36,7 @@ hooks()->add_filter('sales_number_format', 'otmain_sales_number_format', 10, 2);
 hooks()->add_filter('format_estimate_number', 'otmain_format_estimate_number', 10, 2);
 hooks()->add_filter('format_invoice_number', 'otmain_format_invoice_number', 10, 2);
 hooks()->add_filter('proposal_number_format', 'otmain_format_proposal_number', 10, 2);
+hooks()->add_filter('datatables_query_order_column', 'otmain_proposals_datatables_order_column', 10, 2);
 
 hooks()->add_filter('before_estimate_added', 'otmain_before_estimate_save');
 hooks()->add_filter('before_estimate_updated', 'otmain_before_estimate_save');
@@ -498,6 +499,49 @@ function otmain_format_proposal_number($format, $id)
     $counter1xx = (int) $id + 100;
 
     return $offerCount . ' - ' . $year . ' - ' . $prefix . ' - ' . $counter1xx . $title;
+}
+
+/**
+ * Sort Proposal # by PDF number (year DESC, sequence ASC), not DB id.
+ * Example: 1…21 for 2026 first, then any 2025 rows below.
+ *
+ * DataTables appends ASC/DESC after this expression, so year stays fixed DESC
+ * and the direction applies to the sequence number.
+ *
+ * @param string $columnName
+ * @param string $sTable
+ * @return string
+ */
+function otmain_proposals_datatables_order_column($columnName, $sTable)
+{
+    $proposalsTable = db_prefix() . 'proposals';
+    if ($sTable !== $proposalsTable) {
+        return $columnName;
+    }
+
+    $idColumns = [$proposalsTable . '.id', 'id'];
+    if (!in_array($columnName, $idColumns, true)) {
+        return $columnName;
+    }
+
+    $CI = &get_instance();
+    if (!$CI->db->field_exists('source_quote_number', $proposalsTable)) {
+        return $columnName;
+    }
+
+    $src = $proposalsTable . '.source_quote_number';
+    // "3 - 2026 - OTMSQ - 103 - Title" → seq=3, year=2026
+    $yearExpr = 'COALESCE('
+        . 'NULLIF(CAST(SUBSTRING_INDEX(SUBSTRING_INDEX(TRIM(' . $src . '), \' - \', 2), \' - \', -1) AS UNSIGNED), 0),'
+        . 'YEAR(' . $proposalsTable . '.date),'
+        . 'YEAR(' . $proposalsTable . '.datecreated)'
+        . ')';
+    $seqExpr = 'COALESCE('
+        . 'NULLIF(CAST(SUBSTRING_INDEX(TRIM(' . $src . '), \' - \', 1) AS UNSIGNED), 0),'
+        . $proposalsTable . '.id'
+        . ')';
+
+    return $yearExpr . ' DESC, ' . $seqExpr;
 }
 
 function otmain_before_proposal_save($hookData)
