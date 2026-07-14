@@ -1301,6 +1301,29 @@ function otmain_currency_display_code($currency)
 }
 
 /**
+ * Label-safe currency code for totals rows (USD / GBP / EURO).
+ * Avoids "Subtotal $ … $ 1.00" doubling when amounts already use a symbol.
+ *
+ * @param mixed $currency
+ * @return string
+ */
+function otmain_currency_label_code($currency)
+{
+    $code = otmain_currency_display_code($currency);
+    if ($code === '$') {
+        return 'USD';
+    }
+    if ($code === '£') {
+        return 'GBP';
+    }
+    if ($code === '€') {
+        return 'EURO';
+    }
+
+    return $code;
+}
+
+/**
  * Get the currency symbol (€, $, etc.) for display in PDFs.
  * Falls back to the display code if no symbol is found.
  *
@@ -1473,7 +1496,8 @@ function otmain_pdf_po_items_table_html($po, $currencyName = 'EUR')
 function otmain_pdf_po_totals_column_html($po, $currencyName = 'EUR')
 {
     $summary = otmain_pdf_po_calculate_vat_summary($po->items);
-    $currencyLabel = otmain_currency_display_code($currencyName);
+    // Prefer ISO codes in labels so amounts that already carry $, £, € don't look doubled.
+    $currencyLabel = otmain_currency_label_code($currencyName);
 
     $origUsdDisplay  = isset($po->total_usd_display) ? trim((string) $po->total_usd_display) : '';
     $origGoldDisplay = isset($po->total_gold_display) ? trim((string) $po->total_gold_display) : '';
@@ -1489,7 +1513,7 @@ function otmain_pdf_po_totals_column_html($po, $currencyName = 'EUR')
     $targetId = $target ? (int) $target->id : 0;
     $canConvert = ($rate > 0 && $target && $targetId > 0 && $targetId !== $docCurrencyId);
 
-    // Auto-calc only fills values; does not force rows to appear.
+    // Auto-calc converted total from Convert to + rate when display override is empty.
     if ($usdDisplay === '' && $canConvert) {
         $usdDisplay = otmain_format_money_text(((float) $summary['total']) * $rate, $target);
     }
@@ -1508,9 +1532,11 @@ function otmain_pdf_po_totals_column_html($po, $currencyName = 'EUR')
     }
     $html .= '<tr><td align="right"><strong>TOTAL ' . e($currencyLabel) . '</strong></td><td align="right"><strong>' . otmain_pdf_format_total_amount($summary['total'], $currencyName) . '</strong></td></tr>';
 
-    // Only show converted currency / gold when explicitly set on the document.
-    if ($origUsdDisplay !== '') {
-        $convertedLabel = $target ? ('TOTAL ' . otmain_currency_display_code($target)) : 'TOTAL CONVERTED';
+    // Show conversion when Convert to + rate are set (or explicit TOTAL USD display override).
+    if ($usdDisplay !== '' && ($canConvert || $origUsdDisplay !== '')) {
+        $convertedLabel = $target
+            ? ('TOTAL ' . otmain_currency_label_code($target))
+            : 'TOTAL CONVERTED';
         $html .= '<tr><td align="right"><strong>' . e($convertedLabel) . '</strong></td><td align="right">' . e($usdDisplay) . '</td></tr>';
     }
     if ($origGoldDisplay !== '') {
@@ -2257,14 +2283,14 @@ function otmain_pdf_totals_column_html($document, $items, $currencyName)
     $vat0  = isset($byRate[0]) ? $byRate[0] : 0.0;
     $html .= '<tr><td align="right" width="70%"><strong>VAT 21%</strong></td><td ' . $cellAmt . '>' . otmain_pdf_format_total_amount($vat21, $currencyName) . '</td></tr>';
     $html .= '<tr><td align="right" width="70%"><strong>VAT 0%</strong></td><td ' . $cellAmt . '>' . otmain_pdf_format_total_amount($vat0, $currencyName) . '</td></tr>';
-    $currencyLabel = otmain_currency_display_code($currencyName);
+    $currencyLabel = otmain_currency_label_code($currencyName);
     $html .= '<tr><td align="right" width="70%"><strong>TOTAL ' . e($currencyLabel) . '</strong></td><td ' . $cellAmt . '><strong>' . otmain_pdf_format_total_amount($document->total, $currencyName) . '</strong></td></tr>';
 
-    // USD conversion row — only shown when total_usd_display was EXPLICITLY set on the document
-    if ($origUsdDisplay !== '') {
+    // Show conversion when Convert to + rate are set, or when TOTAL USD display override is filled.
+    if ($usdDisplay !== '' && ($canConvert || $origUsdDisplay !== '')) {
         $convertedLabel = 'TOTAL CONVERTED';
         if ($target) {
-            $convertedLabel = 'TOTAL ' . otmain_currency_display_code($target);
+            $convertedLabel = 'TOTAL ' . otmain_currency_label_code($target);
         }
         $html .= '<tr><td align="right" width="70%"><strong>' . e($convertedLabel) . '</strong></td><td ' . $cellAmt . '>' . e($usdDisplay) . '</td></tr>';
     }
