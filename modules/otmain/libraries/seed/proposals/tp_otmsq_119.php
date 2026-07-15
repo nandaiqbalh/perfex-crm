@@ -32,7 +32,7 @@ return [
         // PDF deal contact (optional override)
         'contact_person_name'  => 'S.A.Ibrahim',
         'contact_person_email' => 's.ibrahim@otmain.com',
-        'contact_person_phone' => '+316****8651',
+        'contact_person_phone' => '+31618228651',
         'payment_terms_text'   => '50% advance payment<br />50% payable within 30 days after invoice date',
         'shipment_terms'       => 'EXW (Ex Works)',
         'delivery_time'        => 'All On Stock',

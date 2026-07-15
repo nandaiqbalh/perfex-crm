@@ -22,7 +22,7 @@ return [
         // contact PDF — ensure di tblcontacts (tanpa replace)
         'contact_person_name'  => 'Jerrel',
         'contact_person_email' => 'jerrel@rudisa.net',
-        'contact_person_phone' => '+597****2726',
+        'contact_person_phone' => '+5978532726',
         // PDF: Subtotal EUR 7.600,90 / Subtotal USD 9.206,09
         'subtotal_usd'         => 9206.09,
         'conversion_rate'      => 1.211187, // 9206.09 / 7600.90

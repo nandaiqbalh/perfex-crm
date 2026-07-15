@@ -39,7 +39,7 @@ return [
         // PDF deal contact (optional override)
         'contact_person_name'  => 'S.A.Ibrahim',
         'contact_person_email' => 's.ibrahim@otmain.com',
-        'contact_person_phone' => '+316****8651',
+        'contact_person_phone' => '+31618228651',
         'payment_terms_text'   => 'To be agreed.',
         'shipment_terms'       => 'EXW (Ex Works)',
         'delivery_time'        => 'Voor 9:30 uur Surinaamse tijd, melden zodat ik het morgen kan leveren.',

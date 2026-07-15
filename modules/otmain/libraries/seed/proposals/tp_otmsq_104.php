@@ -51,7 +51,7 @@ return [
         // PDF deal contact (optional override; leave empty to use primary contact)
         'contact_person_name'  => 'S.A.Ibrahim',
         'contact_person_email' => 's.ibrahim@otmain.com',
-        'contact_person_phone' => '+316****8651',
+        'contact_person_phone' => '+31618228651',
         'payment_terms_text'   => 'Term 1: 50% due upon acceptance of the offer<br />Term 2: 50% due upon receipt of the Bill of Lading copy',
         'shipment_terms'       => 'EXW. Shipment can be arranged by Air or Sea Cargo.',
         'delivery_time'        => '14 days',

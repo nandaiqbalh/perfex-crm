@@ -38,7 +38,7 @@ Electrical cables',
         // PDF deal contact (optional override)
         'contact_person_name'  => 'S.A.Ibrahim',
         'contact_person_email' => 's.ibrahim@otmain.com',
-        'contact_person_phone' => '+316****8651',
+        'contact_person_phone' => '+31618228651',
         'payment_terms_text'   => 'To be agreed upon order confirmation.',
         'shipment_terms'       => 'EXW (Ex Works – Incoterms 2020). Shipping arrangements can be organized upon request at additional cost.',
         'delivery_time'        => 'Delivery time depends on final order confirmation and scope.',

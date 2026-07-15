@@ -12,7 +12,7 @@ Docs: `customize/docs/SEED-DEMO-DATA.md` · `SEED-FROM-PDF.md` · `SEED-AI-PROMP
 | `invoices/*.php` | One Perfex invoice per file (47) |
 | `purchase_orders/*.php` | One PO per file (9) |
 
-**Marker:** `otmain_prod_v23` (bump in `Otmain_seed.php` when dataset structure changes).
+**Marker:** `otmain_prod_v24` (bump in `Otmain_seed.php` when dataset structure changes).
 
 **Run:** `/admin/otmain/seed` · `?force=1` · `?repair=1`
 

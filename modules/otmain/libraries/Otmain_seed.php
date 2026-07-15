@@ -13,7 +13,7 @@ class Otmain_seed
     protected $CI;
 
     /** Bump when seed dataset structure changes so next /admin/otmain/seed recreates. */
-    protected $marker = 'otmain_prod_v23';
+    protected $marker = 'otmain_prod_v24';
 
     /** @var string Absolute path to libraries/seed */
     protected $seedPath;
@@ -1288,6 +1288,15 @@ class Otmain_seed
                 ->row();
             if ($existing) {
                 $this->syncSeedContactPassword((int) $existing->id);
+                // Unmask / fill phone when seed has a full number and DB still empty or redacted.
+                if ($phone !== '' && strpos($phone, '*') === false) {
+                    $existingPhone = trim((string) ($existing->phonenumber ?? ''));
+                    if ($existingPhone === '' || strpos($existingPhone, '*') !== false) {
+                        $this->CI->db->where('id', (int) $existing->id)->update(db_prefix() . 'contacts', [
+                            'phonenumber' => $phone,
+                        ]);
+                    }
+                }
 
                 return (int) $existing->id;
             }
@@ -1303,6 +1312,14 @@ class Otmain_seed
                 $full = strtolower(preg_replace('/\s+/', ' ', trim(($c['firstname'] ?? '') . ' ' . ($c['lastname'] ?? ''))));
                 if ($full === $needle) {
                     $this->syncSeedContactPassword((int) $c['id']);
+                    if ($phone !== '' && strpos($phone, '*') === false) {
+                        $existingPhone = trim((string) ($c['phonenumber'] ?? ''));
+                        if ($existingPhone === '' || strpos($existingPhone, '*') !== false) {
+                            $this->CI->db->where('id', (int) $c['id'])->update(db_prefix() . 'contacts', [
+                                'phonenumber' => $phone,
+                            ]);
+                        }
+                    }
 
                     return (int) $c['id'];
                 }

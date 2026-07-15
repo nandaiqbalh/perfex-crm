@@ -38,7 +38,7 @@ return [
         'notes'                => '',
         'contact_person_name'  => 'S.A.Ibrahim',
         'contact_person_email' => 's.ibrahim@otmain.com',
-        'contact_person_phone' => '+316****8651',
+        'contact_person_phone' => '+31618228651',
         'payment_terms_text'   => '50% in advance<br />50% before delivery',
         'shipment_terms'       => 'EXW Jakarta',
         'delivery_time'        => '45 days',
