@@ -15,8 +15,10 @@ return [
     'aliases'             => [
         '2 - 2025 - PQ - 101 - Vigor Extension',
         '2025-PQ-101',
+        '2025-SQ-101', // INV-114 OCR
         '2.2025-PQ- 101-Vigor Extension',
         '2025-PQ- 101',
+        'Extension Vigor Shipunloader Delivery',
     ],
     'customer_company'    => 'TP Company Limited',
     'force_status'        => 3,

@@ -13,7 +13,7 @@ class Otmain_seed
     protected $CI;
 
     /** Bump when seed dataset structure changes so next /admin/otmain/seed recreates. */
-    protected $marker = 'otmain_prod_v20';
+    protected $marker = 'otmain_prod_v23';
 
     /** @var string Absolute path to libraries/seed */
     protected $seedPath;
@@ -630,8 +630,18 @@ class Otmain_seed
 
         $po = $def['purchase_order'] ?? [];
         $po['supplierid'] = $this->clientIdsByCompany[$company];
-        $po['currency']   = $po['currency'] ?? $eurId;
-        $po['items']      = $def['items'] ?? ($po['items'] ?? []);
+
+        $currencyCode = strtoupper((string) ($def['currency_code'] ?? $po['currency_code'] ?? 'EUR'));
+        unset($po['currency_code']);
+        $po['currency'] = $this->getCurrencyId($currencyCode) ?: $eurId;
+
+        $po['items'] = $def['items'] ?? ($po['items'] ?? []);
+        if (!empty($def['number']) && empty($po['number'])) {
+            $po['number'] = (int) $def['number'];
+        }
+        if (!empty($def['prefix']) && empty($po['prefix'])) {
+            $po['prefix'] = (string) $def['prefix'];
+        }
 
         $master = $this->getClientMasterData($po['supplierid']);
         $contact = $this->resolveDocumentContact($po['supplierid'], [
@@ -651,7 +661,7 @@ class Otmain_seed
             $po['supplier_address'] = $this->formatClientAddressBlock($master);
         }
 
-        // Optional proposal link (FK).
+        // Optional proposal link (FK). Do not overwrite supplier_quote_ref (supplier quote ≠ our quote).
         $proposalId = 0;
         $relatedKeys = [];
         if (!empty($def['related_proposal_key'])) {
@@ -671,9 +681,6 @@ class Otmain_seed
         }
         if ($proposalId > 0) {
             $po['proposal_id'] = $proposalId;
-            if (empty($po['supplier_quote_ref'])) {
-                $po['supplier_quote_ref'] = format_proposal_number($proposalId);
-            }
         } elseif (array_key_exists('proposal_id', $po) && empty($po['proposal_id'])) {
             unset($po['proposal_id']);
         }
@@ -689,6 +696,7 @@ class Otmain_seed
         }
         if ($poId > 0) {
             $this->trackSeededId('purchase_orders', $poId);
+            $this->registerRelated($def, $poId);
         }
 
         return $poId;
@@ -847,6 +855,12 @@ class Otmain_seed
         if (!empty($def['source_quote_number'])) {
             $this->relatedRegistry[trim((string) $def['source_quote_number'])] = $proposalId;
         }
+        if (!empty($def['source_po_number'])) {
+            $this->relatedRegistry[trim((string) $def['source_po_number'])] = $proposalId;
+        }
+        if (!empty($def['source_invoice_number'])) {
+            $this->relatedRegistry[trim((string) $def['source_invoice_number'])] = $proposalId;
+        }
         foreach ($def['aliases'] ?? [] as $alias) {
             $alias = trim((string) $alias);
             if ($alias !== '') {
@@ -949,6 +963,9 @@ class Otmain_seed
     }
 
     /**
+     * Prefer save_option, then number + invoice_title (+ year from date when present)
+     * so 2025-INV-101 and 2026-INV-101 can coexist (same number, different year/title).
+     *
      * @param array $def
      * @return int
      */
@@ -970,6 +987,10 @@ class Otmain_seed
         $this->CI->db->select('id')->where('number', $number);
         if ($title !== '' && $this->CI->db->field_exists('invoice_title', db_prefix() . 'invoices')) {
             $this->CI->db->where('invoice_title', $title);
+        }
+        $date = (string) ($def['invoice']['date'] ?? '');
+        if ($date !== '' && preg_match('/^(\d{4})-/', $date, $m)) {
+            $this->CI->db->where('YEAR(' . db_prefix() . 'invoices.date) =', (int) $m[1], false);
         }
         $row = $this->CI->db->order_by('id', 'DESC')->limit(1)->get(db_prefix() . 'invoices')->row();
 
@@ -1049,9 +1070,44 @@ class Otmain_seed
 
     protected function getCurrencyId($name)
     {
-        $currency = $this->CI->db->where('name', $name)->get(db_prefix() . 'currencies')->row();
+        $name = strtoupper(trim((string) $name));
+        if ($name === '') {
+            $name = 'EUR';
+        }
 
-        return $currency ? (int) $currency->id : 1;
+        $currency = $this->CI->db->where('name', $name)->get(db_prefix() . 'currencies')->row();
+        if ($currency) {
+            return (int) $currency->id;
+        }
+
+        $fields = $this->CI->db->list_fields(db_prefix() . 'currencies');
+        $row    = ['name' => $name];
+        if (in_array('symbol', $fields, true)) {
+            $symbols = ['EUR' => '€', 'USD' => '$', 'IDR' => 'Rp'];
+            $row['symbol'] = $symbols[$name] ?? $name;
+        }
+        if (in_array('decimal_separator', $fields, true)) {
+            $row['decimal_separator'] = ($name === 'IDR') ? ',' : '.';
+        }
+        if (in_array('thousand_separator', $fields, true)) {
+            $row['thousand_separator'] = ($name === 'IDR') ? '.' : ',';
+        }
+        if (in_array('placement', $fields, true)) {
+            $row['placement'] = 'before';
+        }
+        if (in_array('isdefault', $fields, true)) {
+            $row['isdefault'] = 0;
+        }
+
+        $this->CI->db->insert(db_prefix() . 'currencies', $row);
+        $id = (int) $this->CI->db->insert_id();
+        if ($id > 0) {
+            return $id;
+        }
+
+        $fallback = $this->CI->db->where('name', 'EUR')->get(db_prefix() . 'currencies')->row();
+
+        return $fallback ? (int) $fallback->id : 1;
     }
 
     /**

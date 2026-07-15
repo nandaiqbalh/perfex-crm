@@ -39,12 +39,20 @@ class Purchase_order_model extends App_Model
         $items = $data['items'] ?? [];
         unset($data['items']);
 
+        // Allow seed / API to pin PDF numbers (filtered out of column whitelist below).
+        $forcedNumber = isset($data['number']) ? (int) $data['number'] : 0;
+        $forcedPrefix = isset($data['prefix']) ? (string) $data['prefix'] : '';
+
         $data = $this->normalize_data($data);
         $data = $this->apply_defaults($data);
         $data = $this->filter_data($data);
 
-        $data['number']           = get_option('next_otmain_purchase_order_number');
-        $data['prefix']           = get_option('otmain_purchase_order_prefix');
+        $data['number'] = $forcedNumber > 0
+            ? $forcedNumber
+            : (int) get_option('next_otmain_purchase_order_number');
+        $data['prefix'] = $forcedPrefix !== ''
+            ? $forcedPrefix
+            : get_option('otmain_purchase_order_prefix');
         $data['date']             = to_sql_date($data['date']);
         $data['datecreated']      = date('Y-m-d H:i:s');
         $data['addedfrom']        = get_staff_user_id();
@@ -59,7 +67,11 @@ class Purchase_order_model extends App_Model
         $insert_id = $this->db->insert_id();
 
         if ($insert_id) {
-            update_option('next_otmain_purchase_order_number', (int) get_option('next_otmain_purchase_order_number') + 1);
+            $next = max(
+                (int) get_option('next_otmain_purchase_order_number'),
+                (int) $data['number'] + 1
+            );
+            update_option('next_otmain_purchase_order_number', $next);
             $this->save_items($insert_id, $items);
         }
 

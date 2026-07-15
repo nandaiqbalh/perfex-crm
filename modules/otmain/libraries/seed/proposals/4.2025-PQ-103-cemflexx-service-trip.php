@@ -13,6 +13,7 @@ return [
     'aliases'             => [
         '4 - 2025 - PQ - 103 - CemflexX - Service Trip - Vigor Shipunloader',
         '2025-PQ-103- Vigor Shipunloader',
+        '2025-PQ-103-Vigor Shipunloader',
         '2025-PQ-103',
         '4.2025-PQ-103 - CemflexX - Service Trip - Vigor Shipunloader',
     ],

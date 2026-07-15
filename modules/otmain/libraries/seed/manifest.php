@@ -13,7 +13,9 @@ defined('BASEPATH') or exit('No direct script access allowed');
  *
  * 2025 Sales Quotations seq 1–11 complete.
  * Extra spare-parts track: 2025-SQ-100 remote (not in folder seq).
- * Invoices: INV-101..116 (T1 + commercial where both exist; INV-115 = REVISED only).
+ * Invoices: 2025 Projectservice 100–110 + CemFlexX/TP 111–126 (skip discarded 122)
+ *          + 2026 INV-101…116.
+ * Purchase orders: 2026-PO-100…108 (OTMPO-105).
  */
 return [
     'proposals' => [
@@ -64,6 +66,36 @@ return [
         'packing_lists/tp_vigor_110_rubbers.php',
     ],
     'invoices' => [
+        // —— 2025 Projectservice Nederland (hours / km / parking) ——
+        'invoices/ps_inv_100.php',
+        'invoices/ps_inv_101.php',
+        'invoices/ps_inv_102.php',
+        'invoices/ps_inv_103.php',
+        'invoices/ps_inv_104.php',
+        'invoices/ps_inv_105.php',
+        'invoices/ps_inv_106.php',
+        'invoices/ps_inv_107.php',
+        'invoices/ps_inv_108.php',
+        'invoices/ps_inv_109.php',
+        'invoices/ps_inv_110.php',
+        // —— 2025 CemFlexX / TP (111–126; INV-122 discarded — not seeded) ——
+        'invoices/cx_inv_111.php',
+        'invoices/cx_inv_112_t1.php',
+        'invoices/cx_inv_112_t2.php',
+        'invoices/tp_inv_113.php',
+        'invoices/tp_inv_114.php',
+        'invoices/tp_inv_115.php',
+        'invoices/tp_inv_116.php',
+        'invoices/tp_inv_117.php',
+        'invoices/tp_inv_118.php',
+        'invoices/tp_inv_119_bd.php',
+        'invoices/tp_inv_120.php',
+        'invoices/cx_inv_121.php',
+        'invoices/cx_inv_123_t1.php',
+        'invoices/tp_inv_124.php',
+        'invoices/tp_inv_125.php',
+        'invoices/tp_inv_126.php',
+        // —— 2026 production ——
         'invoices/cx_inv_101_t2.php',
         'invoices/tp_inv_102_t1.php',
         'invoices/tp_inv_102.php',
@@ -86,5 +118,14 @@ return [
         'invoices/sr_inv_116.php',
     ],
     'purchase_orders' => [
+        'purchase_orders/po_100_pov_valves.php',
+        'purchase_orders/po_101_interfilter.php',
+        'purchase_orders/po_102_distrimex.php',
+        'purchase_orders/po_103_nanjing_hose.php',
+        'purchase_orders/po_104_nanjing_expansion.php',
+        'purchase_orders/po_105_handelsmij_spt.php',
+        'purchase_orders/po_106_hydraunica.php',
+        'purchase_orders/po_107_rr_holland.php',
+        'purchase_orders/po_108_agung_mccb.php',
     ],
 ];
