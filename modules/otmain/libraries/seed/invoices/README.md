@@ -1,8 +1,8 @@
 # Seed invoices (OT-Main)
 
-Folder sengaja kosong sementara.
+Satu file per Perfex invoice. Daftarkan di `manifest.php` → `invoices`.
 
-Seed quotation **2025** + **2026** dulu (lihat `proposals/` + `manifest.php`).  
-Setelah quotes lengkap, tambah satu file per invoice di sini dan daftarkan di `manifest.php` → `invoices`.
+**Batch saat ini:** INV-101 … INV-116 (20 file).  
+T1 + commercial untuk nomor yang sama (`invoice_title` membedakan). INV-115 = **REVISED** saja.
 
 Lihat: `customize/docs/SEED-DEMO-DATA.md`, `customize/docs/SEED-FROM-PDF.md`.

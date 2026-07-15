@@ -12,6 +12,10 @@ defined('BASEPATH') or exit('No direct script access allowed');
 return [
     'key'                 => 'tp_otmsq_111',
     'source_quote_number' => '11 - 2026 - OTMSQ - 111',
+    'aliases'             => [
+        '11 - 2026 - OTMSQ - 111',
+        '11 - 2026 - OTMSQ - 111 - ABB Contactor - Rudisa',
+    ],
     'customer_company'    => 'Suriname Shiphandling & Services NV',
     'force_status'        => 3, // Accepted
     'populate_tracker'    => true,

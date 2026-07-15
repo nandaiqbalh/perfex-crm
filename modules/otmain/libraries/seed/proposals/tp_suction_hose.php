@@ -12,6 +12,10 @@ defined('BASEPATH') or exit('No direct script access allowed');
 return [
     'key'                 => 'tp_suction_hose',
     'source_quote_number' => '3 - 2026 - OTMSQ - 103 - Suction Hose',
+    'aliases'             => [
+        '3 - 2026 - OTMSQ - 103 - Suction Hose',
+        '3 - 2026 - OTMSQ - 103 - Suction Hose rev.1.1',
+    ],
     'customer_company'    => 'TP Company Limited',
     'force_status'        => 3, // Accepted
     'populate_tracker'    => true,

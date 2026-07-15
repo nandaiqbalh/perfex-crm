@@ -13,6 +13,11 @@ defined('BASEPATH') or exit('No direct script access allowed');
 return [
     'key'                 => 'tp_service_melita',
     'source_quote_number' => '5 - 2026 - OTMPQ - 105 - Service Trip Melita Vessel',
+    'aliases'             => [
+        '5 - 2026 - OTMPQ - 105 - Service Trip Melita Vessel',
+        '5 - 2026 - OTMSQ - 105 - Service Trip Melita Vessel', // invoice OCR
+        '2026-OTMSQ-105',
+    ],
     'customer_company'    => 'CemFlexX B.V.',
     'force_status'        => 3, // Accepted
     'populate_tracker'    => true,

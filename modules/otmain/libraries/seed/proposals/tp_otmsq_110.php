@@ -12,6 +12,10 @@ defined('BASEPATH') or exit('No direct script access allowed');
 return [
     'key'                 => 'tp_otmsq_110',
     'source_quote_number' => '10 - 2026 - OTMSQ - 110 - Vigor Ship Unloader',
+    'aliases'             => [
+        '10 - 2026 - OTMSQ - 110 - Vigor Ship Unloader',
+        '10 - 2026 - OTMSQ - 110 - Spare Parts ZE6 Compressor - Vigor Ship Unloader',
+    ],
     'customer_company'    => 'TP Company Limited',
     'force_status'        => 3, // Accepted
     'populate_tracker'    => true,
