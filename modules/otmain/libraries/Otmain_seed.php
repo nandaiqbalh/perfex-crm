@@ -13,7 +13,7 @@ class Otmain_seed
     protected $CI;
 
     /** Bump when seed dataset structure changes so next /admin/otmain/seed recreates. */
-    protected $marker = 'otmain_prod_v19';
+    protected $marker = 'otmain_prod_v20';
 
     /** @var string Absolute path to libraries/seed */
     protected $seedPath;
@@ -424,6 +424,48 @@ class Otmain_seed
     }
 
     /**
+     * Sum qty×rate (+ VAT from taxname "NAME|RATE") for Perfex sales documents.
+     * Required for invoice seed: model add() does not recalculate subtotal/total from items.
+     *
+     * @param array $items newitems[] from seed
+     * @return array{subtotal:float,total_tax:float,total:float}
+     */
+    protected function calculateSalesTotalsFromItems(array $items)
+    {
+        $subtotal = 0.0;
+        $totalTax = 0.0;
+
+        foreach ($items as $item) {
+            if (!is_array($item)) {
+                continue;
+            }
+            $line = (float) ($item['qty'] ?? 0) * (float) ($item['rate'] ?? 0);
+            $subtotal += $line;
+
+            $taxnames = $item['taxname'] ?? [];
+            if (!is_array($taxnames)) {
+                continue;
+            }
+            foreach ($taxnames as $taxname) {
+                $parts = explode('|', (string) $taxname);
+                $rate  = isset($parts[1]) ? (float) $parts[1] : 0.0;
+                if ($rate > 0) {
+                    $totalTax += ($line * $rate) / 100;
+                }
+            }
+        }
+
+        $subtotal = round($subtotal, 2);
+        $totalTax = round($totalTax, 2);
+
+        return [
+            'subtotal'  => $subtotal,
+            'total_tax' => $totalTax,
+            'total'     => round($subtotal + $totalTax, 2),
+        ];
+    }
+
+    /**
      * @param array $def
      * @param int   $eurId
      * @return int invoice id
@@ -499,12 +541,33 @@ class Otmain_seed
             unset($invoice['proposal_id']);
         }
 
+        // Perfex Invoices_model::add() stores subtotal/total from POST (form JS).
+        // update_sales_total_tax_column() only refreshes total_tax — so seed must set totals.
+        $totals = $this->calculateSalesTotalsFromItems($invoice['newitems'] ?? []);
+        $invoice['subtotal']  = $totals['subtotal'];
+        $invoice['total_tax'] = $totals['total_tax'];
+        $invoice['total']     = $totals['total'];
+        if (!isset($invoice['discount_percent'])) {
+            $invoice['discount_percent'] = 0;
+        }
+        if (!isset($invoice['discount_total'])) {
+            $invoice['discount_total'] = 0;
+        }
+        if (!isset($invoice['adjustment'])) {
+            $invoice['adjustment'] = 0;
+        }
+
         $invoiceId = (int) $this->CI->invoices_model->add($invoice);
         if ($invoiceId < 1) {
             throw new RuntimeException('Failed to seed invoice: ' . ($def['key'] ?? 'unknown'));
         }
 
-        $postUpdate = [];
+        $postUpdate = [
+            // Re-assert after add (hooks / default columns can leave 0).
+            'subtotal'  => $totals['subtotal'],
+            'total_tax' => $totals['total_tax'],
+            'total'     => $totals['total'],
+        ];
         if (isset($def['force_status'])) {
             $postUpdate['status'] = (int) $def['force_status'];
         }
@@ -515,9 +578,7 @@ class Otmain_seed
         if ($proposalId > 0 && $this->CI->db->field_exists('proposal_id', db_prefix() . 'invoices')) {
             $postUpdate['proposal_id'] = $proposalId;
         }
-        if ($postUpdate !== []) {
-            $this->CI->db->where('id', $invoiceId)->update(db_prefix() . 'invoices', $postUpdate);
-        }
+        $this->CI->db->where('id', $invoiceId)->update(db_prefix() . 'invoices', $postUpdate);
 
         // Back-link proposal + item tracker (same as convert path).
         if ($proposalId > 0) {
