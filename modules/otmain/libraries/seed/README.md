@@ -1,19 +1,19 @@
-<?php
+# OT-Main production seed data
 
-defined('BASEPATH') or exit('No direct script access allowed');
+Orchestrator: `../Otmain_seed.php`  
+Docs: `customize/docs/SEED-DEMO-DATA.md` · `SEED-FROM-PDF.md` · `SEED-AI-PROMPT.md`
 
-/**
- * OT-Main production seed data
- *
- * Otmain_seed.php          = orchestrator only
- *   seedProposal / seedPackingList / seedInvoice / seedPurchaseOrder
- * seed/manifest.php        = load order
- * seed/customers.php       = client catalog
- * seed/proposals/*.php     = one quotation per file (production PDF migration)
- * seed/packing_lists/*.php = one packing list per file
- * seed/purchase_orders/    = one PO per file
- * seed/invoices/*.php      = Perfex invoices (e.g. cx_inv_101_t2.php)
- *
- * See customize/docs/SEED-FROM-PDF.md, SEED-AI-PROMPT.md, SEED-DEMO-DATA.md
- * Keep inventory in SEED-DEMO-DATA.md in sync with manifest.php.
- */
+| Path | Peran |
+|------|--------|
+| `manifest.php` | Load order |
+| `customers.php` | Client / supplier catalog (47) |
+| `proposals/*.php` | One quotation per file (33) |
+| `packing_lists/*.php` | One packing list per file (8) |
+| `invoices/*.php` | One Perfex invoice per file (47) |
+| `purchase_orders/*.php` | One PO per file (9) |
+
+**Marker:** `otmain_prod_v23` (bump in `Otmain_seed.php` when dataset structure changes).
+
+**Run:** `/admin/otmain/seed` · `?force=1` · `?repair=1`
+
+Keep inventory in `SEED-DEMO-DATA.md` in sync with `manifest.php`.

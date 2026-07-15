@@ -64,10 +64,13 @@ class Otmain_seed
     public function run($force = false)
     {
         if (!$force && get_option('otmain_seed_marker') === $this->marker) {
+            $summary = $this->buildInventorySummary($this->getSeededRegistry());
+
             return [
                 'status'  => 'skipped',
                 'message' => 'Production seed already applied (marker ' . $this->marker . '). '
                     . 'Use ?force=1 to recreate seed docs, or ?repair=1 to re-link packing/invoice/PO → proposal without wipe.',
+                'summary' => $summary,
                 'links'   => $this->links(),
             ];
         }
@@ -147,12 +150,14 @@ class Otmain_seed
             'poId'       => (int) $poId,
         ];
 
+        $summary = $this->buildInventorySummary($this->seededIds, [
+            'customers_upserted' => count($this->clientIdsByCompany),
+        ]);
+
         return [
             'status'  => 'success',
-            'message' => 'Production seed applied (' . count($this->clientIdsByCompany) . ' customers upserted, '
-                . count($proposalIds) . ' proposals'
-                . ($invoiceId > 0 ? ', invoice(s) seeded' : '')
-                . '). Replaced seed-stamped docs only; manual proposals kept.',
+            'message' => $this->formatSeedSuccessMessage($summary),
+            'summary' => $summary,
             'ids'     => array_merge($ids, [
                 'tpClientId'  => (int) $tpClientId,
                 'proposalIds' => $proposalIds,
@@ -825,6 +830,8 @@ class Otmain_seed
 
         $stats['missing_proposals'] = array_values(array_unique($stats['missing_proposals']));
 
+        $summary = $this->buildInventorySummary($this->getSeededRegistry());
+
         return [
             'status'  => 'success',
             'message' => 'Relations repaired: packing ' . $stats['packing_updated']
@@ -834,6 +841,7 @@ class Otmain_seed
                     ? '.'
                     : '. Missing proposals (seed ?force=1 if needed): ' . implode(', ', $stats['missing_proposals'])),
             'stats'   => $stats,
+            'summary' => $summary,
             'related_registry' => $this->relatedRegistry,
             'links'   => $this->links(),
         ];
@@ -1838,5 +1846,199 @@ class Otmain_seed
             $clean[$key] = array_values(array_filter($ids));
         }
         update_option('otmain_seed_document_ids', json_encode($clean));
+    }
+
+    /**
+     * DB inventory: seed-tracked vs non-seed (manual/other) per category.
+     *
+     * @param array $seededRegistry proposals/packing_lists/purchase_orders/invoices/estimates ID lists
+     * @param array $extras        Optional flags (e.g. customers_upserted from this run)
+     * @return array{marker:string,categories:array<int,array<string,mixed>>}
+     */
+    protected function buildInventorySummary(array $seededRegistry, array $extras = [])
+    {
+        $catalogCompanies = [];
+        try {
+            foreach ($this->loadSeedFile('customers.php') as $row) {
+                if (!empty($row['company'])) {
+                    $catalogCompanies[] = (string) $row['company'];
+                }
+            }
+        } catch (Throwable $e) {
+            $catalogCompanies = [];
+        }
+        $catalogCompanies = array_values(array_unique($catalogCompanies));
+
+        $clientsTable = db_prefix() . 'clients';
+        $totalClients = (int) $this->CI->db->count_all($clientsTable);
+        $seedClients  = 0;
+        if ($catalogCompanies !== []) {
+            $this->CI->db->from($clientsTable)->where_in('company', $catalogCompanies);
+            $seedClients = (int) $this->CI->db->count_all_results();
+        }
+        if ($seedClients > $totalClients) {
+            $seedClients = $totalClients;
+        }
+
+        $proposalSeedIds = array_values(array_filter(array_map('intval', $seededRegistry['proposals'] ?? [])));
+        $proposals       = $this->countSeedVersusOther(db_prefix() . 'proposals', 'id', $proposalSeedIds);
+        $invoices        = $this->countSeedVersusOther(db_prefix() . 'invoices', 'id', $seededRegistry['invoices'] ?? []);
+        $packing         = $this->countSeedVersusOther(
+            db_prefix() . 'otmain_packing_lists',
+            'id',
+            $seededRegistry['packing_lists'] ?? []
+        );
+        $purchaseOrders  = $this->countSeedVersusOther(
+            db_prefix() . 'otmain_purchase_orders',
+            'id',
+            $seededRegistry['purchase_orders'] ?? []
+        );
+        $estimates       = $this->countSeedVersusOther(db_prefix() . 'estimates', 'id', $seededRegistry['estimates'] ?? []);
+
+        $trackerTable = db_prefix() . 'otmain_item_tracker';
+        $trackerTotal = 0;
+        $trackerSeed  = 0;
+        if ($this->CI->db->table_exists($trackerTable)) {
+            if ($this->CI->db->field_exists('deleted_at', $trackerTable)) {
+                $this->CI->db->from($trackerTable)->where('deleted_at IS NULL', null, false);
+                $trackerTotal = (int) $this->CI->db->count_all_results();
+            } else {
+                $trackerTotal = (int) $this->CI->db->count_all($trackerTable);
+            }
+            if ($proposalSeedIds !== []) {
+                $this->CI->db->from($trackerTable)
+                    ->where('rel_type', 'proposal')
+                    ->where_in('rel_id', $proposalSeedIds);
+                if ($this->CI->db->field_exists('deleted_at', $trackerTable)) {
+                    $this->CI->db->where('deleted_at IS NULL', null, false);
+                }
+                $trackerSeed = (int) $this->CI->db->count_all_results();
+            }
+        }
+        if ($trackerSeed > $trackerTotal) {
+            $trackerSeed = $trackerTotal;
+        }
+
+        $categories = [
+            [
+                'key'       => 'customers',
+                'label'     => 'Customers / Clients',
+                'seed'      => $seedClients,
+                'non_seed'  => max(0, $totalClients - $seedClients),
+                'total'     => $totalClients,
+                'note'      => 'Seed = company match catalog customers.php (' . count($catalogCompanies) . ' names)',
+                'link'      => admin_url('clients'),
+            ],
+            [
+                'key'       => 'proposals',
+                'label'     => 'Quotations (Proposals)',
+                'seed'      => $proposals['seed'],
+                'non_seed'  => $proposals['non_seed'],
+                'total'     => $proposals['total'],
+                'note'      => 'Tracked in otmain_seed_document_ids',
+                'link'      => admin_url('proposals'),
+            ],
+            [
+                'key'       => 'packing_lists',
+                'label'     => 'Packing Lists',
+                'seed'      => $packing['seed'],
+                'non_seed'  => $packing['non_seed'],
+                'total'     => $packing['total'],
+                'note'      => '',
+                'link'      => admin_url('otmain/packing_list'),
+            ],
+            [
+                'key'       => 'invoices',
+                'label'     => 'Invoices',
+                'seed'      => $invoices['seed'],
+                'non_seed'  => $invoices['non_seed'],
+                'total'     => $invoices['total'],
+                'note'      => '',
+                'link'      => admin_url('invoices'),
+            ],
+            [
+                'key'       => 'purchase_orders',
+                'label'     => 'Purchase Orders',
+                'seed'      => $purchaseOrders['seed'],
+                'non_seed'  => $purchaseOrders['non_seed'],
+                'total'     => $purchaseOrders['total'],
+                'note'      => '',
+                'link'      => admin_url('otmain/purchase_order'),
+            ],
+            [
+                'key'       => 'item_tracker',
+                'label'     => 'Item Tracker rows',
+                'seed'      => $trackerSeed,
+                'non_seed'  => max(0, $trackerTotal - $trackerSeed),
+                'total'     => $trackerTotal,
+                'note'      => 'Rows linked to seeded proposals',
+                'link'      => admin_url('otmain/item_tracker'),
+            ],
+            [
+                'key'       => 'estimates',
+                'label'     => 'Estimates (legacy)',
+                'seed'      => $estimates['seed'],
+                'non_seed'  => $estimates['non_seed'],
+                'total'     => $estimates['total'],
+                'note'      => 'Production quotation = Proposals; estimates usually unused',
+                'link'      => admin_url('estimates'),
+            ],
+        ];
+
+        return [
+            'marker'             => $this->marker,
+            'marker_db'          => (string) get_option('otmain_seed_marker'),
+            'customers_upserted' => (int) ($extras['customers_upserted'] ?? $seedClients),
+            'categories'         => $categories,
+        ];
+    }
+
+    /**
+     * @param string $table
+     * @param string $idColumn
+     * @param array  $seedIds
+     * @return array{seed:int,non_seed:int,total:int}
+     */
+    protected function countSeedVersusOther($table, $idColumn, array $seedIds)
+    {
+        if (!$this->CI->db->table_exists($table)) {
+            return ['seed' => 0, 'non_seed' => 0, 'total' => 0];
+        }
+
+        $total = (int) $this->CI->db->count_all($table);
+        $ids   = array_values(array_unique(array_filter(array_map('intval', $seedIds))));
+        $seed  = 0;
+        if ($ids !== []) {
+            $this->CI->db->from($table)->where_in($idColumn, $ids);
+            $seed = (int) $this->CI->db->count_all_results();
+        }
+        if ($seed > $total) {
+            $seed = $total;
+        }
+
+        return [
+            'seed'     => $seed,
+            'non_seed' => max(0, $total - $seed),
+            'total'    => $total,
+        ];
+    }
+
+    /**
+     * @param array $summary
+     * @return string
+     */
+    protected function formatSeedSuccessMessage(array $summary)
+    {
+        $parts = [];
+        foreach ($summary['categories'] ?? [] as $cat) {
+            if (in_array($cat['key'], ['estimates', 'item_tracker'], true)) {
+                continue;
+            }
+            $parts[] = (int) $cat['seed'] . ' ' . $cat['label'];
+        }
+
+        return 'Production seed applied (marker ' . $this->marker . '). '
+            . 'Seeded/upserted: ' . implode(', ', $parts) . '. '
+            . 'Replaced seed-stamped docs only; manual documents kept.';
     }
 }
