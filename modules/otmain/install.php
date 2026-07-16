@@ -296,6 +296,7 @@ if (!$CI->db->table_exists(db_prefix() . 'otmain_item_tracker')) {
         `rel_type` varchar(20) NOT NULL DEFAULT 'proposal',
         `rel_id` int(11) NOT NULL,
         `invoice_id` int(11) DEFAULT NULL,
+        `itemable_id` int(11) DEFAULT NULL,
         `item_order` int(11) NOT NULL DEFAULT 0,
         `description` text DEFAULT NULL,
         `long_description` text DEFAULT NULL,
@@ -313,14 +314,46 @@ if (!$CI->db->table_exists(db_prefix() . 'otmain_item_tracker')) {
         PRIMARY KEY (`id`),
         KEY `rel_type_rel_id` (`rel_type`, `rel_id`),
         KEY `invoice_id` (`invoice_id`),
-        KEY `item_status` (`item_status`)
+        KEY `item_status` (`item_status`),
+        KEY `itemable_id` (`itemable_id`)
     ) ENGINE=InnoDB DEFAULT CHARSET=" . $CI->db->char_set . ';');
+}
+
+$trackerTable = db_prefix() . 'otmain_item_tracker';
+if ($CI->db->table_exists($trackerTable) && !$CI->db->field_exists('itemable_id', $trackerTable)) {
+    $CI->db->query('ALTER TABLE `' . $trackerTable . '` ADD `itemable_id` INT(11) NULL DEFAULT NULL');
+    $idxCheck = $CI->db->query("SHOW INDEX FROM `{$trackerTable}` WHERE Key_name = 'itemable_id'")->num_rows();
+    if ($idxCheck < 1) {
+        $CI->db->query("ALTER TABLE `{$trackerTable}` ADD INDEX `itemable_id` (`itemable_id`)");
+    }
 }
 
 if (!$CI->db->field_exists('quotation_status', db_prefix() . 'proposals')) {
     $CI->db->query('ALTER TABLE `' . db_prefix() . "proposals`
         ADD COLUMN `quotation_status` varchar(30) NOT NULL DEFAULT 'pending'
         COMMENT 'pending|in_progress|ready_for_shipment|shipped' AFTER `status`");
+}
+
+// Expense: payment until date + expense payment modes
+if ($CI->db->table_exists(db_prefix() . 'expenses') && !$CI->db->field_exists('payment_until', db_prefix() . 'expenses')) {
+    $CI->db->query('ALTER TABLE `' . db_prefix() . 'expenses` ADD `payment_until` DATE NULL DEFAULT NULL');
+}
+
+if ($CI->db->table_exists(db_prefix() . 'payment_modes')) {
+    foreach (['ABN Amro', 'BCA', 'Wise', 'Cash'] as $modeName) {
+        $CI->db->where('name', $modeName);
+        if ((int) $CI->db->count_all_results(db_prefix() . 'payment_modes') === 0) {
+            $CI->db->insert(db_prefix() . 'payment_modes', [
+                'name'                => $modeName,
+                'description'         => '',
+                'active'              => 1,
+                'show_on_pdf'         => 0,
+                'selected_by_default' => 0,
+                'invoices_only'       => 0,
+                'expenses_only'       => 1,
+            ]);
+        }
+    }
 }
 
 $options = [

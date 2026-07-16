@@ -4,14 +4,14 @@ defined('BASEPATH') or exit('No direct script access allowed');
 
 /**
  * Production quotation — TP Company Limited
- * Source PDF: 1 - 2026 - OTMPQ - 101 - Suction Nozzle R1.1 (21-01-2026)
+ * Source PDF: 3 - 2026 - OTMPQ - 101 - Suction Nozzle R1.1 (21-01-2026)
  *
  * Vigor Ship Unloader – Suction Nozzle DN400 with slew drive assembly.
  * Address / company phone / email diisi orchestrator dari tblclients + primary contact.
  */
 return [
     'key'                 => 'tp_suction_nozzle_101',
-    'source_quote_number' => '1 - 2026 - OTMPQ - 101 - Suction Nozzle R1.1',
+    'source_quote_number' => '3 - 2026 - OTMPQ - 101 - Suction Nozzle R1.1',
     'customer_company'    => 'TP Company Limited',
     'force_status'        => 3, // Accepted
     'populate_tracker'    => true,

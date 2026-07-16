@@ -1620,20 +1620,48 @@ function otmain_get_primary_contact($clientid)
     return $contacts[0];
 }
 
-function otmain_pdf_recipient_address_html($name, $address, $zip = '', $city = '')
+function otmain_pdf_recipient_address_html($name, $address, $zip = '', $city = '', $country = '')
 {
     $lines = '';
 
     if (!empty($name)) {
         $lines .= e($name) . '<br />';
     }
-    if (!empty($address)) {
-        $lines .= process_text_content_for_display($address) . '<br />';
+
+    $address = trim((string) $address);
+    $zip     = trim((string) $zip);
+    $city    = trim((string) $city);
+
+    // Placeholder-only address block: show "- / - / -" (never seller/OT-Main street).
+    $isPlaceholder = ($address === '-' || $address === '')
+        && ($zip === '-' || $zip === '')
+        && ($city === '-' || $city === '');
+
+    if ($isPlaceholder && !empty($name)) {
+        $lines .= '-<br />-<br />-<br />';
+
+        return $lines;
     }
 
-    $zipCity = trim(trim((string) $zip) . ' ' . trim((string) $city));
-    if ($zipCity !== '') {
-        $lines .= e($zipCity) . '<br />';
+    if ($address !== '') {
+        $lines .= process_text_content_for_display($address) . '<br />';
+    }
+    if ($zip !== '') {
+        $lines .= e($zip) . '<br />';
+    }
+    if ($city !== '') {
+        $lines .= e($city) . '<br />';
+    }
+
+    if (is_numeric($country) && (int) $country > 0) {
+        $country = get_country_name((int) $country) ?: get_country_short_name((int) $country);
+    }
+    $country = trim((string) $country);
+    if (strcasecmp($country, 'Netherlands') === 0) {
+        $country = 'The Netherlands';
+    }
+    if ($country !== '') {
+        $lines .= e($country) . '<br />';
     }
 
     return $lines !== '' ? $lines : '-<br />';
@@ -1704,7 +1732,8 @@ function otmain_pdf_invoice_left_block_html($invoice, $invoiceNumber)
             $companyName,
             $invoice->billing_street ?? '',
             $invoice->billing_zip ?? '',
-            $invoice->billing_city ?? ''
+            $invoice->billing_city ?? '',
+            $invoice->billing_country ?? ''
         )
         . '<br />'
         . '<strong>Invoice Date:</strong> <span style="font-weight:bold;">' . e(otmain_pdf_format_document_date($invoice->date ?? '')) . '</span><br />'
@@ -2391,7 +2420,8 @@ function otmain_pdf_proposal_header_html($proposal, $proposalNumber)
         $proposal->proposal_to ?? '',
         $proposal->address ?? '',
         $proposal->zip ?? '',
-        $proposal->city ?? ''
+        $proposal->city ?? '',
+        $proposal->country ?? ''
     );
 
     // Quotation Date: auto-fill today when empty/invalid.

@@ -50,7 +50,7 @@ return [
         'shipment_terms'       => '',
         'delivery_time'        => '',
         'total_usd_display'    => '$ 3.624,48',
-        'total_gold_display'   => '999.9 in Gram',
+        'total_gold_display'   => '',
         'subtotal'             => 2490,
         'total_tax'            => 522.90,
         'total'                => 3012.90,

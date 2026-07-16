@@ -12,6 +12,7 @@ $lang['otmain_quote_reference']     = 'Quote Reference';
 $lang['otmain_optional']            = 'optional';
 $lang['otmain_client_ref']          = 'Client Ref.';
 $lang['otmain_quote_title']         = 'Quote Title (suffix)';
+$lang['otmain_source_quote_number'] = 'Quotation number';
 $lang['otmain_invoice_title']       = 'Invoice Title (suffix)';
 $lang['otmain_expiry_days']         = 'Expiry Days';
 $lang['otmain_shipment_terms']      = 'Shipment Terms';
@@ -147,3 +148,10 @@ $lang['otmain_tracker_no_items']          = 'No tracker items found.';
 $lang['otmain_save_all']                  = 'Save All';
 $lang['otmain_related_invoice']           = 'Related Invoice';
 $lang['otmain_view_details']              = 'View Details';
+
+// Expenses
+$lang['otmain_expense_paid']                    = 'Paid';
+$lang['otmain_expense_not_paid']                = 'Not paid';
+$lang['otmain_expense_payment_status']          = 'Payment status';
+$lang['otmain_expense_payment_until']           = 'Payment until';
+$lang['otmain_expense_payment_mode_required']   = 'Payment method is required when the expense is marked as Paid.';

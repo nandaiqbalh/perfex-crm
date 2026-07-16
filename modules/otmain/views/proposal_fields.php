@@ -23,6 +23,14 @@ $proposal = $proposal ?? null;
     </div>
     <div class="col-md-12">
         <?php
+        $value = isset($proposal) ? ($proposal->source_quote_number ?? '') : '';
+        echo render_input('source_quote_number', _l('otmain_source_quote_number'), $value, 'text', [
+            'placeholder' => 'e.g. 19 - 2026 - OTMSQ - 119 - Spare Parts',
+        ]);
+        ?>
+    </div>
+    <div class="col-md-12">
+        <?php
         $value = isset($proposal) ? ($proposal->quote_title ?? '') : '';
         echo render_input('quote_title', _l('otmain_quote_title'), $value);
         ?>

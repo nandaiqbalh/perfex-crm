@@ -14,12 +14,26 @@ class Seed extends AdminController
 
     public function index()
     {
-        $force  = (bool) $this->input->get('force');
-        $repair = (bool) $this->input->get('repair');
+        $force     = (bool) $this->input->get('force');
+        $repair    = (bool) $this->input->get('repair');
+        $customers = (bool) $this->input->get('customers');
 
         $this->load->library('otmain/otmain_seed');
 
-        if ($repair && !$force) {
+        if ($customers && !$force && !$repair) {
+            $upsert = $this->otmain_seed->upsertCustomers();
+            $result = [
+                'status'  => 'success',
+                'message' => 'Customers upserted from seed/customers.php: ' . (int) $upsert['count'] . ' companies.',
+                'stats'   => [
+                    'customers_upserted' => (int) $upsert['count'],
+                ],
+                'summary' => null,
+                'links'   => [
+                    'seed' => admin_url('otmain/seed'),
+                ],
+            ];
+        } elseif ($repair && !$force) {
             $result = $this->otmain_seed->repairRelations();
         } else {
             $result = $this->otmain_seed->run($force);

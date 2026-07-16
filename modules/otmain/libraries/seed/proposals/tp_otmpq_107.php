@@ -8,12 +8,12 @@ defined('BASEPATH') or exit('No direct script access allowed');
  *
  * Complete System Upgrade – MV MB Melita.
  * Package scope + spare parts + optional pneumatic valves.
- * Address / company phone / email diisi orchestrator dari tblclients + primary contact.
+ * Quotation to: MB Melita (not OT-Main seller). Address / contact dari tblclients + seed contact.
  */
 return [
     'key'                 => 'tp_otmpq_107',
     'source_quote_number' => '7 - 2026 - OTMPQ - 107 - MB Melita - Malta',
-    'customer_company'    => 'OT-Main',
+    'customer_company'    => 'MB Melita',
     'force_status'        => 3, // Accepted
     'populate_tracker'    => true,
     'save_option'         => 'otmain_seed_proposal_tp_otmpq_107',

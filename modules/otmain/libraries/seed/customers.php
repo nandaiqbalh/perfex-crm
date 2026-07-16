@@ -56,4 +56,6 @@ return [
     ['nr' => 45, 'company' => 'Outletspecialist BV', 'address' => 'Zuidhollandsedijk 179', 'zip' => '5171 TM', 'city' => 'Kaatsheuvel', 'phone' => '', 'email' => '', 'country_iso' => 'NL'],
     ['nr' => 46, 'company' => 'RS Components BV', 'address' => 'Bingerweg 19', 'zip' => '2001 HN', 'city' => 'Haarlem', 'phone' => '0235166555', 'email' => '', 'country_iso' => 'NL'],
     ['nr' => 47, 'company' => 'PT.Agung Buana Sentosa', 'address' => 'Komp.Pengampon Square B12,B15,Jl. Semut Baru, Pabean Cantikan', 'zip' => '', 'city' => 'Surabaya', 'phone' => '(031)3550081', 'email' => '', 'country_iso' => 'ID'],
+    // Quotation to for OTMPQ-107 — seller is OT-Main; client address unknown → placeholders.
+    ['nr' => 48, 'company' => 'MB Melita', 'address' => '-', 'zip' => '-', 'city' => '-', 'phone' => '', 'email' => 's.ibrahim@otmain.com', 'country_iso' => ''],
 ];

@@ -56,7 +56,7 @@ return [
         'shipment_terms'       => 'EXW. Shipment can be arranged by Air or Sea Cargo.',
         'delivery_time'        => '14 days',
         'total_usd_display'    => '$ 9.041,46',
-        'total_gold_display'   => '999.9 in Gram',
+        'total_gold_display'   => '',
         'subtotal'             => 7527.05,
         'total_tax'            => 0,
         'total'                => 7527.05,

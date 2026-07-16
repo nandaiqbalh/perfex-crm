@@ -100,8 +100,11 @@ $repairStats = isset($result['stats']) && is_array($result['stats']) ? $result['
                             <code>?force=1</code> — recreate seed docs + bersihkan orphan
                             (<a href="<?php echo admin_url('otmain/seed?force=1'); ?>">jalankan</a>).
                             <br />
-                            <code>?repair=1</code> — hanya re-link packing/invoice/PO → proposal (tanpa hapus)
+                            <code>?repair=1</code> — upsert customers + re-link packing/invoice/PO → proposal (tanpa hapus)
                             (<a href="<?php echo admin_url('otmain/seed?repair=1'); ?>">jalankan</a>).
+                            <br />
+                            <code>?customers=1</code> — upsert catalog <code>customers.php</code> saja
+                            (<a href="<?php echo admin_url('otmain/seed?customers=1'); ?>">jalankan</a>).
                         </p>
                     </div>
                 </div>

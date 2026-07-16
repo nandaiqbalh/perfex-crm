@@ -47,7 +47,7 @@ return [
         'shipment_terms'       => 'EXW Jakarta',
         'delivery_time'        => '30 days',
         'total_usd_display'    => '$ 19.115,00',
-        'total_gold_display'   => '999.9 in Gram',
+        'total_gold_display'   => '',
         'subtotal'             => 16400,
         'total_tax'            => 0,
         'total'                => 16400,

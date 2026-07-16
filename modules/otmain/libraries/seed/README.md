@@ -6,7 +6,7 @@ Docs: `customize/docs/SEED-DEMO-DATA.md` · `SEED-FROM-PDF.md` · `SEED-AI-PROMP
 | Path | Peran |
 |------|--------|
 | `manifest.php` | Load order |
-| `customers.php` | Client / supplier catalog (47) |
+| `customers.php` | Client / supplier catalog (48) |
 | `proposals/*.php` | One quotation per file (33) |
 | `packing_lists/*.php` | One packing list per file (8) |
 | `invoices/*.php` | One Perfex invoice per file (47) |
@@ -14,6 +14,6 @@ Docs: `customize/docs/SEED-DEMO-DATA.md` · `SEED-FROM-PDF.md` · `SEED-AI-PROMP
 
 **Marker:** `otmain_prod_v24` (bump in `Otmain_seed.php` when dataset structure changes).
 
-**Run:** `/admin/otmain/seed` · `?force=1` · `?repair=1`
+**Run:** `/admin/otmain/seed` · `?force=1` · `?repair=1` · `?customers=1` (upsert catalog only)
 
 Keep inventory in `SEED-DEMO-DATA.md` in sync with `manifest.php`.

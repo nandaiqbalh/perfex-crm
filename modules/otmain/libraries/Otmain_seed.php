@@ -92,10 +92,7 @@ class Otmain_seed
         $usdId    = $this->getCurrencyId('USD');
         $manifest = $this->loadSeedFile('manifest.php');
 
-        foreach ($this->loadSeedFile('customers.php') as $row) {
-            $payload = $this->customerToPayload($row, $eurId, $usdId);
-            $this->clientIdsByCompany[$row['company']] = $this->ensureClient($payload);
-        }
+        $this->upsertCustomers($eurId, $usdId);
 
         $proposalIds = [];
         $proposalId  = 0;
@@ -708,6 +705,35 @@ class Otmain_seed
     }
 
     /**
+     * Upsert all customers from seed/customers.php into tblclients.
+     * Fill-empty only on existing rows; create missing companies via clients_model.
+     *
+     * @param int|null $eurId
+     * @param int|null $usdId
+     * @return array{count:int,companies:array<string,int>}
+     */
+    public function upsertCustomers($eurId = null, $usdId = null)
+    {
+        if ($eurId === null) {
+            $eurId = $this->getCurrencyId('EUR');
+        }
+        if ($usdId === null) {
+            $usdId = $this->getCurrencyId('USD');
+        }
+
+        $this->clientIdsByCompany = [];
+        foreach ($this->loadSeedFile('customers.php') as $row) {
+            $payload = $this->customerToPayload($row, $eurId, $usdId);
+            $this->clientIdsByCompany[$row['company']] = $this->ensureClient($payload);
+        }
+
+        return [
+            'count'     => count($this->clientIdsByCompany),
+            'companies' => $this->clientIdsByCompany,
+        ];
+    }
+
+    /**
      * Re-link packing / invoice / PO FK to proposals without deleting documents.
      * Uses seed manifest keys + existing DB `source_quote_number` / save_option IDs.
      *
@@ -720,14 +746,12 @@ class Otmain_seed
         $eurId                    = $this->getCurrencyId('EUR');
         $usdId                    = $this->getCurrencyId('USD');
 
-        foreach ($this->loadSeedFile('customers.php') as $row) {
-            $payload = $this->customerToPayload($row, $eurId, $usdId);
-            $this->clientIdsByCompany[$row['company']] = $this->ensureClient($payload);
-        }
+        $this->upsertCustomers($eurId, $usdId);
 
         $this->hydrateRelatedRegistryFromDatabase();
 
         $manifest = $this->loadSeedFile('manifest.php');
+        $proposalsSynced = 0;
         foreach ($manifest['proposals'] ?? [] as $relative) {
             $def = $this->loadSeedFile($relative);
             $id  = $this->resolveRelatedId($def['key'] ?? '');
@@ -739,14 +763,19 @@ class Otmain_seed
             }
             if ($id > 0) {
                 $this->registerRelated($def, $id);
+                if ($this->syncProposalCustomerFromSeed($id, $def)) {
+                    $proposalsSynced++;
+                }
             }
         }
 
         $stats = [
-            'packing_updated'  => 0,
-            'invoice_updated'  => 0,
-            'po_updated'       => 0,
-            'missing_proposals'=> [],
+            'packing_updated'    => 0,
+            'invoice_updated'    => 0,
+            'po_updated'         => 0,
+            'customers_upserted' => count($this->clientIdsByCompany),
+            'proposals_synced'   => $proposalsSynced,
+            'missing_proposals'  => [],
         ];
 
         foreach ($manifest['packing_lists'] ?? [] as $relative) {
@@ -834,7 +863,9 @@ class Otmain_seed
 
         return [
             'status'  => 'success',
-            'message' => 'Relations repaired: packing ' . $stats['packing_updated']
+            'message' => 'Relations repaired: customers ' . $stats['customers_upserted']
+                . ', proposals synced ' . $stats['proposals_synced']
+                . ', packing ' . $stats['packing_updated']
                 . ', invoice ' . $stats['invoice_updated']
                 . ', PO ' . $stats['po_updated']
                 . (empty($stats['missing_proposals'])
@@ -845,6 +876,40 @@ class Otmain_seed
             'related_registry' => $this->relatedRegistry,
             'links'   => $this->links(),
         ];
+    }
+
+    /**
+     * Align an existing proposal's Quotation to / address with customers.php catalog.
+     *
+     * @param int   $proposalId
+     * @param array $def
+     * @return bool true when updated
+     */
+    protected function syncProposalCustomerFromSeed($proposalId, array $def)
+    {
+        $proposalId = (int) $proposalId;
+        $company    = trim((string) ($def['customer_company'] ?? ''));
+        if ($proposalId < 1 || $company === '' || !isset($this->clientIdsByCompany[$company])) {
+            return false;
+        }
+
+        $clientId = (int) $this->clientIdsByCompany[$company];
+        $master   = $this->getClientMasterData($clientId);
+
+        $this->CI->db->where('id', $proposalId);
+        $this->CI->db->update(db_prefix() . 'proposals', [
+            'rel_type'    => 'customer',
+            'rel_id'      => $clientId,
+            'proposal_to' => $master['company'],
+            'address'     => $master['address'],
+            'city'        => $master['city'],
+            'zip'         => $master['zip'],
+            'country'     => $master['country'],
+            'phone'       => $master['phonenumber'],
+            'email'       => $master['email'],
+        ]);
+
+        return $this->CI->db->affected_rows() >= 0;
     }
 
     /**
@@ -1175,6 +1240,13 @@ class Otmain_seed
                 $cur = $existing->{$col} ?? null;
                 $curEmpty = ($cur === null || $cur === '' || $cur === 0 || $cur === '0');
                 $newEmpty = ($newVal === null || $newVal === '' || $newVal === 0 || $newVal === '0');
+                // Explicit "-" placeholder always wins (clear mistaken OT-Main / copied addresses).
+                if ($newVal === '-') {
+                    if ((string) $cur !== '-') {
+                        $update[$col] = '-';
+                    }
+                    continue;
+                }
                 if ($curEmpty && !$newEmpty) {
                     $update[$col] = $newVal;
                 }
@@ -1405,18 +1477,10 @@ class Otmain_seed
         $countryId = $this->getCountryId($row['country_iso']);
         $email     = $this->normalizeEmail($row['email'], $row['nr']);
         $phone     = trim((string) ($row['phone'] ?? ''));
+        // Keep literal "-" as address placeholder (do not blank — PDF shows "- - -").
         $address   = trim((string) ($row['address'] ?? ''));
-        if ($address === '-') {
-            $address = '';
-        }
-        $zip = trim((string) ($row['zip'] ?? ''));
-        if ($zip === '-') {
-            $zip = '';
-        }
-        $city = trim((string) ($row['city'] ?? ''));
-        if ($city === '-') {
-            $city = '';
-        }
+        $zip       = trim((string) ($row['zip'] ?? ''));
+        $city      = trim((string) ($row['city'] ?? ''));
 
         $currency = in_array($row['country_iso'], ['TZ', 'CN', 'HK', 'US'], true) ? $usdId : $eurId;
 
@@ -1427,9 +1491,9 @@ class Otmain_seed
             'city'                  => $city,
             'zip'                   => $zip,
             'country'               => $countryId,
-            'billing_street'        => $address,
-            'billing_city'          => $city,
-            'billing_zip'           => $zip,
+            'billing_street'        => $address === '-' ? '' : $address,
+            'billing_city'          => $city === '-' ? '' : $city,
+            'billing_zip'           => $zip === '-' ? '' : $zip,
             'billing_country'       => $countryId,
             'default_currency'      => $currency,
             'firstname'             => 'Primary',

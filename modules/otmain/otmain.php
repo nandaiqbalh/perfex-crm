@@ -36,6 +36,8 @@ hooks()->add_filter('theme_menu_items', 'otmain_hide_estimates_theme_menu');
 hooks()->add_action('proposal_accepted', 'otmain_item_tracker_on_accepted');
 hooks()->add_action('after_proposal_staff_status_changed', 'otmain_item_tracker_on_staff_status');
 hooks()->add_action('after_proposal_converted_to_invoice', 'otmain_item_tracker_link_invoice');
+hooks()->add_action('after_proposal_updated', 'otmain_item_tracker_on_proposal_updated');
+hooks()->add_action('after_proposal_deleted', 'otmain_item_tracker_on_proposal_deleted');
 hooks()->add_action('after_invoice_added', 'otmain_sync_invoice_proposal_backlink');
 hooks()->add_action('invoice_updated', 'otmain_sync_invoice_proposal_backlink_on_update');
 hooks()->add_action('clients_init', 'otmain_item_tracker_client_menu');
@@ -60,6 +62,16 @@ hooks()->add_filter('invoice_currency_attributes', 'otmain_enable_currency_selec
 hooks()->add_filter('estimate_currency_attributes', 'otmain_enable_currency_select');
 hooks()->add_filter('proposal_currency_attributes', 'otmain_enable_currency_select');
 hooks()->add_filter('credit_note_currency_attributes', 'otmain_enable_currency_select');
+hooks()->add_filter('expense_currency_attributes', 'otmain_enable_currency_select');
+
+// Expense paid status / payment until
+hooks()->add_action('before_expense_form_template_close', 'otmain_render_expense_form_fields');
+hooks()->add_action('after_left_panel_expense_preview_template', 'otmain_render_expense_preview_fields');
+hooks()->add_filter('before_expense_added', 'otmain_before_expense_save');
+hooks()->add_filter('before_expense_updated', 'otmain_before_expense_save', 10, 2);
+hooks()->add_filter('expenses_table_columns', 'otmain_expenses_table_columns');
+hooks()->add_filter('expenses_table_sql_columns', 'otmain_expenses_table_sql_columns');
+hooks()->add_filter('expenses_table_row_data', 'otmain_expenses_table_row_data', 10, 2);
 
 // Free-form VAT % on sales line items (invoice / estimate / proposal / credit note)
 // and OT-Main custom docs (packing list / purchase order via their own forms).
@@ -103,6 +115,229 @@ function otmain_enable_currency_select($attrs)
     $attrs['data-show-subtext'] = true;
 
     return $attrs;
+}
+
+/**
+ * Whether an expense is considered paid (has a payment mode).
+ *
+ * @param object|array|null $expense
+ * @return bool
+ */
+function otmain_expense_is_paid($expense)
+{
+    if (!$expense) {
+        return false;
+    }
+
+    $mode = is_array($expense) ? ($expense['paymentmode'] ?? '') : ($expense->paymentmode ?? '');
+
+    return $mode !== '' && $mode !== null && (string) $mode !== '0';
+}
+
+/**
+ * Paid / Not paid + Payment until fields on the expense form.
+ *
+ * @param object|null $expense
+ */
+function otmain_render_expense_form_fields($expense = null)
+{
+    $isPaid = otmain_expense_is_paid($expense);
+    $paymentUntil = '';
+    if ($expense && !empty($expense->payment_until) && $expense->payment_until !== '0000-00-00') {
+        $paymentUntil = _d($expense->payment_until);
+    }
+
+    echo '<div id="otmain-expense-payment-fields" class="tw-mt-4 tw-mb-2">';
+    echo '<div class="form-group">';
+    echo '<label class="control-label">' . _l('otmain_expense_payment_status') . '</label>';
+    echo '<div class="tw-flex tw-gap-4 tw-mt-1">';
+    echo '<div class="radio radio-primary radio-inline">';
+    echo '<input type="radio" id="otmain_expense_paid" name="otmain_expense_is_paid" value="1"' . ($isPaid ? ' checked' : '') . '>';
+    echo '<label for="otmain_expense_paid">' . _l('otmain_expense_paid') . '</label>';
+    echo '</div>';
+    echo '<div class="radio radio-primary radio-inline">';
+    echo '<input type="radio" id="otmain_expense_not_paid" name="otmain_expense_is_paid" value="0"' . (!$isPaid ? ' checked' : '') . '>';
+    echo '<label for="otmain_expense_not_paid">' . _l('otmain_expense_not_paid') . '</label>';
+    echo '</div>';
+    echo '</div>';
+    echo '</div>';
+    echo render_date_input('payment_until', 'otmain_expense_payment_until', $paymentUntil);
+    echo '</div>';
+}
+
+/**
+ * Show paid status and payment until on expense preview.
+ *
+ * @param object $expense
+ */
+function otmain_render_expense_preview_fields($expense)
+{
+    if (!$expense) {
+        return;
+    }
+
+    $isPaid = otmain_expense_is_paid($expense);
+    echo '<p class="bold mbot5">' . _l('otmain_expense_payment_status') . '</p>';
+    echo '<p class="mbot15">';
+    if ($isPaid) {
+        echo '<span class="label label-success">' . _l('otmain_expense_paid') . '</span>';
+    } else {
+        echo '<span class="label label-default">' . _l('otmain_expense_not_paid') . '</span>';
+    }
+    echo '</p>';
+
+    if (!empty($expense->payment_until) && $expense->payment_until !== '0000-00-00') {
+        echo '<p class="bold mbot5">' . _l('otmain_expense_payment_until') . '</p>';
+        echo '<p class="mbot15 text-muted">' . e(_d($expense->payment_until)) . '</p>';
+    }
+}
+
+/**
+ * Sanitize expense POST before insert/update.
+ *
+ * @param array $data
+ * @param mixed $id
+ * @return array
+ */
+function otmain_before_expense_save($data, $id = null)
+{
+    if (!is_array($data)) {
+        return $data;
+    }
+
+    $isPaid = isset($data['otmain_expense_is_paid']) && (string) $data['otmain_expense_is_paid'] === '1';
+    unset($data['otmain_expense_is_paid']);
+
+    if (!$isPaid) {
+        $data['paymentmode'] = '';
+    } else {
+        $mode = $data['paymentmode'] ?? '';
+        if ($mode === '' || $mode === null || (string) $mode === '0') {
+            set_alert('danger', _l('otmain_expense_payment_mode_required'));
+            $data['paymentmode'] = '';
+        }
+    }
+
+    if (array_key_exists('payment_until', $data)) {
+        if ($data['payment_until'] === '' || $data['payment_until'] === null) {
+            $data['payment_until'] = null;
+        } else {
+            $data['payment_until'] = to_sql_date($data['payment_until']);
+            if ($data['payment_until'] === '' || $data['payment_until'] === false) {
+                $data['payment_until'] = null;
+            }
+        }
+    }
+
+    return $data;
+}
+
+/**
+ * Add Status + Payment until headers after payment mode.
+ *
+ * @param array $columns
+ * @return array
+ */
+function otmain_expenses_table_columns($columns)
+{
+    if (!is_array($columns)) {
+        return $columns;
+    }
+
+    $paymentLabel = _l('expense_dt_table_heading_payment_mode');
+    $insert = [
+        _l('otmain_expense_payment_status'),
+        _l('otmain_expense_payment_until'),
+    ];
+    $new = [];
+    $inserted = false;
+
+    foreach ($columns as $col) {
+        $new[] = $col;
+        $name = is_array($col) ? ($col['name'] ?? '') : $col;
+        if (!$inserted && $name === $paymentLabel) {
+            foreach ($insert as $label) {
+                $new[] = $label;
+            }
+            $inserted = true;
+        }
+    }
+
+    if (!$inserted) {
+        $new = array_merge($new, $insert);
+    }
+
+    return $new;
+}
+
+/**
+ * Select payment_until (and a paid-flag alias) for the expenses datatable.
+ *
+ * @param array $aColumns
+ * @return array
+ */
+function otmain_expenses_table_sql_columns($aColumns)
+{
+    if (!is_array($aColumns)) {
+        return $aColumns;
+    }
+
+    $new = [];
+    foreach ($aColumns as $col) {
+        $new[] = $col;
+        if ($col === 'paymentmode') {
+            // Keep header/SQL index alignment for Status + Payment until columns.
+            $new[] = 'paymentmode as otmain_expense_paid_flag';
+            $new[] = db_prefix() . 'expenses.payment_until as payment_until';
+        }
+    }
+
+    return $new;
+}
+
+/**
+ * Inject Status + Payment until cells after the payment mode cell.
+ *
+ * @param array $row
+ * @param array $aRow
+ * @return array
+ */
+function otmain_expenses_table_row_data($row, $aRow)
+{
+    if (!is_array($row) || !is_array($aRow)) {
+        return $row;
+    }
+
+    $isPaid = otmain_expense_is_paid($aRow);
+    $statusHtml = $isPaid
+        ? '<span class="label label-success">' . _l('otmain_expense_paid') . '</span>'
+        : '<span class="label label-default">' . _l('otmain_expense_not_paid') . '</span>';
+
+    $untilHtml = '';
+    if (!empty($aRow['payment_until']) && $aRow['payment_until'] !== '0000-00-00') {
+        $untilHtml = e(_d($aRow['payment_until']));
+    }
+
+    $cells = [];
+    $meta = [];
+    foreach ($row as $key => $value) {
+        if (is_int($key)) {
+            $cells[] = $value;
+        } else {
+            $meta[$key] = $value;
+        }
+    }
+
+    $cfCount = count(get_custom_fields('expenses', ['show_on_table' => 1]));
+    $insertAt = max(0, count($cells) - $cfCount);
+    array_splice($cells, $insertAt, 0, [$statusHtml, $untilHtml]);
+
+    $newRow = $cells;
+    foreach ($meta as $key => $value) {
+        $newRow[$key] = $value;
+    }
+
+    return $newRow;
 }
 
 function otmain_disable_sales_pdf_signature($process)
@@ -334,6 +569,10 @@ function otmain_admin_footer_assets()
     ) {
         echo '<link rel="stylesheet" href="' . module_dir_url(OTMAIN_MODULE_NAME, 'assets/css/otmain-forms.css') . '?v=1.0.2" />';
         echo '<script src="' . module_dir_url(OTMAIN_MODULE_NAME, 'assets/js/otmain.js') . '?v=1.4.5"></script>';
+    }
+
+    if (strpos($uri, 'expenses/expense') !== false) {
+        echo '<script src="' . module_dir_url(OTMAIN_MODULE_NAME, 'assets/js/otmain-expenses.js') . '?v=1.0.0"></script>';
     }
 
     if (strpos($uri, 'otmain/item_tracker') !== false) {
@@ -686,6 +925,11 @@ function otmain_before_proposal_save($hookData)
         $data['document_title'] = 'Quotation';
     }
 
+    if (array_key_exists('source_quote_number', $data)) {
+        $src = trim((string) $data['source_quote_number']);
+        $data['source_quote_number'] = $src !== '' ? $src : null;
+    }
+
     $data = otmain_normalize_conversion_fields($data);
 
     $hookData['data'] = $data;
@@ -716,6 +960,30 @@ function otmain_item_tracker_on_accepted($proposal_id)
     $CI = &get_instance();
     $CI->load->model('otmain/item_tracker_model');
     $CI->item_tracker_model->populate_from_proposal((int) $proposal_id);
+}
+
+/**
+ * Sync tracker catalog fields when an Accepted proposal is edited.
+ *
+ * @param int $proposal_id
+ */
+function otmain_item_tracker_on_proposal_updated($proposal_id)
+{
+    $CI = &get_instance();
+    $CI->load->model('otmain/item_tracker_model');
+    $CI->item_tracker_model->sync_from_proposal((int) $proposal_id);
+}
+
+/**
+ * Remove tracker rows when the proposal is deleted.
+ *
+ * @param int $proposal_id
+ */
+function otmain_item_tracker_on_proposal_deleted($proposal_id)
+{
+    $CI = &get_instance();
+    $CI->load->model('otmain/item_tracker_model');
+    $CI->item_tracker_model->delete_for_proposal((int) $proposal_id);
 }
 
 /**

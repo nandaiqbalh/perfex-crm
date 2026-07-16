@@ -10,7 +10,7 @@ defined('BASEPATH') or exit('No direct script access allowed');
 return [
     'key'                   => 'tp_inv_108',
     'source_invoice_number' => '2026-INV-108-Vigor Shipunloader - Suction Nozzle',
-    'source_quote_ref'      => '1 - 2026 - OTMPQ - 101 - Suction Nozzle R1.1',
+    'source_quote_ref'      => '3 - 2026 - OTMPQ - 101 - Suction Nozzle R1.1',
     'related_proposal_key'  => 'tp_suction_nozzle_101',
     'customer_company'      => 'TP Company Limited',
     'force_status'          => 1,

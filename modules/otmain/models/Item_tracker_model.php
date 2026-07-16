@@ -112,7 +112,7 @@ class Item_tracker_model extends App_Model
         $invoice_id = !empty($proposal->invoice_id) ? (int) $proposal->invoice_id : null;
 
         foreach ($items as $item) {
-            $this->db->insert($this->table, [
+            $row = [
                 'rel_type'         => 'proposal',
                 'rel_id'           => $proposal_id,
                 'invoice_id'       => $invoice_id,
@@ -130,7 +130,13 @@ class Item_tracker_model extends App_Model
                 'datecreated'      => $now,
                 'dateupdated'      => null,
                 'deleted_at'       => null,
-            ]);
+            ];
+
+            if ($this->db->field_exists('itemable_id', $this->table)) {
+                $row['itemable_id'] = !empty($item['id']) ? (int) $item['id'] : null;
+            }
+
+            $this->db->insert($this->table, $row);
         }
 
         $this->db->where('id', $proposal_id);
@@ -139,6 +145,156 @@ class Item_tracker_model extends App_Model
         ]);
 
         return true;
+    }
+
+    /**
+     * Merge current proposal line items into an existing tracker.
+     * Updates catalog fields, inserts new lines as pending, soft-deletes removed lines.
+     * Preserves tracker-only fields (status, eta, notes, invoice_id).
+     *
+     * @param int $proposal_id
+     * @return bool true if sync ran, false if no tracker / invalid
+     */
+    public function sync_from_proposal($proposal_id)
+    {
+        $proposal_id = (int) $proposal_id;
+        if ($proposal_id < 1 || !$this->has_tracker($proposal_id)) {
+            return false;
+        }
+
+        $proposal = $this->db->select('id, invoice_id')
+            ->where('id', $proposal_id)
+            ->get(db_prefix() . 'proposals')
+            ->row();
+
+        if (!$proposal) {
+            return false;
+        }
+
+        $itemableRows = $this->db
+            ->where('rel_type', 'proposal')
+            ->where('rel_id', $proposal_id)
+            ->order_by('item_order', 'asc')
+            ->get(db_prefix() . 'itemable')
+            ->result_array();
+
+        // Include soft-deleted so we can revive a row if the line returns.
+        $this->db->where('rel_type', 'proposal');
+        $this->db->where('rel_id', $proposal_id);
+        $trackerRows = $this->db->get($this->table)->result_array();
+
+        $byItemableId = [];
+        $unmatched    = [];
+        foreach ($trackerRows as $row) {
+            $iid = isset($row['itemable_id']) ? (int) $row['itemable_id'] : 0;
+            if ($iid > 0) {
+                $byItemableId[$iid] = $row;
+            } else {
+                $unmatched[] = $row;
+            }
+        }
+
+        $now        = date('Y-m-d H:i:s');
+        $invoice_id = !empty($proposal->invoice_id) ? (int) $proposal->invoice_id : null;
+        $hasItemableCol = $this->db->field_exists('itemable_id', $this->table);
+        $matchedTrackerIds = [];
+
+        foreach ($itemableRows as $item) {
+            $itemableId = (int) ($item['id'] ?? 0);
+            $match      = null;
+
+            if ($itemableId > 0 && isset($byItemableId[$itemableId])) {
+                $match = $byItemableId[$itemableId];
+                unset($byItemableId[$itemableId]);
+            } else {
+                // Legacy fallback: item_order + description
+                $order = (int) ($item['item_order'] ?? 0);
+                $desc  = (string) ($item['description'] ?? '');
+                foreach ($unmatched as $idx => $candidate) {
+                    if ((int) ($candidate['item_order'] ?? 0) === $order
+                        && (string) ($candidate['description'] ?? '') === $desc
+                    ) {
+                        $match = $candidate;
+                        unset($unmatched[$idx]);
+                        break;
+                    }
+                }
+                $unmatched = array_values($unmatched);
+            }
+
+            $catalog = [
+                'item_order'       => (int) ($item['item_order'] ?? 0),
+                'description'      => $item['description'] ?? null,
+                'long_description' => $item['long_description'] ?? null,
+                'qty'              => $item['qty'] ?? 1,
+                'unit'             => $item['unit'] ?? null,
+                'rate'             => $item['rate'] ?? null,
+                'dateupdated'      => $now,
+                'deleted_at'       => null,
+            ];
+            if ($hasItemableCol) {
+                $catalog['itemable_id'] = $itemableId > 0 ? $itemableId : null;
+            }
+
+            if ($match) {
+                $matchedTrackerIds[(int) $match['id']] = true;
+                $this->db->where('id', (int) $match['id']);
+                $this->db->update($this->table, $catalog);
+            } else {
+                $insert = array_merge($catalog, [
+                    'rel_type'    => 'proposal',
+                    'rel_id'      => $proposal_id,
+                    'invoice_id'  => $invoice_id,
+                    'item_status' => 'pending',
+                    'eta_date'    => null,
+                    'notes'       => null,
+                    'admin_notes' => null,
+                    'updated_by'  => null,
+                    'datecreated' => $now,
+                ]);
+                $insert['dateupdated'] = null;
+                $this->db->insert($this->table, $insert);
+            }
+        }
+
+        // Soft-delete tracker rows whose proposal line was removed.
+        $stillActive = array_merge(array_values($byItemableId), $unmatched);
+        foreach ($stillActive as $orphan) {
+            $oid = (int) ($orphan['id'] ?? 0);
+            if ($oid < 1 || isset($matchedTrackerIds[$oid])) {
+                continue;
+            }
+            if (!empty($orphan['deleted_at'])) {
+                continue;
+            }
+            $this->db->where('id', $oid);
+            $this->db->update($this->table, [
+                'deleted_at'  => $now,
+                'dateupdated' => $now,
+            ]);
+        }
+
+        $this->auto_update_quotation_status($proposal_id);
+
+        return true;
+    }
+
+    /**
+     * Hard-delete all tracker rows for a proposal (on proposal delete).
+     *
+     * @param int $proposal_id
+     * @return void
+     */
+    public function delete_for_proposal($proposal_id)
+    {
+        $proposal_id = (int) $proposal_id;
+        if ($proposal_id < 1) {
+            return;
+        }
+
+        $this->db->where('rel_type', 'proposal');
+        $this->db->where('rel_id', $proposal_id);
+        $this->db->delete($this->table);
     }
 
     /**
