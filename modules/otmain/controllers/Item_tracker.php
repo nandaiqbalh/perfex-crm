@@ -209,4 +209,25 @@ class Item_tracker extends AdminController
         set_alert('success', sprintf(_l('otmain_tracker_backfill_all_done'), $count));
         redirect(admin_url('otmain/item_tracker'));
     }
+
+    /**
+     * Resync catalog fields for every existing tracker from its proposal (seed + manual).
+     */
+    public function resync_all()
+    {
+        if (staff_cant('edit', 'otmain_item_tracker')) {
+            access_denied('otmain_item_tracker');
+        }
+
+        $result = $this->item_tracker_model->sync_all_from_proposals();
+        set_alert(
+            'success',
+            sprintf(
+                _l('otmain_tracker_resync_all_done'),
+                (int) ($result['synced'] ?? 0),
+                (int) ($result['skipped'] ?? 0)
+            )
+        );
+        redirect(admin_url('otmain/item_tracker'));
+    }
 }

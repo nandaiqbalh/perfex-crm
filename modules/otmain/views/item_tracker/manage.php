@@ -9,12 +9,20 @@
                         <?php echo _l('otmain_item_tracker'); ?>
                     </h4>
                     <?php if (staff_can('edit', 'otmain_item_tracker')) { ?>
+                    <div class="tw-flex tw-gap-2">
+                    <a href="<?php echo admin_url('otmain/item_tracker/resync_all'); ?>"
+                       class="btn btn-primary"
+                       onclick="return confirm('<?php echo _l('otmain_tracker_resync_confirm'); ?>');">
+                        <i class="fa fa-link tw-mr-1"></i>
+                        <?php echo _l('otmain_resync_all_trackers'); ?>
+                    </a>
                     <a href="<?php echo admin_url('otmain/item_tracker/backfill_all'); ?>"
                        class="btn btn-default"
                        onclick="return confirm('<?php echo _l('confirm_action_prompt'); ?>');">
                         <i class="fa fa-sync tw-mr-1"></i>
                         <?php echo _l('otmain_generate_all_trackers'); ?>
                     </a>
+                    </div>
                     <?php } ?>
                 </div>
 

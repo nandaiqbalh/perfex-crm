@@ -14,13 +14,31 @@ class Seed extends AdminController
 
     public function index()
     {
-        $force     = (bool) $this->input->get('force');
-        $repair    = (bool) $this->input->get('repair');
-        $customers = (bool) $this->input->get('customers');
+        $force          = (bool) $this->input->get('force');
+        $repair         = (bool) $this->input->get('repair');
+        $customers      = (bool) $this->input->get('customers');
+        $resyncTracker  = (bool) $this->input->get('resync_tracker');
 
         $this->load->library('otmain/otmain_seed');
 
-        if ($customers && !$force && !$repair) {
+        if ($resyncTracker && !$force && !$repair && !$customers) {
+            $resync = $this->otmain_seed->resyncItemTrackers();
+            $result = [
+                'status'  => 'success',
+                'message' => 'Item Tracker resynced from proposal line items (all proposals with a tracker, including non-seed): '
+                    . (int) ($resync['synced'] ?? 0) . ' synced'
+                    . ', ' . (int) ($resync['skipped'] ?? 0) . ' skipped.',
+                'stats'   => [
+                    'trackers_synced'  => (int) ($resync['synced'] ?? 0),
+                    'trackers_skipped' => (int) ($resync['skipped'] ?? 0),
+                ],
+                'summary' => null,
+                'links'   => [
+                    'seed'         => admin_url('otmain/seed'),
+                    'item_tracker' => admin_url('otmain/item_tracker'),
+                ],
+            ];
+        } elseif ($customers && !$force && !$repair) {
             $upsert = $this->otmain_seed->upsertCustomers();
             $result = [
                 'status'  => 'success',

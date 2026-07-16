@@ -280,6 +280,50 @@ class Item_tracker_model extends App_Model
     }
 
     /**
+     * Resync ALL item trackers from their linked proposals (seed + non-seed).
+     * Preserves tracker-only fields via sync_from_proposal().
+     *
+     * @return array{synced:int,skipped:int,proposal_ids:int[]}
+     */
+    public function sync_all_from_proposals()
+    {
+        if (!$this->db->table_exists($this->table)) {
+            return ['synced' => 0, 'skipped' => 0, 'proposal_ids' => []];
+        }
+
+        $rows = $this->db
+            ->select('rel_id')
+            ->where('rel_type', 'proposal')
+            ->group_by('rel_id')
+            ->get($this->table)
+            ->result_array();
+
+        $synced       = 0;
+        $skipped      = 0;
+        $proposalIds  = [];
+
+        foreach ($rows as $row) {
+            $proposalId = (int) ($row['rel_id'] ?? 0);
+            if ($proposalId < 1) {
+                $skipped++;
+                continue;
+            }
+            $proposalIds[] = $proposalId;
+            if ($this->sync_from_proposal($proposalId)) {
+                $synced++;
+            } else {
+                $skipped++;
+            }
+        }
+
+        return [
+            'synced'       => $synced,
+            'skipped'      => $skipped,
+            'proposal_ids' => $proposalIds,
+        ];
+    }
+
+    /**
      * Hard-delete all tracker rows for a proposal (on proposal delete).
      *
      * @param int $proposal_id

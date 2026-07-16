@@ -859,12 +859,17 @@ class Otmain_seed
 
         $stats['missing_proposals'] = array_values(array_unique($stats['missing_proposals']));
 
+        $trackerResync = $this->resyncItemTrackers();
+        $stats['trackers_synced']  = (int) ($trackerResync['synced'] ?? 0);
+        $stats['trackers_skipped'] = (int) ($trackerResync['skipped'] ?? 0);
+
         $summary = $this->buildInventorySummary($this->getSeededRegistry());
 
         return [
             'status'  => 'success',
             'message' => 'Relations repaired: customers ' . $stats['customers_upserted']
                 . ', proposals synced ' . $stats['proposals_synced']
+                . ', trackers resynced ' . $stats['trackers_synced']
                 . ', packing ' . $stats['packing_updated']
                 . ', invoice ' . $stats['invoice_updated']
                 . ', PO ' . $stats['po_updated']
@@ -876,6 +881,19 @@ class Otmain_seed
             'related_registry' => $this->relatedRegistry,
             'links'   => $this->links(),
         ];
+    }
+
+    /**
+     * Resync item tracker catalog fields from proposal line items for EVERY
+     * proposal that already has a tracker (seed and non-seed / manual).
+     *
+     * @return array{synced:int,skipped:int,proposal_ids:int[]}
+     */
+    public function resyncItemTrackers()
+    {
+        $this->CI->load->model('otmain/item_tracker_model');
+
+        return $this->CI->item_tracker_model->sync_all_from_proposals();
     }
 
     /**

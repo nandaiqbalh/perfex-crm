@@ -22,6 +22,9 @@ $repairStats = isset($result['stats']) && is_array($result['stats']) ? $result['
                         <?php if ($repairStats) { ?>
                         <div class="alert alert-warning">
                             Repair detail:
+                            customers <?php echo (int) ($repairStats['customers_upserted'] ?? 0); ?>,
+                            proposals <?php echo (int) ($repairStats['proposals_synced'] ?? 0); ?>,
+                            trackers resynced <?php echo (int) ($repairStats['trackers_synced'] ?? 0); ?>,
                             packing updated <?php echo (int) ($repairStats['packing_updated'] ?? 0); ?>,
                             invoice updated <?php echo (int) ($repairStats['invoice_updated'] ?? 0); ?>,
                             PO updated <?php echo (int) ($repairStats['po_updated'] ?? 0); ?>
@@ -100,11 +103,14 @@ $repairStats = isset($result['stats']) && is_array($result['stats']) ? $result['
                             <code>?force=1</code> — recreate seed docs + bersihkan orphan
                             (<a href="<?php echo admin_url('otmain/seed?force=1'); ?>">jalankan</a>).
                             <br />
-                            <code>?repair=1</code> — upsert customers + re-link packing/invoice/PO → proposal (tanpa hapus)
+                            <code>?repair=1</code> — upsert customers + re-link packing/invoice/PO → proposal + <strong>resync all item trackers</strong> (seed &amp; non-seed)
                             (<a href="<?php echo admin_url('otmain/seed?repair=1'); ?>">jalankan</a>).
                             <br />
                             <code>?customers=1</code> — upsert catalog <code>customers.php</code> saja
                             (<a href="<?php echo admin_url('otmain/seed?customers=1'); ?>">jalankan</a>).
+                            <br />
+                            <code>?resync_tracker=1</code> — resync Item Tracker dari line items proposal (semua proposal yang punya tracker, termasuk non-seed)
+                            (<a href="<?php echo admin_url('otmain/seed?resync_tracker=1'); ?>">jalankan</a>).
                         </p>
                     </div>
                 </div>
