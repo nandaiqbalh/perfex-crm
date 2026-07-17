@@ -13,7 +13,7 @@ class Otmain_seed
     protected $CI;
 
     /** Bump when seed dataset structure changes so next /admin/otmain/seed recreates. */
-    protected $marker = 'otmain_prod_v24';
+    protected $marker = 'otmain_prod_v25';
 
     /** @var string Absolute path to libraries/seed */
     protected $seedPath;
@@ -39,6 +39,9 @@ class Otmain_seed
 
     /** Default client-area password for contacts created/synced by seed. */
     protected $seedContactPassword = '123Password!';
+
+    /** @var int Duplicate contacts removed during cleanup (force / marker bump). */
+    protected $contactsDeduped = 0;
 
     public function __construct()
     {
@@ -76,6 +79,7 @@ class Otmain_seed
         }
 
         // Only remove seed-stamped / previously tracked docs — never wipe manual proposals.
+        $this->contactsDeduped = 0;
         $this->cleanup();
 
         $this->relatedRegistry    = [];
@@ -149,6 +153,7 @@ class Otmain_seed
 
         $summary = $this->buildInventorySummary($this->seededIds, [
             'customers_upserted' => count($this->clientIdsByCompany),
+            'contacts_deduped'   => (int) $this->contactsDeduped,
         ]);
 
         return [
@@ -1371,24 +1376,9 @@ class Otmain_seed
         $phone    = trim((string) $phone);
 
         if ($email !== '') {
-            $existing = $this->CI->db
-                ->where('userid', $clientId)
-                ->where('email', $email)
-                ->get(db_prefix() . 'contacts')
-                ->row();
+            $existing = $this->findClientContactByEmail($clientId, $email);
             if ($existing) {
-                $this->syncSeedContactPassword((int) $existing->id);
-                // Unmask / fill phone when seed has a full number and DB still empty or redacted.
-                if ($phone !== '' && strpos($phone, '*') === false) {
-                    $existingPhone = trim((string) ($existing->phonenumber ?? ''));
-                    if ($existingPhone === '' || strpos($existingPhone, '*') !== false) {
-                        $this->CI->db->where('id', (int) $existing->id)->update(db_prefix() . 'contacts', [
-                            'phonenumber' => $phone,
-                        ]);
-                    }
-                }
-
-                return (int) $existing->id;
+                return $this->touchSeedContact($existing, $phone);
             }
         }
 
@@ -1401,30 +1391,21 @@ class Otmain_seed
             foreach ($contacts as $c) {
                 $full = strtolower(preg_replace('/\s+/', ' ', trim(($c['firstname'] ?? '') . ' ' . ($c['lastname'] ?? ''))));
                 if ($full === $needle) {
-                    $this->syncSeedContactPassword((int) $c['id']);
-                    if ($phone !== '' && strpos($phone, '*') === false) {
-                        $existingPhone = trim((string) ($c['phonenumber'] ?? ''));
-                        if ($existingPhone === '' || strpos($existingPhone, '*') !== false) {
-                            $this->CI->db->where('id', (int) $c['id'])->update(db_prefix() . 'contacts', [
-                                'phonenumber' => $phone,
-                            ]);
-                        }
-                    }
-
-                    return (int) $c['id'];
+                    return $this->touchSeedContact((object) $c, $phone);
                 }
             }
         }
 
-        $emailForDb = $email;
-        if ($emailForDb === '') {
-            $emailForDb = 'seed.contact.' . $clientId . '.' . substr(md5($name . '|' . $phone), 0, 10) . '@otmain.local';
-        } else {
-            // Globally unique email constraint — if owned by another client, use local alias (PDF email stays on document).
-            $other = $this->CI->clients_model->get_contact_by_email($emailForDb);
-            if ($other && (int) $other->userid !== $clientId) {
-                $emailForDb = 'seed.contact.' . $clientId . '.' . substr(md5($email), 0, 10) . '@otmain.local';
-            }
+        $emailForDb = $this->resolveSeedContactEmailForDb($clientId, $name, $email, $phone);
+
+        // Reuse prior alias / same resolved email (prevents hundreds of duplicates on force-reseed).
+        $existingResolved = $this->findClientContactByEmail($clientId, $emailForDb);
+        if ($existingResolved) {
+            return $this->touchSeedContact($existingResolved, $phone);
+        }
+        $global = $this->CI->clients_model->get_contact_by_email($emailForDb);
+        if ($global && (int) $global->userid === $clientId) {
+            return $this->touchSeedContact($global, $phone);
         }
 
         $parts = preg_split('/\s+/', $name !== '' ? $name : 'Contact', 2);
@@ -1452,6 +1433,82 @@ class Otmain_seed
         }
 
         return $contactId;
+    }
+
+    /**
+     * @param int    $clientId
+     * @param string $email
+     * @return object|null
+     */
+    protected function findClientContactByEmail($clientId, $email)
+    {
+        $email = strtolower(trim((string) $email));
+        if ($email === '') {
+            return null;
+        }
+
+        return $this->CI->db
+            ->where('userid', (int) $clientId)
+            ->where('email', $email)
+            ->order_by('is_primary', 'DESC')
+            ->order_by('id', 'ASC')
+            ->limit(1)
+            ->get(db_prefix() . 'contacts')
+            ->row();
+    }
+
+    /**
+     * DB email for a new contact row (PDF email kept on the document separately).
+     *
+     * @param int    $clientId
+     * @param string $name
+     * @param string $email PDF email (already lowercased)
+     * @param string $phone
+     * @return string
+     */
+    protected function resolveSeedContactEmailForDb($clientId, $name, $email, $phone)
+    {
+        $clientId = (int) $clientId;
+        if ($email === '') {
+            return 'seed.contact.' . $clientId . '.' . substr(md5($name . '|' . $phone), 0, 10) . '@otmain.local';
+        }
+
+        // Globally unique email — if owned by another client, use local alias (PDF email stays on document).
+        $other = $this->CI->clients_model->get_contact_by_email($email);
+        if ($other && (int) $other->userid !== $clientId) {
+            return 'seed.contact.' . $clientId . '.' . substr(md5($email), 0, 10) . '@otmain.local';
+        }
+
+        return $email;
+    }
+
+    /**
+     * @param object|array $contact
+     * @param string       $phone
+     * @return int
+     */
+    protected function touchSeedContact($contact, $phone)
+    {
+        $id = (int) (is_array($contact) ? ($contact['id'] ?? 0) : ($contact->id ?? 0));
+        if ($id < 1) {
+            return 0;
+        }
+
+        $this->syncSeedContactPassword($id);
+
+        $phone = trim((string) $phone);
+        if ($phone !== '' && strpos($phone, '*') === false) {
+            $existingPhone = trim((string) (is_array($contact)
+                ? ($contact['phonenumber'] ?? '')
+                : ($contact->phonenumber ?? '')));
+            if ($existingPhone === '' || strpos($existingPhone, '*') !== false) {
+                $this->CI->db->where('id', $id)->update(db_prefix() . 'contacts', [
+                    'phonenumber' => $phone,
+                ]);
+            }
+        }
+
+        return $id;
     }
 
     /**
@@ -1647,7 +1704,122 @@ class Otmain_seed
             $this->CI->invoices_model->delete((int) $id, true);
         }
 
+        // Collapse duplicate contacts on seed catalog clients (same email under same client).
+        // Safe: never deletes primary; remaps otmain_contact_id before delete.
+        $this->contactsDeduped = $this->cleanupDuplicateSeedContacts();
+
         $this->clearSeedOptions();
+    }
+
+    /**
+     * Remove duplicate tblcontacts rows on seed catalog customers (same userid + email).
+     * Keeps primary (or lowest id), remaps document FK, then deletes extras.
+     *
+     * @return int Number of contact rows deleted
+     */
+    protected function cleanupDuplicateSeedContacts()
+    {
+        $companies = [];
+        try {
+            foreach ($this->loadSeedFile('customers.php') as $row) {
+                if (!empty($row['company'])) {
+                    $companies[] = (string) $row['company'];
+                }
+            }
+        } catch (Throwable $e) {
+            return 0;
+        }
+        $companies = array_values(array_unique($companies));
+        if ($companies === []) {
+            return 0;
+        }
+
+        $clients = $this->CI->db
+            ->select('userid, company')
+            ->where_in('company', $companies)
+            ->get(db_prefix() . 'clients')
+            ->result_array();
+        if ($clients === []) {
+            return 0;
+        }
+
+        $deleted = 0;
+        foreach ($clients as $client) {
+            $clientId = (int) $client['userid'];
+            $contacts = $this->CI->db
+                ->where('userid', $clientId)
+                ->order_by('is_primary', 'DESC')
+                ->order_by('id', 'ASC')
+                ->get(db_prefix() . 'contacts')
+                ->result_array();
+            if (count($contacts) < 2) {
+                continue;
+            }
+
+            $byEmail = [];
+            foreach ($contacts as $c) {
+                $key = strtolower(trim((string) ($c['email'] ?? '')));
+                if ($key === '') {
+                    $key = '__empty__:' . (int) $c['id'];
+                }
+                $byEmail[$key][] = $c;
+            }
+
+            foreach ($byEmail as $group) {
+                if (count($group) < 2) {
+                    continue;
+                }
+                $keepId = (int) $group[0]['id'];
+                foreach ($group as $c) {
+                    if ((int) ($c['is_primary'] ?? 0) === 1) {
+                        $keepId = (int) $c['id'];
+                        break;
+                    }
+                }
+                foreach ($group as $c) {
+                    $dupId = (int) $c['id'];
+                    if ($dupId === $keepId || (int) ($c['is_primary'] ?? 0) === 1) {
+                        continue;
+                    }
+                    $this->remapOtmainContactId($dupId, $keepId);
+                    if ($this->CI->clients_model->delete_contact($dupId)) {
+                        $deleted++;
+                    }
+                }
+            }
+        }
+
+        return $deleted;
+    }
+
+    /**
+     * Point document FK columns from a duplicate contact id to the kept contact id.
+     *
+     * @param int $fromId
+     * @param int $toId
+     */
+    protected function remapOtmainContactId($fromId, $toId)
+    {
+        $fromId = (int) $fromId;
+        $toId   = (int) $toId;
+        if ($fromId < 1 || $toId < 1 || $fromId === $toId) {
+            return;
+        }
+
+        $tables = [
+            db_prefix() . 'proposals',
+            db_prefix() . 'invoices',
+            db_prefix() . 'otmain_packing_lists',
+            db_prefix() . 'otmain_purchase_orders',
+        ];
+        foreach ($tables as $table) {
+            if (!$this->CI->db->table_exists($table) || !$this->CI->db->field_exists('otmain_contact_id', $table)) {
+                continue;
+            }
+            $this->CI->db->where('otmain_contact_id', $fromId)->update($table, [
+                'otmain_contact_id' => $toId,
+            ]);
+        }
     }
 
     /**
@@ -2088,6 +2260,7 @@ class Otmain_seed
             'marker'             => $this->marker,
             'marker_db'          => (string) get_option('otmain_seed_marker'),
             'customers_upserted' => (int) ($extras['customers_upserted'] ?? $seedClients),
+            'contacts_deduped'   => (int) ($extras['contacts_deduped'] ?? $this->contactsDeduped),
             'categories'         => $categories,
         ];
     }
@@ -2136,8 +2309,15 @@ class Otmain_seed
             $parts[] = (int) $cat['seed'] . ' ' . $cat['label'];
         }
 
-        return 'Production seed applied (marker ' . $this->marker . '). '
+        $msg = 'Production seed applied (marker ' . $this->marker . '). '
             . 'Seeded/upserted: ' . implode(', ', $parts) . '. '
             . 'Replaced seed-stamped docs only; manual documents kept.';
+
+        $deduped = (int) ($summary['contacts_deduped'] ?? $this->contactsDeduped);
+        if ($deduped > 0) {
+            $msg .= ' Removed ' . $deduped . ' duplicate contact(s).';
+        }
+
+        return $msg;
     }
 }
