@@ -782,6 +782,11 @@ function otmain_before_invoice_save($hookData)
         $data['bank_account'] = ($bank === 'USD' || $bank === 'EUR') ? $bank : null;
     }
 
+    $isNewInvoice = !isset($hookData['id']);
+    if ($isNewInvoice && isset($data['status']) && (int) $data['status'] === Invoices_model::STATUS_DRAFT) {
+        $data['number'] = get_option('next_invoice_number');
+    }
+
     $hookData['data'] = $data;
 
     return $hookData;
@@ -1038,6 +1043,16 @@ function otmain_sync_invoice_proposal_backlink($invoiceId)
     }
 
     $CI = &get_instance();
+    $CI->load->model('invoices_model');
+
+    if ($CI->invoices_model->is_draft($invoiceId)) {
+        $invoice = $CI->invoices_model->get($invoiceId);
+        if ($invoice && (int) $invoice->number !== Invoices_model::STATUS_DRAFT_NUMBER) {
+            $CI->invoices_model->increment_next_number();
+            $CI->invoices_model->save_formatted_number($invoiceId);
+        }
+    }
+
     if (!$CI->db->field_exists('proposal_id', db_prefix() . 'invoices')) {
         return;
     }

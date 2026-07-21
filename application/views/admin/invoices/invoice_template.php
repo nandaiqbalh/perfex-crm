@@ -87,6 +87,7 @@ if ($format == 1) {
 }
 
 $_is_draft            = (isset($invoice) && $invoice->status == Invoices_model::STATUS_DRAFT) ? true : false;
+$_is_draft_placeholder = $_is_draft && isset($invoice) && (int) $invoice->number === Invoices_model::STATUS_DRAFT_NUMBER;
 $_invoice_number      = str_pad($__number, get_option('number_padding_prefixes'), '0', STR_PAD_LEFT);
 $isedit               = isset($invoice) ? 'true' : 'false';
 $data_original_number = isset($invoice) ? $invoice->number : 'false';
@@ -111,10 +112,10 @@ $data_original_number = isset($invoice) ? $invoice->number : 'false';
                             <?= $prefix; ?>
                         </span>
                         <input type="text" name="number" class="form-control"
-                            value="<?= ($_is_draft) ? 'DRAFT' : $_invoice_number; ?>"
+                            value="<?= $_is_draft_placeholder ? 'DRAFT' : $_invoice_number; ?>"
                             data-isedit="<?= e($isedit); ?>"
                             data-original-number="<?= e($data_original_number); ?>"
-                            <?= ($_is_draft) ? 'disabled' : '' ?>>
+                            <?= $_is_draft_placeholder ? 'disabled' : '' ?>>
                         <?php if ($format == 3) { ?>
                         <span class="input-group-addon">
                             <span id="prefix_year"

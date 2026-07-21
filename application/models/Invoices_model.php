@@ -1845,6 +1845,10 @@ class Invoices_model extends App_Model
         $this->db->select('number')->where('id', $id);
         $invoice = $this->db->get('invoices')->row();
 
+        if ((int) $invoice->number !== self::STATUS_DRAFT_NUMBER) {
+            return $invoice->number;
+        }
+
         $newNumber = get_option('next_invoice_number');
 
         $this->db->where('id', $id);

@@ -109,6 +109,11 @@ return App_table::find('invoices')
             if (staff_can('edit', 'invoices')) {
                 $numberOutput .= ' | <a href="' . admin_url('invoices/invoice/' . $aRow['id']) . '">' . _l('edit') . '</a>';
             }
+            if (staff_can('delete', 'invoices')) {
+                if (get_option('delete_only_on_last_invoice') == 0 || is_last_invoice($aRow['id'])) {
+                    $numberOutput .= ' | <a href="' . admin_url('invoices/delete/' . $aRow['id']) . '" class="_delete text-danger">' . _l('delete') . '</a>';
+                }
+            }
             $numberOutput .= '</div>';
 
             $row[] = $numberOutput;

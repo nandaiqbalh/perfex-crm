@@ -419,12 +419,29 @@ function otmain_format_estimate_number($number, $data)
 
 function otmain_format_invoice_number($number, $data)
 {
-    $CI = &get_instance();
-    $CI->db->select('invoice_title')->where('id', $data['id']);
-    $row = $CI->db->get(db_prefix() . 'invoices')->row();
+    $invoice = $data['invoice'] ?? null;
 
-    if ($row && !empty($row->invoice_title)) {
-        $number .= ' - ' . $row->invoice_title;
+    if ($invoice
+        && (int) $invoice->status === Invoices_model::STATUS_DRAFT
+        && (int) $invoice->number !== Invoices_model::STATUS_DRAFT_NUMBER) {
+        $number = sales_number_format(
+            $invoice->number,
+            $invoice->number_format,
+            $invoice->prefix,
+            $invoice->date
+        );
+    }
+
+    if ($invoice && !empty($invoice->invoice_title)) {
+        $number .= ' - ' . $invoice->invoice_title;
+    } elseif (!empty($data['id'])) {
+        $CI = &get_instance();
+        $CI->db->select('invoice_title')->where('id', $data['id']);
+        $row = $CI->db->get(db_prefix() . 'invoices')->row();
+
+        if ($row && !empty($row->invoice_title)) {
+            $number .= ' - ' . $row->invoice_title;
+        }
     }
 
     return $number;
