@@ -308,6 +308,11 @@ function update_invoice_status($id, $force_update = false, $prevent_logging = fa
 
     $original_status = $invoice->status;
 
+    // OT-Main: respect manual status override unless force_update (Automatic mode)
+    if (!empty($invoice->status_locked) && $force_update == false) {
+        return false;
+    }
+
     if (($original_status == Invoices_model::STATUS_DRAFT && $force_update == false)
         || ($original_status == Invoices_model::STATUS_CANCELLED && $force_update == false)
     ) {

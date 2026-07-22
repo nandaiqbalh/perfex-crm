@@ -40,6 +40,7 @@ hooks()->add_action('after_proposal_updated', 'otmain_item_tracker_on_proposal_u
 hooks()->add_action('after_proposal_deleted', 'otmain_item_tracker_on_proposal_deleted');
 hooks()->add_action('after_invoice_added', 'otmain_sync_invoice_proposal_backlink');
 hooks()->add_action('invoice_updated', 'otmain_sync_invoice_proposal_backlink_on_update');
+hooks()->add_action('before_invoice_preview_more_menu_button', 'otmain_render_invoice_status_dropdown');
 hooks()->add_action('clients_init', 'otmain_item_tracker_client_menu');
 
 hooks()->add_filter('sales_number_format', 'otmain_sales_number_format', 10, 2);
@@ -637,6 +638,23 @@ function otmain_render_invoice_fields($invoice = null)
     otmain_invoice_section('addresses', $invoice);
     otmain_invoice_section('extras', $invoice);
     otmain_invoice_section('notes', $invoice);
+}
+
+/**
+ * Dropdown to manually override invoice status (full override).
+ *
+ * @param object $invoice
+ */
+function otmain_render_invoice_status_dropdown($invoice)
+{
+    if (!$invoice || empty($invoice->id) || staff_cant('edit', 'invoices')) {
+        return;
+    }
+
+    $CI = &get_instance();
+    $CI->load->view('otmain/invoice_status_dropdown', [
+        'invoice' => $invoice,
+    ]);
 }
 
 function otmain_render_proposal_fields($proposal = null)

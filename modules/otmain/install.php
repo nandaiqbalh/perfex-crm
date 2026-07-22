@@ -58,6 +58,7 @@ $invoiceColumns = [
     'conversion_rate'        => "DECIMAL(15,6) NULL DEFAULT NULL",
     'conversion_currency'    => "INT(11) NULL DEFAULT NULL",
     'bank_account'           => "VARCHAR(10) NULL DEFAULT NULL",
+    'status_locked'          => "TINYINT(1) NOT NULL DEFAULT 0",
 ];
 
 foreach ($invoiceColumns as $column => $definition) {

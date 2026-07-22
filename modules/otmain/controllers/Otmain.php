@@ -244,4 +244,78 @@ class Otmain extends AdminController
             'phone' => $primary['phonenumber'] ?? ($client->phonenumber ?? ''),
         ]);
     }
+
+    /**
+     * Manually override invoice status (or return to automatic).
+     *
+     * @param int $id invoice id
+     */
+    public function set_invoice_status($id)
+    {
+        if (staff_cant('edit', 'invoices')) {
+            access_denied('invoices');
+        }
+
+        $id = (int) $id;
+        if ($id < 1) {
+            set_alert('danger', _l('otmain_invoice_status_invalid'));
+            redirect(admin_url('invoices'));
+        }
+
+        $this->load->model('invoices_model');
+        $invoice = $this->invoices_model->get($id);
+        if (!$invoice) {
+            set_alert('danger', _l('otmain_invoice_status_invalid'));
+            redirect(admin_url('invoices'));
+        }
+
+        $automatic = (int) $this->input->get_post('automatic') === 1;
+
+        if ($automatic) {
+            $this->db->where('id', $id)->update(db_prefix() . 'invoices', [
+                'status_locked' => 0,
+            ]);
+            update_invoice_status($id, true);
+            $this->invoices_model->log_invoice_activity($id, 'otmain_invoice_status_set_automatic');
+            set_alert('success', _l('otmain_invoice_status_automatic_success'));
+            redirect(admin_url('invoices/list_invoices/' . $id));
+        }
+
+        $status = (int) $this->input->get_post('status');
+        $allowed = $this->invoices_model->get_statuses();
+        if (!in_array($status, $allowed, true)) {
+            set_alert('danger', _l('otmain_invoice_status_invalid'));
+            redirect(admin_url('invoices/list_invoices/' . $id));
+        }
+
+        $wasDraft = (int) $invoice->status === Invoices_model::STATUS_DRAFT;
+        $leavingDraft = $wasDraft && $status !== Invoices_model::STATUS_DRAFT;
+
+        if ($leavingDraft && (int) $invoice->number === Invoices_model::STATUS_DRAFT_NUMBER) {
+            $this->invoices_model->change_invoice_number_when_status_draft($id);
+        }
+
+        $this->db->where('id', $id)->update(db_prefix() . 'invoices', [
+            'status'        => $status,
+            'status_locked' => 1,
+        ]);
+
+        if ($leavingDraft) {
+            $this->invoices_model->save_formatted_number($id);
+        }
+
+        $additional = serialize([
+            '<original_status>' . (int) $invoice->status . '</original_status>',
+            '<new_status>' . $status . '</new_status>',
+        ]);
+        $this->invoices_model->log_invoice_activity(
+            $id,
+            'otmain_invoice_status_overridden',
+            false,
+            $additional
+        );
+
+        set_alert('success', _l('otmain_invoice_status_updated', format_invoice_status($status, '', false)));
+        redirect(admin_url('invoices/list_invoices/' . $id));
+    }
 }

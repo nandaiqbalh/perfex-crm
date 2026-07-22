@@ -158,3 +158,14 @@ $lang['otmain_expense_not_paid']                = 'Not paid';
 $lang['otmain_expense_payment_status']          = 'Payment status';
 $lang['otmain_expense_payment_until']           = 'Payment until';
 $lang['otmain_expense_payment_mode_required']   = 'Payment method is required when the expense is marked as Paid.';
+
+// Invoice status override
+$lang['otmain_invoice_status']                  = 'Status';
+$lang['otmain_invoice_status_manual']           = 'manual';
+$lang['otmain_invoice_status_automatic']        = 'Automatic (follow payments / due date)';
+$lang['otmain_invoice_status_override_help']    = 'Manually set invoice status. Choose Automatic to let Perfex recalculate from payments and due date.';
+$lang['otmain_invoice_status_updated']          = 'Invoice status set to %s (manual override).';
+$lang['otmain_invoice_status_automatic_success']= 'Invoice status is automatic again.';
+$lang['otmain_invoice_status_invalid']          = 'Invalid invoice status.';
+$lang['otmain_invoice_status_overridden']       = 'Invoice status manually overridden';
+$lang['otmain_invoice_status_set_automatic']    = 'Invoice status returned to automatic';
