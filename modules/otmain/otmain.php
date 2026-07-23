@@ -41,6 +41,7 @@ hooks()->add_action('after_proposal_deleted', 'otmain_item_tracker_on_proposal_d
 hooks()->add_action('after_invoice_added', 'otmain_sync_invoice_proposal_backlink');
 hooks()->add_action('invoice_updated', 'otmain_sync_invoice_proposal_backlink_on_update');
 hooks()->add_action('before_invoice_preview_more_menu_button', 'otmain_render_invoice_status_dropdown');
+hooks()->add_action('after_total_summary_invoicehtml', 'otmain_render_invoicehtml_converted_total');
 hooks()->add_action('clients_init', 'otmain_item_tracker_client_menu');
 
 hooks()->add_filter('sales_number_format', 'otmain_sales_number_format', 10, 2);
@@ -655,6 +656,29 @@ function otmain_render_invoice_status_dropdown($invoice)
     $CI->load->view('otmain/invoice_status_dropdown', [
         'invoice' => $invoice,
     ]);
+}
+
+/**
+ * Client "view as customer" — show manual other-currency total under invoice totals.
+ * Hidden for standard EUR invoices when TOTAL USD (display) is empty.
+ *
+ * @param object $invoice
+ */
+function otmain_render_invoicehtml_converted_total($invoice)
+{
+    $converted = otmain_get_manual_converted_total($invoice);
+    if (!$converted) {
+        return;
+    }
+
+    echo '<div class="col-md-6 col-md-offset-6">'
+        . '<table class="table text-right tw-text-normal"><tbody>'
+        . '<tr>'
+        . '<td><span class="bold tw-text-neutral-700">' . e($converted['label']) . '</span></td>'
+        . '<td>' . e($converted['value']) . '</td>'
+        . '</tr>'
+        . '</tbody></table>'
+        . '</div>';
 }
 
 function otmain_render_proposal_fields($proposal = null)

@@ -1341,6 +1341,46 @@ function otmain_currency_label_code($currency)
 }
 
 /**
+ * Manual other-currency total (TOTAL USD display field).
+ * Only when explicitly filled — EUR invoices must not show a second currency automatically.
+ *
+ * @param object|array $document
+ * @return array{label:string,value:string}|null
+ */
+function otmain_get_manual_converted_total($document)
+{
+    $display = '';
+    if (is_object($document) && isset($document->total_usd_display)) {
+        $display = trim((string) $document->total_usd_display);
+    } elseif (is_array($document) && isset($document['total_usd_display'])) {
+        $display = trim((string) $document['total_usd_display']);
+    }
+
+    if ($display === '') {
+        return null;
+    }
+
+    $target         = otmain_get_conversion_currency($document);
+    $docCurrencyId  = 0;
+    if (is_object($document) && isset($document->currency)) {
+        $docCurrencyId = (int) $document->currency;
+    } elseif (is_array($document) && isset($document['currency'])) {
+        $docCurrencyId = (int) $document['currency'];
+    }
+    $targetId = $target ? (int) $target->id : 0;
+
+    $label = 'TOTAL USD';
+    if ($target && $targetId > 0 && $targetId !== $docCurrencyId) {
+        $label = 'TOTAL ' . otmain_currency_label_code($target);
+    }
+
+    return [
+        'label' => $label,
+        'value' => $display,
+    ];
+}
+
+/**
  * Get the currency symbol (€, $, etc.) for display in PDFs.
  * Falls back to the display code if no symbol is found.
  *
@@ -1516,24 +1556,12 @@ function otmain_pdf_po_totals_column_html($po, $currencyName = 'EUR')
     // Prefer ISO codes in labels so amounts that already carry $, £, € don't look doubled.
     $currencyLabel = otmain_currency_label_code($currencyName);
 
-    $origUsdDisplay  = isset($po->total_usd_display) ? trim((string) $po->total_usd_display) : '';
     $origGoldDisplay = isset($po->total_gold_display) ? trim((string) $po->total_gold_display) : '';
-    $usdDisplay      = $origUsdDisplay;
     $goldDisplay     = $origGoldDisplay;
     if ($goldDisplay === '0' || $goldDisplay === '0.00' || strtolower($goldDisplay) === '0') {
         $goldDisplay = '';
     }
 
-    $rate   = otmain_get_conversion_rate($po);
-    $target = otmain_get_conversion_currency($po);
-    $docCurrencyId = isset($po->currency) ? (int) $po->currency : 0;
-    $targetId = $target ? (int) $target->id : 0;
-    $canConvert = ($rate > 0 && $target && $targetId > 0 && $targetId !== $docCurrencyId);
-
-    // Auto-calc converted total from Convert to + rate when display override is empty.
-    if ($usdDisplay === '' && $canConvert) {
-        $usdDisplay = otmain_format_money_text(((float) $summary['total']) * $rate, $target);
-    }
     if ($goldDisplay === '') {
         $pricePerGram = (float) str_replace(',', '.', (string) get_option('otmain_gold_price_eur_per_gram'));
         if ($pricePerGram > 0) {
@@ -1549,12 +1577,10 @@ function otmain_pdf_po_totals_column_html($po, $currencyName = 'EUR')
     }
     $html .= '<tr><td align="right"><strong>TOTAL ' . e($currencyLabel) . '</strong></td><td align="right"><strong>' . otmain_pdf_format_total_amount($summary['total'], $currencyName) . '</strong></td></tr>';
 
-    // Show conversion when Convert to + rate are set (or explicit TOTAL USD display override).
-    if ($usdDisplay !== '' && ($canConvert || $origUsdDisplay !== '')) {
-        $convertedLabel = $target
-            ? ('TOTAL ' . otmain_currency_label_code($target))
-            : 'TOTAL CONVERTED';
-        $html .= '<tr><td align="right"><strong>' . e($convertedLabel) . '</strong></td><td align="right">' . e($usdDisplay) . '</td></tr>';
+    // Second currency only when TOTAL USD (display) is filled manually.
+    $converted = otmain_get_manual_converted_total($po);
+    if ($converted) {
+        $html .= '<tr><td align="right"><strong>' . e($converted['label']) . '</strong></td><td align="right">' . e($converted['value']) . '</td></tr>';
     }
     if ($origGoldDisplay !== '') {
         $html .= '<tr><td align="right"><strong>TOTAL GOLD</strong></td><td align="right">' . e($goldDisplay) . '</td></tr>';
@@ -2284,25 +2310,10 @@ function otmain_pdf_totals_column_html($document, $items, $currencyName)
 {
     $byRate = otmain_pdf_calculate_vat_totals($items);
 
-    $origUsdDisplay  = isset($document->total_usd_display) ? trim((string) $document->total_usd_display) : '';
     $origGoldDisplay = isset($document->total_gold_display) ? trim((string) $document->total_gold_display) : '';
-    $usdDisplay      = $origUsdDisplay;
     $goldDisplay     = $origGoldDisplay;
     if ($goldDisplay === '0' || $goldDisplay === '0.00' || strtolower($goldDisplay) === '0') {
         $goldDisplay = '';
-    }
-
-    $rate   = otmain_get_conversion_rate($document);
-    $target = otmain_get_conversion_currency($document);
-    $docCurrencyId = isset($document->currency) ? (int) $document->currency : 0;
-    $targetId = $target ? (int) $target->id : 0;
-    $canConvert = ($rate > 0 && $target && $targetId > 0 && $targetId !== $docCurrencyId);
-
-    // Auto-calc when display fields are empty (requires options / document rate).
-    if ($usdDisplay === '' && $canConvert) {
-        $usdDisplay = otmain_format_money_text(((float) $document->total) * $rate, $target);
-    } elseif (!$canConvert && $usdDisplay === '') {
-        $usdDisplay = '';
     }
 
     if ($goldDisplay === '') {
@@ -2332,13 +2343,11 @@ function otmain_pdf_totals_column_html($document, $items, $currencyName)
     $currencyLabel = otmain_currency_label_code($currencyName);
     $html .= '<tr><td align="right" width="70%"><strong>TOTAL ' . e($currencyLabel) . '</strong></td><td ' . $cellAmt . '><strong>' . otmain_pdf_format_total_amount($document->total, $currencyName) . '</strong></td></tr>';
 
-    // Show conversion when Convert to + rate are set, or when TOTAL USD display override is filled.
-    if ($usdDisplay !== '' && ($canConvert || $origUsdDisplay !== '')) {
-        $convertedLabel = 'TOTAL CONVERTED';
-        if ($target) {
-            $convertedLabel = 'TOTAL ' . otmain_currency_label_code($target);
-        }
-        $html .= '<tr><td align="right" width="70%"><strong>' . e($convertedLabel) . '</strong></td><td ' . $cellAmt . '>' . e($usdDisplay) . '</td></tr>';
+    // Second currency only when TOTAL USD (display) is filled manually —
+    // European EUR invoices must not show double currency automatically.
+    $converted = otmain_get_manual_converted_total($document);
+    if ($converted) {
+        $html .= '<tr><td align="right" width="70%"><strong>' . e($converted['label']) . '</strong></td><td ' . $cellAmt . '>' . e($converted['value']) . '</td></tr>';
     }
 
     // Gold row — only shown when total_gold_display was EXPLICITLY set on the document
