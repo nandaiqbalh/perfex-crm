@@ -80,10 +80,12 @@ if ($format == 1) {
 } elseif ($format == 6) {
     if (isset($invoice)) {
         $__number = $invoice->number;
+        $year     = date('Y', strtotime($invoice->date));
     } else {
         $__number = $next_invoice_number;
+        $year     = date('Y');
     }
-    $prefix = date('Y', strtotime(isset($invoice) ? $invoice->date : date('Y-m-d'))) . '-' . get_option('invoice_prefix');
+    $prefix = '<span id="prefix_year">' . $year . '</span>-' . get_option('invoice_prefix');
 }
 
 $_is_draft            = (isset($invoice) && $invoice->status == Invoices_model::STATUS_DRAFT) ? true : false;
