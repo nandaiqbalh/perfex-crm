@@ -2343,6 +2343,30 @@ function otmain_pdf_totals_column_html($document, $items, $currencyName)
     $currencyLabel = otmain_currency_label_code($currencyName);
     $html .= '<tr><td align="right" width="70%"><strong>TOTAL ' . e($currencyLabel) . '</strong></td><td ' . $cellAmt . '><strong>' . otmain_pdf_format_total_amount($document->total, $currencyName) . '</strong></td></tr>';
 
+    // Invoice-only: total paid / credits / amount due (partially paid PDFs).
+    // Gate on total_left_to_pay so proposals/estimates sharing this helper are unchanged.
+    if (isset($document->total_left_to_pay) && isset($document->id)) {
+        if (isset($document->payments) && is_array($document->payments) && count($document->payments) > 0 && get_option('show_total_paid_on_invoice') == 1) {
+            $totalPaid = sum_from_table(db_prefix() . 'invoicepaymentrecords', [
+                'field' => 'amount',
+                'where' => [
+                    'invoiceid' => $document->id,
+                ],
+            ]);
+            $html .= '<tr><td align="right" width="70%"><strong>' . e(_l('invoice_total_paid')) . '</strong></td><td ' . $cellAmt . '>-' . otmain_pdf_format_total_amount($totalPaid, $currencyName) . '</td></tr>';
+        }
+
+        if (get_option('show_credits_applied_on_invoice') == 1 && ($credits_applied = total_credits_applied_to_invoice($document->id))) {
+            $html .= '<tr><td align="right" width="70%"><strong>' . e(_l('applied_credits')) . '</strong></td><td ' . $cellAmt . '>-' . otmain_pdf_format_total_amount($credits_applied, $currencyName) . '</td></tr>';
+        }
+
+        if (get_option('show_amount_due_on_invoice') == 1 && (int) ($document->status ?? 0) !== Invoices_model::STATUS_CANCELLED) {
+            $dueStyle = ((float) $document->total_left_to_pay > 0) ? 'color:#fc2d42;' : '';
+            $cellDue  = 'align="right" width="30%" style="white-space:nowrap;' . $dueStyle . '"';
+            $html .= '<tr><td align="right" width="70%" style="' . $dueStyle . '"><strong>' . e(_l('invoice_amount_due')) . '</strong></td><td ' . $cellDue . '><strong>' . otmain_pdf_format_total_amount($document->total_left_to_pay, $currencyName) . '</strong></td></tr>';
+        }
+    }
+
     // Second currency only when TOTAL USD (display) is filled manually —
     // European EUR invoices must not show double currency automatically.
     $converted = otmain_get_manual_converted_total($document);
