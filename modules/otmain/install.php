@@ -389,6 +389,24 @@ foreach ($options as $name => $value) {
     }
 }
 
+// Allow deleting any invoice (not only the highest-ID / "last" invoice).
+// Core setting "Delete invoice allowed only on last invoice" hid Delete on older invoices.
+if (get_option('otmain_allow_delete_any_invoice') !== '1') {
+    update_option('delete_only_on_last_invoice', '0');
+    add_option('otmain_allow_delete_any_invoice', '1');
+    update_option('otmain_allow_delete_any_invoice', '1');
+}
+
+// Existing proposal attachments were uploaded with visible_to_customer=0, so they
+// appear in admin "Proposal Files" but not on client view / admin View-as-client.
+if (get_option('otmain_proposal_attachments_visible_v1') !== '1') {
+    $CI->db->where('rel_type', 'proposal');
+    $CI->db->where('visible_to_customer', 0);
+    $CI->db->update(db_prefix() . 'files', ['visible_to_customer' => 1]);
+    add_option('otmain_proposal_attachments_visible_v1', '1');
+    update_option('otmain_proposal_attachments_visible_v1', '1');
+}
+
 // Prefixes / terms: only on Activate (Deactivate → Activate). Additive DDL always runs.
 if (!empty($GLOBALS['OTMAIN_APPLY_FORCED_OPTIONS'])) {
     update_option('estimate_prefix', 'OTMSQ-');

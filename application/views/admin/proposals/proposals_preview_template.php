@@ -360,7 +360,7 @@ if (count($tags) > 0) {
                                     $icon    = 'fa-toggle-off';
                                     $tooltip = _l('show_to_customer');
                                 } else {
-                                    $icon    = 'fa-toggle-on';
+                                    $icon    = 'fa-toggle-on text-success';
                                     $tooltip = _l('hide_from_customer');
                                 } ?>
                                 <a href="#" data-toggle="tooltip"

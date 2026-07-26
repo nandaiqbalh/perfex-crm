@@ -161,6 +161,12 @@ class Misc_model extends App_Model
             }
         }
 
+        // Staff-uploaded proposal files must be visible on the client proposal view
+        // (and when admin uses View / eye). Default DB value is 0 = hidden.
+        if (!isset($data['visible_to_customer']) && $rel_type === 'proposal') {
+            $data['visible_to_customer'] = 1;
+        }
+
         $data['attachment_key'] = app_generate_hash();
 
         if ($external == false) {
