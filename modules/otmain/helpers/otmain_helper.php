@@ -1341,8 +1341,52 @@ function otmain_currency_label_code($currency)
 }
 
 /**
- * Manual other-currency total (TOTAL USD display field).
- * Only when explicitly filled — EUR invoices must not show a second currency automatically.
+ * Document-level conversion rate only (no settings fallback).
+ *
+ * @param mixed $document
+ * @return float
+ */
+function otmain_get_document_conversion_rate($document = null)
+{
+    $fromDoc = null;
+    if (is_object($document) && isset($document->conversion_rate) && $document->conversion_rate !== '' && $document->conversion_rate !== null) {
+        $fromDoc = $document->conversion_rate;
+    } elseif (is_array($document) && array_key_exists('conversion_rate', $document) && $document['conversion_rate'] !== '' && $document['conversion_rate'] !== null) {
+        $fromDoc = $document['conversion_rate'];
+    }
+
+    if ($fromDoc === null) {
+        return 0.0;
+    }
+
+    $rate = (float) str_replace(',', '.', (string) $fromDoc);
+
+    return $rate > 0 ? $rate : 0.0;
+}
+
+/**
+ * Document-level convert-to currency id only (no settings fallback).
+ *
+ * @param mixed $document
+ * @return int
+ */
+function otmain_get_document_conversion_currency_id($document = null)
+{
+    if (is_object($document) && isset($document->conversion_currency) && $document->conversion_currency !== '' && $document->conversion_currency !== null) {
+        return (int) $document->conversion_currency;
+    }
+    if (is_array($document) && !empty($document['conversion_currency'])) {
+        return (int) $document['conversion_currency'];
+    }
+
+    return 0;
+}
+
+/**
+ * Other-currency total for PDF / customer view.
+ * 1) Manual TOTAL USD (display) override when filled.
+ * 2) Else auto-calc total × document conversion rate when Convert to ≠ document currency.
+ * Standard EUR invoices without an explicit convert-to / rate do not get a second row.
  *
  * @param object|array $document
  * @return array{label:string,value:string}|null
@@ -1356,27 +1400,48 @@ function otmain_get_manual_converted_total($document)
         $display = trim((string) $document['total_usd_display']);
     }
 
-    if ($display === '') {
-        return null;
-    }
-
-    $target         = otmain_get_conversion_currency($document);
-    $docCurrencyId  = 0;
+    $docCurrencyId = 0;
     if (is_object($document) && isset($document->currency)) {
         $docCurrencyId = (int) $document->currency;
     } elseif (is_array($document) && isset($document['currency'])) {
         $docCurrencyId = (int) $document['currency'];
     }
-    $targetId = $target ? (int) $target->id : 0;
+
+    $targetId = otmain_get_document_conversion_currency_id($document);
+    $target   = $targetId > 0 ? get_currency($targetId) : null;
 
     $label = 'TOTAL USD';
-    if ($target && $targetId > 0 && $targetId !== $docCurrencyId) {
+    if ($target && $targetId > 0) {
         $label = 'TOTAL ' . otmain_currency_label_code($target);
+    }
+
+    if ($display !== '') {
+        return [
+            'label' => $label,
+            'value' => $display,
+        ];
+    }
+
+    // Auto-calc only with document-level Convert to + rate (not settings defaults).
+    if ($targetId < 1 || $targetId === $docCurrencyId || !$target) {
+        return null;
+    }
+
+    $rate = otmain_get_document_conversion_rate($document);
+    $total = 0.0;
+    if (is_object($document) && isset($document->total)) {
+        $total = (float) $document->total;
+    } elseif (is_array($document) && isset($document['total'])) {
+        $total = (float) $document['total'];
+    }
+
+    if ($rate <= 0 || $total == 0.0) {
+        return null;
     }
 
     return [
         'label' => $label,
-        'value' => $display,
+        'value' => otmain_format_money_text($total * $rate, $target),
     ];
 }
 
@@ -1577,7 +1642,7 @@ function otmain_pdf_po_totals_column_html($po, $currencyName = 'EUR')
     }
     $html .= '<tr><td align="right"><strong>TOTAL ' . e($currencyLabel) . '</strong></td><td align="right"><strong>' . otmain_pdf_format_total_amount($summary['total'], $currencyName) . '</strong></td></tr>';
 
-    // Second currency only when TOTAL USD (display) is filled manually.
+    // Second currency: manual display, or auto total × document conversion rate.
     $converted = otmain_get_manual_converted_total($po);
     if ($converted) {
         $html .= '<tr><td align="right"><strong>' . e($converted['label']) . '</strong></td><td align="right">' . e($converted['value']) . '</td></tr>';
@@ -2367,8 +2432,7 @@ function otmain_pdf_totals_column_html($document, $items, $currencyName)
         }
     }
 
-    // Second currency only when TOTAL USD (display) is filled manually —
-    // European EUR invoices must not show double currency automatically.
+    // Second currency: manual TOTAL USD display, or auto total × document conversion rate.
     $converted = otmain_get_manual_converted_total($document);
     if ($converted) {
         $html .= '<tr><td align="right" width="70%"><strong>' . e($converted['label']) . '</strong></td><td ' . $cellAmt . '>' . e($converted['value']) . '</td></tr>';

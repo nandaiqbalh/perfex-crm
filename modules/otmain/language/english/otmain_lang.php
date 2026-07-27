@@ -26,6 +26,7 @@ $lang['otmain_notes']                = 'Notes';
 $lang['otmain_contact_person_email'] = 'Email Address';
 $lang['otmain_contact_person_phone'] = 'Phone Number';
 $lang['otmain_total_usd_display']    = 'TOTAL USD (display)';
+$lang['otmain_total_usd_display_help'] = 'Auto-filled from document total × conversion rate when Convert to differs. Edit to override, or clear to hide the second currency on the PDF.';
 $lang['otmain_total_gold_display']   = 'TOTAL GOLD (display)';
 $lang['otmain_bank_details']        = 'Bank Details';
 $lang['otmain_consignee']           = 'Consignee';

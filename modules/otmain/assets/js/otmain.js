@@ -531,6 +531,174 @@
         }
     }
 
+    /**
+     * Parse a rate that may use comma as decimal separator (e.g. 1,17).
+     */
+    function otmainParseRate(value) {
+        if (value === undefined || value === null || value === '') {
+            return 0;
+        }
+        var s = String(value).trim().replace(/\s/g, '');
+        if (s.indexOf(',') !== -1 && s.indexOf('.') !== -1) {
+            // 1.211,187 or 1,211.187 — treat last separator as decimal
+            if (s.lastIndexOf(',') > s.lastIndexOf('.')) {
+                s = s.replace(/\./g, '').replace(',', '.');
+            } else {
+                s = s.replace(/,/g, '');
+            }
+        } else {
+            s = s.replace(',', '.');
+        }
+        var n = parseFloat(s);
+        return isNaN(n) ? 0 : n;
+    }
+
+    /**
+     * Format converted total like PHP otmain_format_money_text / seed PDFs.
+     */
+    function otmainFormatConvertedDisplay(amount, currencyCode, currencySymbol) {
+        var code = otmainCurrencyDisplayCode(currencyCode, currencySymbol);
+        var formatted;
+        if (typeof format_money === 'function') {
+            formatted = format_money(amount, true);
+        } else if (typeof accounting !== 'undefined' && accounting.formatNumber) {
+            formatted = accounting.formatNumber(
+                amount,
+                app.options.decimal_places,
+                app.options.thousand_separator,
+                app.options.decimal_separator
+            );
+        } else {
+            formatted = amount.toFixed(2);
+        }
+        if (code === '$' || code === '€' || code === '£') {
+            return code + ' ' + formatted;
+        }
+        if (code === 'USD') {
+            return '$ ' + formatted;
+        }
+        return formatted + ' ' + code;
+    }
+
+    function otmainSalesFormRoot() {
+        if ($('body').find('.invoice-form').length) {
+            return $('.invoice-form').first();
+        }
+        if ($('body').find('.proposal').length || $('#proposal-form').length) {
+            return $('#proposal-form').length ? $('#proposal-form') : $('form').has('input[name="total_usd_display"]').first();
+        }
+        if ($('body').find('.estimate-form').length) {
+            return $('.estimate-form').first();
+        }
+        if ($('#otmain-purchase-order-form').length) {
+            return $('#otmain-purchase-order-form');
+        }
+        return $('form').has('input[name="total_usd_display"]').first();
+    }
+
+    /**
+     * Fill TOTAL USD (display) from document total × conversion rate when Convert to differs.
+     * @param {boolean} force overwrite even if marked manual / empty
+     */
+    function otmainSyncConvertedTotalDisplay(force) {
+        var $form = otmainSalesFormRoot();
+        if (!$form || !$form.length) {
+            return;
+        }
+        var $usd = $form.find('input[name="total_usd_display"]');
+        if (!$usd.length) {
+            return;
+        }
+
+        var hasValue = $.trim($usd.val() || '') !== '';
+        if (!force) {
+            // Keep empty fields empty on line-item edits; only refresh auto/existing values.
+            if ($usd.data('otmain-usd-manual')) {
+                return;
+            }
+            if (!$usd.data('otmain-usd-auto') && !hasValue) {
+                return;
+            }
+        }
+
+        var $docCur = $form.find('select[name="currency"]');
+        var $convCur = $form.find('select[name="conversion_currency"]');
+        var $rateInput = $form.find('input[name="conversion_rate"]');
+        if (!$convCur.length || !$rateInput.length) {
+            return;
+        }
+
+        var docId = String($docCur.val() || '');
+        var targetId = String($convCur.val() || '');
+        if (!targetId || (docId && targetId === docId)) {
+            if (force && $usd.data('otmain-usd-auto')) {
+                $usd.val('');
+                $usd.data('otmain-usd-auto', false);
+            }
+            return;
+        }
+
+        var rate = otmainParseRate($rateInput.val());
+        if (rate <= 0) {
+            return;
+        }
+
+        var total = 0;
+        var $hiddenTotal = $form.find('input[name="total"]').last();
+        if ($hiddenTotal.length) {
+            total = otmainParseRate($hiddenTotal.val());
+        }
+        if (!total && $('#otmain-po-total').length) {
+            total = otmainParseRate($('#otmain-po-total').text());
+        }
+        if (!total) {
+            return;
+        }
+
+        var $opt = $convCur.find('option:selected');
+        var name = ($opt.text() || '').toString().trim();
+        var symbol = ($opt.attr('data-subtext') || '').toString().trim();
+        var display = otmainFormatConvertedDisplay(total * rate, name, symbol);
+
+        $usd.val(display);
+        $usd.data('otmain-usd-manual', false);
+        $usd.data('otmain-usd-auto', true);
+    }
+
+    function otmainBindConvertedTotalSync() {
+        var hasField = $('input[name="total_usd_display"]').length &&
+            ($('body').find('.invoice-form').length ||
+                $('body').find('.proposal').length ||
+                $('body').find('.estimate-form').length ||
+                $('#proposal-form').length ||
+                $('#otmain-purchase-order-form').length);
+        if (!hasField) {
+            return;
+        }
+
+        $('body').on('input change', 'input[name="conversion_rate"]', function() {
+            otmainSyncConvertedTotalDisplay(true);
+        });
+        $('body').on('changed.bs.select change', 'select[name="conversion_currency"], select[name="currency"]', function() {
+            otmainSyncConvertedTotalDisplay(true);
+        });
+        $('body').on('input', 'input[name="total_usd_display"]', function() {
+            $(this).data('otmain-usd-manual', true);
+            $(this).data('otmain-usd-auto', false);
+        });
+        $(document).on('sales-total-calculated', function() {
+            otmainSyncConvertedTotalDisplay(false);
+        });
+
+        // Refresh an existing TOTAL USD display from current total × rate (leave empty fields empty).
+        setTimeout(function() {
+            var $usd = $('input[name="total_usd_display"]');
+            if ($usd.length && $.trim($usd.val()) !== '') {
+                otmainSyncConvertedTotalDisplay(true);
+            }
+        }, 400);
+    }
+
     function otmainRecalculatePackingTotals() {
         var subtotal = 0;
         var totalTax = 0;
@@ -727,6 +895,7 @@
 
     $(function() {
         otmainEnsureCurrencySelectable();
+        otmainBindConvertedTotalSync();
 
         // bootstrap-select inside inactive Edit tabs needs a refresh once visible
         $('a[data-toggle="tab"][href="#tab_edit"]').on('shown.bs.tab', function() {
@@ -1129,6 +1298,7 @@
         $('#otmain-po-subtotal').text(subtotal.toFixed(2));
         $('#otmain-po-total').html('<strong>' + (subtotal + totalTax).toFixed(2) + '</strong>');
         otmainUpdateCurrencyLabels($('#otmain-purchase-order-form'), '#otmain-po-subtotal-label', '#otmain-po-total-label');
+        otmainSyncConvertedTotalDisplay(false);
     }
 
     if ($('#otmain-purchase-order-form').length) {

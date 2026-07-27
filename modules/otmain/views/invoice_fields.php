@@ -150,6 +150,7 @@ $invoice = $invoice ?? null;
         $value = isset($invoice) ? ($invoice->total_usd_display ?? '') : '';
         echo render_input('total_usd_display', _l('otmain_total_usd_display'), $value, 'text', ['placeholder' => 'e.g. 9,00 USD']);
         ?>
+        <p class="text-muted"><?php echo _l('otmain_total_usd_display_help'); ?></p>
     </div>
     <div class="col-md-12">
         <?php
