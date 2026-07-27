@@ -1383,6 +1383,80 @@ function otmain_get_document_conversion_currency_id($document = null)
 }
 
 /**
+ * Parse a free-form money display string to float.
+ * Examples: "$ 32.034,60" → 32034.60, "18064.80" → 18064.80
+ *
+ * @param mixed $display
+ * @return float|null
+ */
+function otmain_parse_display_amount($display)
+{
+    $s = trim((string) $display);
+    if ($s === '') {
+        return null;
+    }
+
+    $s = preg_replace('/[^\d.,\-]/', '', $s);
+    if ($s === '' || $s === '-' || $s === '.' || $s === ',') {
+        return null;
+    }
+
+    if (strpos($s, ',') !== false && strpos($s, '.') !== false) {
+        if (strrpos($s, ',') > strrpos($s, '.')) {
+            // European: 32.034,60
+            $s = str_replace('.', '', $s);
+            $s = str_replace(',', '.', $s);
+        } else {
+            // US: 32,034.60
+            $s = str_replace(',', '', $s);
+        }
+    } else {
+        $s = str_replace(',', '.', $s);
+    }
+
+    if (!is_numeric($s)) {
+        return null;
+    }
+
+    return (float) $s;
+}
+
+/**
+ * Resolve conversion rate for a document: saved rate, else infer from TOTAL USD display ÷ total.
+ *
+ * @param mixed $document
+ * @return float
+ */
+function otmain_resolve_document_conversion_rate($document)
+{
+    $rate = otmain_get_document_conversion_rate($document);
+    if ($rate > 0) {
+        return $rate;
+    }
+
+    $display = '';
+    $total   = 0.0;
+    if (is_object($document)) {
+        $display = isset($document->total_usd_display) ? trim((string) $document->total_usd_display) : '';
+        $total   = isset($document->total) ? (float) $document->total : 0.0;
+    } elseif (is_array($document)) {
+        $display = isset($document['total_usd_display']) ? trim((string) $document['total_usd_display']) : '';
+        $total   = isset($document['total']) ? (float) $document['total'] : 0.0;
+    }
+
+    if ($display === '' || $total <= 0) {
+        return 0.0;
+    }
+
+    $parsed = otmain_parse_display_amount($display);
+    if ($parsed === null || $parsed <= 0) {
+        return 0.0;
+    }
+
+    return $parsed / $total;
+}
+
+/**
  * Other-currency total for PDF / customer view.
  * 1) Manual TOTAL USD (display) override when filled.
  * 2) Else auto-calc total × document conversion rate when Convert to ≠ document currency.
@@ -1442,6 +1516,91 @@ function otmain_get_manual_converted_total($document)
     return [
         'label' => $label,
         'value' => otmain_format_money_text($total * $rate, $target),
+    ];
+}
+
+/**
+ * Invoice converted total for customer HTML / PDF.
+ * When amount due is shown, convert the due amount (red "Totaal verschuldigd"), not the whole invoice total.
+ *
+ * @param object|array $invoice
+ * @return array{label:string,value:string}|null
+ */
+function otmain_get_invoice_converted_total($invoice)
+{
+    if (!$invoice) {
+        return null;
+    }
+
+    $status = is_object($invoice) ? (int) ($invoice->status ?? 0) : (int) ($invoice['status'] ?? 0);
+    $hasDue = is_object($invoice)
+        ? isset($invoice->total_left_to_pay)
+        : array_key_exists('total_left_to_pay', $invoice);
+
+    $showAmountDue = $hasDue
+        && get_option('show_amount_due_on_invoice') == 1
+        && $status !== Invoices_model::STATUS_CANCELLED;
+
+    if (!$showAmountDue) {
+        return otmain_get_manual_converted_total($invoice);
+    }
+
+    $display = '';
+    $docCurrencyId = 0;
+    $invoiceTotal = 0.0;
+    $amountDue = 0.0;
+
+    if (is_object($invoice)) {
+        $display       = isset($invoice->total_usd_display) ? trim((string) $invoice->total_usd_display) : '';
+        $docCurrencyId = isset($invoice->currency) ? (int) $invoice->currency : 0;
+        $invoiceTotal  = isset($invoice->total) ? (float) $invoice->total : 0.0;
+        $amountDue     = (float) $invoice->total_left_to_pay;
+    } else {
+        $display       = isset($invoice['total_usd_display']) ? trim((string) $invoice['total_usd_display']) : '';
+        $docCurrencyId = isset($invoice['currency']) ? (int) $invoice['currency'] : 0;
+        $invoiceTotal  = isset($invoice['total']) ? (float) $invoice['total'] : 0.0;
+        $amountDue     = (float) $invoice['total_left_to_pay'];
+    }
+
+    $targetId = otmain_get_document_conversion_currency_id($invoice);
+    $target   = $targetId > 0 ? get_currency($targetId) : null;
+
+    // Intent: manual TOTAL USD display, or explicit Convert to ≠ document currency.
+    if ($display === '' && ($targetId < 1 || $targetId === $docCurrencyId)) {
+        return null;
+    }
+
+    if (!$target) {
+        $target = otmain_get_conversion_currency($invoice);
+        $targetId = $target ? (int) $target->id : 0;
+    }
+
+    if (!$target) {
+        return null;
+    }
+
+    $label = 'TOTAL ' . otmain_currency_label_code($target);
+
+    // Unpaid / no reduction: due equals total — manual override can be shown as-is.
+    if ($display !== '' && abs($amountDue - $invoiceTotal) < 0.00001) {
+        return [
+            'label' => $label,
+            'value' => $display,
+        ];
+    }
+
+    if ($amountDue <= 0) {
+        return null;
+    }
+
+    $rate = otmain_resolve_document_conversion_rate($invoice);
+    if ($rate <= 0) {
+        return null;
+    }
+
+    return [
+        'label' => $label,
+        'value' => otmain_format_money_text($amountDue * $rate, $target),
     ];
 }
 
@@ -2432,10 +2591,20 @@ function otmain_pdf_totals_column_html($document, $items, $currencyName)
         }
     }
 
-    // Second currency: manual TOTAL USD display, or auto total × document conversion rate.
-    $converted = otmain_get_manual_converted_total($document);
+    // Second currency: for invoices with amount due, convert the due amount (not whole total).
+    $converted = isset($document->total_left_to_pay)
+        ? otmain_get_invoice_converted_total($document)
+        : otmain_get_manual_converted_total($document);
     if ($converted) {
-        $html .= '<tr><td align="right" width="70%"><strong>' . e($converted['label']) . '</strong></td><td ' . $cellAmt . '>' . e($converted['value']) . '</td></tr>';
+        $convStyle = '';
+        if (isset($document->total_left_to_pay)
+            && get_option('show_amount_due_on_invoice') == 1
+            && (int) ($document->status ?? 0) !== Invoices_model::STATUS_CANCELLED
+            && (float) $document->total_left_to_pay > 0) {
+            $convStyle = 'color:#fc2d42;';
+        }
+        $cellConv = 'align="right" width="30%" style="white-space:nowrap;' . $convStyle . '"';
+        $html .= '<tr><td align="right" width="70%" style="' . $convStyle . '"><strong>' . e($converted['label']) . '</strong></td><td ' . $cellConv . '>' . e($converted['value']) . '</td></tr>';
     }
 
     // Gold row — only shown when total_gold_display was EXPLICITLY set on the document

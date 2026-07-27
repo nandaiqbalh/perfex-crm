@@ -660,22 +660,29 @@ function otmain_render_invoice_status_dropdown($invoice)
 
 /**
  * Client "view as customer" — other-currency total under invoice totals.
- * Shows manual TOTAL USD (display), or auto total × rate when Convert to differs.
+ * Converts the amount due (red) when present; otherwise the whole invoice total.
  *
  * @param object $invoice
  */
 function otmain_render_invoicehtml_converted_total($invoice)
 {
-    $converted = otmain_get_manual_converted_total($invoice);
+    $converted = otmain_get_invoice_converted_total($invoice);
     if (!$converted) {
         return;
+    }
+
+    $dueStyle = '';
+    if (isset($invoice->total_left_to_pay) && (float) $invoice->total_left_to_pay > 0
+        && get_option('show_amount_due_on_invoice') == 1
+        && (int) ($invoice->status ?? 0) !== Invoices_model::STATUS_CANCELLED) {
+        $dueStyle = ' text-danger';
     }
 
     echo '<div class="col-md-6 col-md-offset-6">'
         . '<table class="table text-right tw-text-normal"><tbody>'
         . '<tr>'
-        . '<td><span class="bold tw-text-neutral-700">' . e($converted['label']) . '</span></td>'
-        . '<td>' . e($converted['value']) . '</td>'
+        . '<td><span class="bold tw-text-neutral-700' . $dueStyle . '">' . e($converted['label']) . '</span></td>'
+        . '<td class="' . trim($dueStyle) . '">' . e($converted['value']) . '</td>'
         . '</tr>'
         . '</tbody></table>'
         . '</div>';
