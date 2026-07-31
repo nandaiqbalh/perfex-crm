@@ -335,9 +335,29 @@ if (!$CI->db->field_exists('quotation_status', db_prefix() . 'proposals')) {
         COMMENT 'pending|in_progress|ready_for_shipment|shipped' AFTER `status`");
 }
 
-// Expense: payment until date + expense payment modes
+// Expense: payment until date + amount paid + expense payment modes
 if ($CI->db->table_exists(db_prefix() . 'expenses') && !$CI->db->field_exists('payment_until', db_prefix() . 'expenses')) {
     $CI->db->query('ALTER TABLE `' . db_prefix() . 'expenses` ADD `payment_until` DATE NULL DEFAULT NULL');
+}
+
+if ($CI->db->table_exists(db_prefix() . 'expenses') && !$CI->db->field_exists('amount_paid', db_prefix() . 'expenses')) {
+    $CI->db->query('ALTER TABLE `' . db_prefix() . 'expenses` ADD `amount_paid` DECIMAL(15,2) NULL DEFAULT NULL');
+
+    // Backfill: expenses with a payment mode were previously treated as Paid.
+    $expensesTable = db_prefix() . 'expenses';
+    $taxesTable    = db_prefix() . 'taxes';
+    $CI->db->query(
+        'UPDATE `' . $expensesTable . '` e
+         SET e.`amount_paid` = ROUND(
+            e.`amount`
+            + IFNULL((SELECT t1.taxrate FROM `' . $taxesTable . '` t1 WHERE t1.id = e.tax LIMIT 1), 0) * e.`amount` / 100
+            + IFNULL((SELECT t2.taxrate FROM `' . $taxesTable . '` t2 WHERE t2.id = e.tax2 LIMIT 1), 0) * e.`amount` / 100
+         , 2)
+         WHERE e.`amount_paid` IS NULL
+           AND e.`paymentmode` IS NOT NULL
+           AND e.`paymentmode` != \'\'
+           AND e.`paymentmode` != \'0\''
+    );
 }
 
 if ($CI->db->table_exists(db_prefix() . 'payment_modes')) {

@@ -71,9 +71,13 @@ hooks()->add_action('before_expense_form_template_close', 'otmain_render_expense
 hooks()->add_action('after_left_panel_expense_preview_template', 'otmain_render_expense_preview_fields');
 hooks()->add_filter('before_expense_added', 'otmain_before_expense_save');
 hooks()->add_filter('before_expense_updated', 'otmain_before_expense_save', 10, 2);
+hooks()->add_action('after_expense_added', 'otmain_after_expense_saved_reminder');
+hooks()->add_action('expense_updated', 'otmain_on_expense_updated_reminder');
+hooks()->add_action('after_expense_deleted', 'otmain_after_expense_deleted_reminder');
 hooks()->add_filter('expenses_table_columns', 'otmain_expenses_table_columns');
 hooks()->add_filter('expenses_table_sql_columns', 'otmain_expenses_table_sql_columns');
 hooks()->add_filter('expenses_table_row_data', 'otmain_expenses_table_row_data', 10, 2);
+hooks()->add_filter('calendar_data', 'otmain_expenses_calendar_data', 10, 2);
 
 // Free-form VAT % on sales line items (invoice / estimate / proposal / credit note)
 // and OT-Main custom docs (packing list / purchase order via their own forms).
@@ -120,55 +124,149 @@ function otmain_enable_currency_select($attrs)
 }
 
 /**
- * Whether an expense is considered paid (has a payment mode).
+ * Expense total including tax (same formula as expenses DataTable).
  *
+ * @param object|array|null $expense
+ * @return float
+ */
+function otmain_expense_total_amount($expense)
+{
+    if (!$expense) {
+        return 0.0;
+    }
+
+    $amount = (float) (is_array($expense) ? ($expense['amount'] ?? 0) : ($expense->amount ?? 0));
+    $taxId  = (int) (is_array($expense) ? ($expense['tax'] ?? 0) : ($expense->tax ?? 0));
+    $tax2Id = (int) (is_array($expense) ? ($expense['tax2'] ?? 0) : ($expense->tax2 ?? 0));
+    $total  = $amount;
+
+    if ($taxId > 0) {
+        $tax = get_tax_by_id($taxId);
+        if ($tax) {
+            $total += ($amount / 100 * (float) $tax->taxrate);
+        }
+    }
+    if ($tax2Id > 0) {
+        $tax = get_tax_by_id($tax2Id);
+        if ($tax) {
+            $total += ($amount / 100 * (float) $tax->taxrate);
+        }
+    }
+
+    return round($total, get_decimal_places());
+}
+
+/**
+ * Amount paid stored on the expense (0 if empty).
+ *
+ * @param object|array|null $expense
+ * @return float
+ */
+function otmain_expense_amount_paid($expense)
+{
+    if (!$expense) {
+        return 0.0;
+    }
+
+    $raw = is_array($expense) ? ($expense['amount_paid'] ?? null) : ($expense->amount_paid ?? null);
+    if ($raw === null || $raw === '') {
+        return 0.0;
+    }
+
+    return (float) str_replace(',', '.', (string) $raw);
+}
+
+/**
+ * Payment status key: not_paid | partially_paid | paid
+ *
+ * @param object|array|null $expense
+ * @return string
+ */
+function otmain_expense_payment_status_key($expense)
+{
+    $paid  = otmain_expense_amount_paid($expense);
+    $total = otmain_expense_total_amount($expense);
+
+    if ($paid <= 0) {
+        return 'not_paid';
+    }
+    if ($total > 0 && $paid + 0.00001 >= $total) {
+        return 'paid';
+    }
+    if ($total <= 0 && $paid > 0) {
+        return 'paid';
+    }
+
+    return 'partially_paid';
+}
+
+/**
  * @param object|array|null $expense
  * @return bool
  */
 function otmain_expense_is_paid($expense)
 {
-    if (!$expense) {
-        return false;
-    }
-
-    $mode = is_array($expense) ? ($expense['paymentmode'] ?? '') : ($expense->paymentmode ?? '');
-
-    return $mode !== '' && $mode !== null && (string) $mode !== '0';
+    return otmain_expense_payment_status_key($expense) === 'paid';
 }
 
 /**
- * Paid / Not paid + Payment until fields on the expense form.
+ * HTML badge for expense payment status.
+ *
+ * @param string $statusKey
+ * @return string
+ */
+function otmain_expense_payment_status_badge($statusKey)
+{
+    if ($statusKey === 'paid') {
+        return '<span class="label label-success">' . _l('otmain_expense_paid') . '</span>';
+    }
+    if ($statusKey === 'partially_paid') {
+        return '<span class="label label-warning">' . _l('otmain_expense_partially_paid') . '</span>';
+    }
+
+    return '<span class="label label-default">' . _l('otmain_expense_not_paid') . '</span>';
+}
+
+/**
+ * Amount paid + Payment until fields on the expense form.
  *
  * @param object|null $expense
  */
 function otmain_render_expense_form_fields($expense = null)
 {
-    $isPaid = otmain_expense_is_paid($expense);
+    $amountPaid = '';
+    if ($expense && isset($expense->amount_paid) && $expense->amount_paid !== null && $expense->amount_paid !== '') {
+        $amountPaid = (string) $expense->amount_paid;
+    }
+
     $paymentUntil = '';
     if ($expense && !empty($expense->payment_until) && $expense->payment_until !== '0000-00-00') {
         $paymentUntil = _d($expense->payment_until);
     }
 
+    $statusKey = otmain_expense_payment_status_key($expense);
+
     echo '<div id="otmain-expense-payment-fields" class="tw-mt-4 tw-mb-2">';
+    echo '<div class="form-group" app-field-wrapper="amount_paid">';
+    echo '<label for="otmain_expense_amount_paid" class="control-label">' . _l('otmain_expense_amount_paid') . '</label>';
+    echo '<input type="number" id="otmain_expense_amount_paid" name="amount_paid" class="form-control" step="any" min="0" value="' . e($amountPaid) . '" placeholder="0">';
+    echo '<p class="text-muted tw-mt-1 tw-mb-0">' . _l('otmain_expense_amount_paid_help') . '</p>';
+    echo '</div>';
     echo '<div class="form-group">';
     echo '<label class="control-label">' . _l('otmain_expense_payment_status') . '</label>';
-    echo '<div class="tw-flex tw-gap-4 tw-mt-1">';
-    echo '<div class="radio radio-primary radio-inline">';
-    echo '<input type="radio" id="otmain_expense_paid" name="otmain_expense_is_paid" value="1"' . ($isPaid ? ' checked' : '') . '>';
-    echo '<label for="otmain_expense_paid">' . _l('otmain_expense_paid') . '</label>';
-    echo '</div>';
-    echo '<div class="radio radio-primary radio-inline">';
-    echo '<input type="radio" id="otmain_expense_not_paid" name="otmain_expense_is_paid" value="0"' . (!$isPaid ? ' checked' : '') . '>';
-    echo '<label for="otmain_expense_not_paid">' . _l('otmain_expense_not_paid') . '</label>';
-    echo '</div>';
-    echo '</div>';
+    echo '<div id="otmain-expense-payment-status-preview" class="tw-mt-1"'
+        . ' data-label-paid="' . e(_l('otmain_expense_paid')) . '"'
+        . ' data-label-partial="' . e(_l('otmain_expense_partially_paid')) . '"'
+        . ' data-label-unpaid="' . e(_l('otmain_expense_not_paid')) . '"'
+        . ' data-msg-mode-required="' . e(_l('otmain_expense_payment_mode_required')) . '">'
+        . otmain_expense_payment_status_badge($statusKey) . '</div>';
     echo '</div>';
     echo render_date_input('payment_until', 'otmain_expense_payment_until', $paymentUntil);
     echo '</div>';
 }
 
 /**
- * Show paid status and payment until on expense preview.
+ * Show payment status, amount paid, and payment until on expense preview.
  *
  * @param object $expense
  */
@@ -178,15 +276,20 @@ function otmain_render_expense_preview_fields($expense)
         return;
     }
 
-    $isPaid = otmain_expense_is_paid($expense);
+    $statusKey = otmain_expense_payment_status_key($expense);
     echo '<p class="bold mbot5">' . _l('otmain_expense_payment_status') . '</p>';
-    echo '<p class="mbot15">';
-    if ($isPaid) {
-        echo '<span class="label label-success">' . _l('otmain_expense_paid') . '</span>';
-    } else {
-        echo '<span class="label label-default">' . _l('otmain_expense_not_paid') . '</span>';
+    echo '<p class="mbot15">' . otmain_expense_payment_status_badge($statusKey) . '</p>';
+
+    $amountPaid = otmain_expense_amount_paid($expense);
+    if ($amountPaid > 0) {
+        $currency = isset($expense->currency_name) ? $expense->currency_name : '';
+        if ($currency === '' && !empty($expense->currency)) {
+            $cur = get_currency($expense->currency);
+            $currency = $cur ? $cur->name : '';
+        }
+        echo '<p class="bold mbot5">' . _l('otmain_expense_amount_paid') . '</p>';
+        echo '<p class="mbot15 text-muted">' . e(app_format_money($amountPaid, $currency)) . '</p>';
     }
-    echo '</p>';
 
     if (!empty($expense->payment_until) && $expense->payment_until !== '0000-00-00') {
         echo '<p class="bold mbot5">' . _l('otmain_expense_payment_until') . '</p>';
@@ -207,16 +310,33 @@ function otmain_before_expense_save($data, $id = null)
         return $data;
     }
 
-    $isPaid = isset($data['otmain_expense_is_paid']) && (string) $data['otmain_expense_is_paid'] === '1';
+    // Legacy radio field — ignore if still posted.
     unset($data['otmain_expense_is_paid']);
 
-    if (!$isPaid) {
-        $data['paymentmode'] = '';
-    } else {
+    if (array_key_exists('amount_paid', $data)) {
+        $raw = trim((string) $data['amount_paid']);
+        if ($raw === '') {
+            $data['amount_paid'] = null;
+        } else {
+            $data['amount_paid'] = (float) str_replace(',', '.', $raw);
+            if ($data['amount_paid'] < 0) {
+                $data['amount_paid'] = 0;
+            }
+            if ($data['amount_paid'] == 0.0) {
+                $data['amount_paid'] = null;
+            }
+        }
+    }
+
+    $amountPaid = isset($data['amount_paid']) && $data['amount_paid'] !== null
+        ? (float) $data['amount_paid']
+        : 0.0;
+
+    if ($amountPaid > 0) {
         $mode = $data['paymentmode'] ?? '';
         if ($mode === '' || $mode === null || (string) $mode === '0') {
             set_alert('danger', _l('otmain_expense_payment_mode_required'));
-            $data['paymentmode'] = '';
+            // Keep amount_paid; do not wipe paymentmode encoding — leave empty so user can fix.
         }
     }
 
@@ -235,7 +355,7 @@ function otmain_before_expense_save($data, $id = null)
 }
 
 /**
- * Add Status + Payment until headers after payment mode.
+ * Put Payment status + Payment until near the front (after #).
  *
  * @param array $columns
  * @return array
@@ -246,34 +366,40 @@ function otmain_expenses_table_columns($columns)
         return $columns;
     }
 
-    $paymentLabel = _l('expense_dt_table_heading_payment_mode');
-    $insert = [
-        _l('otmain_expense_payment_status'),
-        _l('otmain_expense_payment_until'),
-    ];
-    $new = [];
-    $inserted = false;
+    $statusLabel = _l('otmain_expense_payment_status');
+    $untilLabel  = _l('otmain_expense_payment_until');
+
+    // Remove if previously appended elsewhere.
+    $columns = array_values(array_filter($columns, static function ($col) use ($statusLabel, $untilLabel) {
+        $name = is_array($col) ? ($col['name'] ?? '') : $col;
+
+        return $name !== $statusLabel && $name !== $untilLabel;
+    }));
+
+    $hashLabel = _l('the_number_sign');
+    $new       = [];
+    $inserted  = false;
 
     foreach ($columns as $col) {
         $new[] = $col;
-        $name = is_array($col) ? ($col['name'] ?? '') : $col;
-        if (!$inserted && $name === $paymentLabel) {
-            foreach ($insert as $label) {
-                $new[] = $label;
-            }
-            $inserted = true;
+        $name  = is_array($col) ? ($col['name'] ?? '') : $col;
+        if (!$inserted && $name === $hashLabel) {
+            $new[]     = $statusLabel;
+            $new[]     = $untilLabel;
+            $inserted  = true;
         }
     }
 
     if (!$inserted) {
-        $new = array_merge($new, $insert);
+        // After checkbox (index 0) if present, else at start.
+        array_splice($new, min(1, count($new)), 0, [$statusLabel, $untilLabel]);
     }
 
     return $new;
 }
 
 /**
- * Select payment_until (and a paid-flag alias) for the expenses datatable.
+ * Select amount_paid + payment_until after the id column (aligned with early headers).
  *
  * @param array $aColumns
  * @return array
@@ -284,21 +410,39 @@ function otmain_expenses_table_sql_columns($aColumns)
         return $aColumns;
     }
 
-    $new = [];
+    $new      = [];
+    $inserted = false;
     foreach ($aColumns as $col) {
-        $new[] = $col;
-        if ($col === 'paymentmode') {
-            // Keep header/SQL index alignment for Status + Payment until columns.
-            $new[] = 'paymentmode as otmain_expense_paid_flag';
-            $new[] = db_prefix() . 'expenses.payment_until as payment_until';
+        // Drop legacy aliases from older OT-Main versions.
+        if (is_string($col) && (
+            strpos($col, 'otmain_expense_paid_flag') !== false
+            || preg_match('/\bas amount_paid\b/', $col)
+            || preg_match('/\bas payment_until\b/', $col)
+        )) {
+            continue;
         }
+        $new[] = $col;
+        if (!$inserted && is_string($col) && (
+            $col === db_prefix() . 'expenses.id as id'
+            || substr($col, -6) === '.id as id'
+            || $col === 'id'
+        )) {
+            $new[]     = db_prefix() . 'expenses.amount_paid as amount_paid';
+            $new[]     = db_prefix() . 'expenses.payment_until as payment_until';
+            $inserted  = true;
+        }
+    }
+
+    if (!$inserted) {
+        $new[] = db_prefix() . 'expenses.amount_paid as amount_paid';
+        $new[] = db_prefix() . 'expenses.payment_until as payment_until';
     }
 
     return $new;
 }
 
 /**
- * Inject Status + Payment until cells after the payment mode cell.
+ * Inject Status + Payment until cells after the # column.
  *
  * @param array $row
  * @param array $aRow
@@ -310,10 +454,7 @@ function otmain_expenses_table_row_data($row, $aRow)
         return $row;
     }
 
-    $isPaid = otmain_expense_is_paid($aRow);
-    $statusHtml = $isPaid
-        ? '<span class="label label-success">' . _l('otmain_expense_paid') . '</span>'
-        : '<span class="label label-default">' . _l('otmain_expense_not_paid') . '</span>';
+    $statusHtml = otmain_expense_payment_status_badge(otmain_expense_payment_status_key($aRow));
 
     $untilHtml = '';
     if (!empty($aRow['payment_until']) && $aRow['payment_until'] !== '0000-00-00') {
@@ -321,7 +462,7 @@ function otmain_expenses_table_row_data($row, $aRow)
     }
 
     $cells = [];
-    $meta = [];
+    $meta  = [];
     foreach ($row as $key => $value) {
         if (is_int($key)) {
             $cells[] = $value;
@@ -330,8 +471,8 @@ function otmain_expenses_table_row_data($row, $aRow)
         }
     }
 
-    $cfCount = count(get_custom_fields('expenses', ['show_on_table' => 1]));
-    $insertAt = max(0, count($cells) - $cfCount);
+    // After checkbox (0) and # (1) → insert at index 2.
+    $insertAt = min(2, count($cells));
     array_splice($cells, $insertAt, 0, [$statusHtml, $untilHtml]);
 
     $newRow = $cells;
@@ -341,6 +482,182 @@ function otmain_expenses_table_row_data($row, $aRow)
 
     return $newRow;
 }
+
+/**
+ * Calendar events for unpaid / partially paid expense payment_until dates.
+ *
+ * @param array $data
+ * @param array $config
+ * @return array
+ */
+function otmain_expenses_calendar_data($data, $config = [])
+{
+    if (!is_array($data) || !is_staff_logged_in() || staff_cant('view', 'expenses')) {
+        return $data;
+    }
+
+    $start = $config['start'] ?? '';
+    $end   = $config['end'] ?? '';
+    if ($start === '' || $end === '') {
+        return $data;
+    }
+
+    $CI = &get_instance();
+    $CI->db->select(db_prefix() . 'expenses.id, expense_name, payment_until, amount, amount_paid, tax, tax2, ' . db_prefix() . 'expenses_categories.name as category_name');
+    $CI->db->from(db_prefix() . 'expenses');
+    $CI->db->join(db_prefix() . 'expenses_categories', db_prefix() . 'expenses_categories.id = ' . db_prefix() . 'expenses.category', 'left');
+    $CI->db->where(db_prefix() . 'expenses.payment_until IS NOT NULL', null, false);
+    $CI->db->where(db_prefix() . 'expenses.payment_until !=', '0000-00-00');
+    $CI->db->where(db_prefix() . 'expenses.payment_until >=', $start);
+    $CI->db->where(db_prefix() . 'expenses.payment_until <=', $end);
+    $rows = $CI->db->get()->result_array();
+
+    foreach ($rows as $row) {
+        $status = otmain_expense_payment_status_key($row);
+        if ($status === 'paid') {
+            continue;
+        }
+
+        $name = trim((string) ($row['expense_name'] ?? ''));
+        if ($name === '') {
+            $name = trim((string) ($row['category_name'] ?? ''));
+        }
+        if ($name === '') {
+            $name = '#' . (int) $row['id'];
+        }
+
+        $title = _l('otmain_expense_calendar_payment_due') . ': ' . $name;
+        $data[] = [
+            'title'    => $title,
+            '_tooltip' => $title,
+            'date'     => $row['payment_until'],
+            'color'    => '#f59e0b',
+            'url'      => admin_url('expenses/list_expenses/' . (int) $row['id']),
+        ];
+    }
+
+    return $data;
+}
+
+/**
+ * @param int $expenseId
+ */
+function otmain_after_expense_saved_reminder($expenseId)
+{
+    otmain_sync_expense_payment_reminder((int) $expenseId);
+}
+
+/**
+ * @param array $payload
+ */
+function otmain_on_expense_updated_reminder($payload)
+{
+    $id = is_array($payload) ? (int) ($payload['id'] ?? 0) : 0;
+    if ($id > 0) {
+        otmain_sync_expense_payment_reminder($id);
+    }
+}
+
+/**
+ * @param int $expenseId
+ */
+function otmain_after_expense_deleted_reminder($expenseId)
+{
+    otmain_delete_expense_payment_reminders((int) $expenseId);
+}
+
+/**
+ * Upsert / delete OT-Main payment-due staff reminder for an expense.
+ *
+ * @param int $expenseId
+ */
+function otmain_sync_expense_payment_reminder($expenseId)
+{
+    $expenseId = (int) $expenseId;
+    if ($expenseId < 1) {
+        return;
+    }
+
+    $CI = &get_instance();
+    $CI->load->model('expenses_model');
+    $expense = $CI->expenses_model->get($expenseId);
+    if (!$expense) {
+        otmain_delete_expense_payment_reminders($expenseId);
+
+        return;
+    }
+
+    $status = otmain_expense_payment_status_key($expense);
+    $until  = !empty($expense->payment_until) && $expense->payment_until !== '0000-00-00'
+        ? $expense->payment_until
+        : null;
+
+    if ($status === 'paid' || !$until) {
+        otmain_delete_expense_payment_reminders($expenseId);
+
+        return;
+    }
+
+    $prefix = _l('otmain_expense_reminder_prefix');
+    $name   = trim((string) ($expense->expense_name ?? ''));
+    if ($name === '') {
+        $name = '#' . $expenseId;
+    }
+    $description = $prefix . ' ' . $name;
+
+    $staffId = get_staff_user_id();
+    if (!$staffId && !empty($expense->addedfrom)) {
+        $staffId = (int) $expense->addedfrom;
+    }
+    if (!$staffId) {
+        return;
+    }
+
+    // Reminder datetime: payment_until at 09:00
+    $reminderDate = $until . ' 09:00:00';
+
+    $CI->db->where('rel_type', 'expense');
+    $CI->db->where('rel_id', $expenseId);
+    $CI->db->like('description', $prefix, 'after');
+    $existing = $CI->db->get(db_prefix() . 'reminders')->row();
+
+    $payload = [
+        'description'     => $description,
+        'date'            => $reminderDate,
+        'staff'           => $staffId,
+        'notify_by_email' => 1,
+        'isnotified'      => 0,
+    ];
+
+    if ($existing) {
+        $CI->db->where('id', (int) $existing->id);
+        $CI->db->update(db_prefix() . 'reminders', $payload);
+    } else {
+        $payload['rel_type'] = 'expense';
+        $payload['rel_id']   = $expenseId;
+        $payload['creator']  = $staffId;
+        $CI->db->insert(db_prefix() . 'reminders', $payload);
+    }
+}
+
+/**
+ * @param int $expenseId
+ */
+function otmain_delete_expense_payment_reminders($expenseId)
+{
+    $expenseId = (int) $expenseId;
+    if ($expenseId < 1) {
+        return;
+    }
+
+    $CI     = &get_instance();
+    $prefix = _l('otmain_expense_reminder_prefix');
+    $CI->db->where('rel_type', 'expense');
+    $CI->db->where('rel_id', $expenseId);
+    $CI->db->like('description', $prefix, 'after');
+    $CI->db->delete(db_prefix() . 'reminders');
+}
+
 
 function otmain_disable_sales_pdf_signature($process)
 {
@@ -574,7 +891,7 @@ function otmain_admin_footer_assets()
     }
 
     if (strpos($uri, 'expenses/expense') !== false) {
-        echo '<script src="' . module_dir_url(OTMAIN_MODULE_NAME, 'assets/js/otmain-expenses.js') . '?v=1.0.0"></script>';
+        echo '<script src="' . module_dir_url(OTMAIN_MODULE_NAME, 'assets/js/otmain-expenses.js') . '?v=1.1.0"></script>';
     }
 
     if (strpos($uri, 'otmain/item_tracker') !== false) {

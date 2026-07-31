@@ -156,9 +156,14 @@ $lang['otmain_view_details']              = 'View Details';
 // Expenses
 $lang['otmain_expense_paid']                    = 'Paid';
 $lang['otmain_expense_not_paid']                = 'Not paid';
+$lang['otmain_expense_partially_paid']          = 'Partially paid';
+$lang['otmain_expense_amount_paid']             = 'Amount paid';
+$lang['otmain_expense_amount_paid_help']        = 'Status is automatic: Not paid (0), Partially paid (some), Paid (full total including tax).';
 $lang['otmain_expense_payment_status']          = 'Payment status';
 $lang['otmain_expense_payment_until']           = 'Payment until';
-$lang['otmain_expense_payment_mode_required']   = 'Payment method is required when the expense is marked as Paid.';
+$lang['otmain_expense_payment_mode_required']   = 'Payment method is required when amount paid is greater than zero.';
+$lang['otmain_expense_calendar_payment_due']    = 'Expense payment due';
+$lang['otmain_expense_reminder_prefix']         = 'OT-Main payment due:';
 
 // Invoice status override
 $lang['otmain_invoice_status']                  = 'Status';
