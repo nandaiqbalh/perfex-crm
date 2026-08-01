@@ -864,7 +864,8 @@ class Clients extends ClientsController
             $to   = $this->input->get('to');
         }
 
-        $data['statement'] = $this->clients_model->get_statement(get_client_user_id(), to_sql_date($from), to_sql_date($to));
+        $currency_id = $this->input->get('currency');
+        $data['statement'] = $this->clients_model->get_statement(get_client_user_id(), to_sql_date($from), to_sql_date($to), $currency_id);
 
         $data['from'] = $from;
         $data['to']   = $to;
@@ -935,7 +936,8 @@ class Clients extends ClientsController
         $data['statement'] = $this->clients_model->get_statement(
             get_client_user_id(),
             to_sql_date($from),
-            to_sql_date($to)
+            to_sql_date($to),
+            $this->input->get('currency')
         );
 
         try {

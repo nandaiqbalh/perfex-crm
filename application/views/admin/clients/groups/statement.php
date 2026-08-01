@@ -6,7 +6,27 @@
     <div class="col-md-4">
         <?php $this->load->view('admin/clients/groups/_statement_period_select', ['onChange' => 'render_customer_statement()']); ?>
     </div>
-    <div class="col-md-8 col-xs-12">
+    <div class="col-md-3">
+        <?php
+        $statementCurrencies = $statement_currencies ?? [];
+        $selectedCurrency    = $statement_currency_id ?? '';
+        if (!empty($statementCurrencies)) {
+            echo render_select(
+                'statement_currency',
+                $statementCurrencies,
+                ['id', 'name', 'symbol'],
+                'currency',
+                $selectedCurrency,
+                ['data-width' => '100%'],
+                [],
+                '',
+                '',
+                false
+            );
+        }
+        ?>
+    </div>
+    <div class="col-md-5 col-xs-12">
         <div class="text-right _buttons pull-right tw-space-x-1">
 
             <a href="#" id="statement_print" target="_blank" class="btn btn-default btn-with-tooltip sm:!tw-px-3"
@@ -118,6 +138,9 @@ function parse_customer_statement_html()
 { ?>
 <script>
     $(function() {
+        $('#statement_currency').on('changed.bs.select change', function() {
+            render_customer_statement();
+        });
         render_customer_statement();
     });
 
@@ -142,6 +165,10 @@ function parse_customer_statement_html()
         statementUrlParams['customer_id'] = customer_id;
         statementUrlParams['from'] = period[0];
         statementUrlParams['to'] = period[1];
+        var statementCurrency = $('#statement_currency').val();
+        if (statementCurrency) {
+            statementUrlParams['currency'] = statementCurrency;
+        }
         statementUrl = buildUrl(statementUrl, statementUrlParams);
 
         $.get(statementUrl, function(response) {

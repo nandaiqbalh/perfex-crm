@@ -184,6 +184,9 @@ class Clients extends AdminController
                 }
 
                 $data = array_merge($data, prepare_mail_preview_data('customer_statement', $id));
+                $this->load->model('statement_model');
+                $data['statement_currencies'] = $this->statement_model->get_statement_currencies_for_customer($id);
+                $data['statement_currency_id'] = $this->statement_model->resolve_statement_currency_id($id);
             } elseif ($group == 'map') {
                 if (get_option('google_api_key') != '' && !empty($client->latitude) && !empty($client->longitude)) {
                     $this->app_scripts->add('map-js', base_url($this->app_scripts->core_file('assets/js', 'map.js')) . '?v=' . $this->app_css->core_version());
@@ -1017,10 +1020,11 @@ class Clients extends AdminController
             redirect(admin_url('clients/client/' . $customer_id));
         }
 
-        $from = $this->input->get('from');
-        $to   = $this->input->get('to');
+        $from        = $this->input->get('from');
+        $to          = $this->input->get('to');
+        $currency_id = $this->input->get('currency');
 
-        $data['statement'] = $this->clients_model->get_statement($customer_id, to_sql_date($from), to_sql_date($to));
+        $data['statement'] = $this->clients_model->get_statement($customer_id, to_sql_date($from), to_sql_date($to), $currency_id);
 
         try {
             $pdf = statement_pdf($data['statement']);
@@ -1050,13 +1054,14 @@ class Clients extends AdminController
             redirect(admin_url('clients/client/' . $customer_id));
         }
 
-        $from = $this->input->get('from');
-        $to   = $this->input->get('to');
+        $from        = $this->input->get('from');
+        $to          = $this->input->get('to');
+        $currency_id = $this->input->get('currency');
 
         $send_to = $this->input->post('send_to');
         $cc      = $this->input->post('cc');
 
-        $success = $this->clients_model->send_statement_to_email($customer_id, $send_to, $from, $to, $cc);
+        $success = $this->clients_model->send_statement_to_email($customer_id, $send_to, $from, $to, $cc, $currency_id);
         // In case client use another language
         load_admin_language();
         if ($success) {
@@ -1079,8 +1084,9 @@ class Clients extends AdminController
         $customer_id = $this->input->get('customer_id');
         $from        = $this->input->get('from');
         $to          = $this->input->get('to');
+        $currency_id = $this->input->get('currency');
 
-        $data['statement'] = $this->clients_model->get_statement($customer_id, to_sql_date($from), to_sql_date($to));
+        $data['statement'] = $this->clients_model->get_statement($customer_id, to_sql_date($from), to_sql_date($to), $currency_id);
 
         $data['from'] = $from;
         $data['to']   = $to;

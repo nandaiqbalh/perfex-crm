@@ -1510,11 +1510,12 @@ class Clients_model extends App_Model
     * @param  mixed $customer_id customer id
     * @param  string $from        date from
     * @param  string $to          date to
+    * @param  mixed  $currency_id optional currency filter
     * @return array
     */
-    public function get_statement($customer_id, $from, $to)
+    public function get_statement($customer_id, $from, $to, $currency_id = null)
     {
-        return $this->statement_model->get_statement($customer_id, $from, $to);
+        return $this->statement_model->get_statement($customer_id, $from, $to, $currency_id);
     }
 
     /**
@@ -1524,11 +1525,12 @@ class Clients_model extends App_Model
     * @param  string $from        date from
     * @param  string $to          date to
     * @param  string $cc          email CC
+    * @param  mixed  $currency_id optional currency filter
     * @return boolean
     */
-    public function send_statement_to_email($customer_id, $send_to, $from, $to, $cc = '')
+    public function send_statement_to_email($customer_id, $send_to, $from, $to, $cc = '', $currency_id = null)
     {
-        return $this->statement_model->send_statement_to_email($customer_id, $send_to, $from, $to, $cc);
+        return $this->statement_model->send_statement_to_email($customer_id, $send_to, $from, $to, $cc, $currency_id);
     }
 
     /**
