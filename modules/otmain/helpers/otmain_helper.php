@@ -2089,10 +2089,38 @@ function otmain_pdf_meta_kv_table_html(array $rows, $labelWidth = '40%', $alignR
     return '<table cellpadding="1" cellspacing="0" width="100%" style="' . otmain_pdf_meta_text_style() . '">' . $html . '</table>';
 }
 
-function otmain_pdf_company_contact_block_html($alignRight = false, $includeBankDetails = false, $currencyName = '')
+/**
+ * Company contact email printed on OT-Main PDFs, per document type.
+ *
+ * @param string $type invoice|proposal|quotation|estimate|packing_list, or a full email
+ * @return string
+ */
+function otmain_pdf_company_email($type = 'proposal')
+{
+    $type = trim((string) $type);
+    if ($type !== '' && strpos($type, '@') !== false) {
+        return $type;
+    }
+
+    $type = strtolower(str_replace(['-', ' '], '_', $type));
+
+    $emails = [
+        'invoice'             => 'inv@otmain.com',
+        'commercial_invoice'  => 'inv@otmain.com',
+        'proposal'            => 'sales@otmain.com',
+        'quotation'           => 'sales@otmain.com',
+        'estimate'            => 'sales@otmain.com',
+        'packing_list'        => 'info@otmain.com',
+        'packing'             => 'info@otmain.com',
+    ];
+
+    return $emails[$type] ?? 'sales@otmain.com';
+}
+
+function otmain_pdf_company_contact_block_html($alignRight = false, $includeBankDetails = false, $currencyName = '', $emailType = 'proposal')
 {
     $phone   = get_option('invoice_company_phonenumber') ?: '+31618228651';
-    $email   = get_option('smtp_email') ?: 'sales@otmain.com';
+    $email   = otmain_pdf_company_email($emailType);
     $website = get_option('companywebsite') ?: 'www.otmain.com';
     $vat     = get_option('company_vat') ?: 'NL004830818B51';
     $coc     = get_option('company_registration_number') ?: '90597427';
@@ -2169,14 +2197,14 @@ function otmain_pdf_company_contact_block_html($alignRight = false, $includeBank
     return $html;
 }
 
-function otmain_pdf_company_meta_block($alignRight = false)
+function otmain_pdf_company_meta_block($alignRight = false, $emailType = 'proposal')
 {
-    return otmain_pdf_company_contact_block_html($alignRight, false);
+    return otmain_pdf_company_contact_block_html($alignRight, false, '', $emailType);
 }
 
 function otmain_pdf_invoice_right_column_html($currencyName)
 {
-    return otmain_pdf_company_contact_block_html(true, true, $currencyName);
+    return otmain_pdf_company_contact_block_html(true, true, $currencyName, 'invoice');
 }
 
 function otmain_pdf_right_column_wrap_html($content)
@@ -2759,7 +2787,7 @@ function otmain_pdf_proposal_footer_html($proposal, $items, $currencyName)
 function otmain_pdf_shipper_block_html()
 {
     $phone   = get_option('invoice_company_phonenumber') ?: '+31618228651';
-    $email   = get_option('smtp_email') ?: 'sales@otmain.com';
+    $email   = otmain_pdf_company_email('packing_list');
     $website = get_option('companywebsite') ?: 'www.otmain.com';
     $address = get_option('invoice_company_address') ?: 'Bajonetstraat 52';
     $city    = get_option('invoice_company_city') ?: 'Rotterdam';
@@ -2871,7 +2899,7 @@ function otmain_pdf_packing_header_html($packing)
     $logo     = otmain_pdf_logo_url(130);
     $title    = !empty($packing->document_title) ? $packing->document_title : 'Packing List & Invoice';
     $leftMeta = otmain_pdf_packing_left_block_html($packing);
-    $rightMeta = otmain_pdf_right_column_wrap_html(otmain_pdf_company_meta_block(true));
+    $rightMeta = otmain_pdf_right_column_wrap_html(otmain_pdf_company_meta_block(true, 'packing_list'));
 
     return '<table cellpadding="2" cellspacing="0" width="100%">'
         . '<tr>'
