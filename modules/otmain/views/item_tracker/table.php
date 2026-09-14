@@ -37,7 +37,7 @@ $additionalSelect = [
     $p . '.rel_type as rel_type',
     $p . '.rel_id as rel_id',
     $p . '.subject as subject',
-    '(SELECT COUNT(*) FROM ' . $t . ' ti WHERE ti.rel_type = \'proposal\' AND ti.rel_id = ' . $p . '.id AND ti.deleted_at IS NULL AND ti.item_status = \'received\') as item_received',
+    '(SELECT COUNT(*) FROM ' . $t . ' ti WHERE ti.rel_type = \'proposal\' AND ti.rel_id = ' . $p . '.id AND ti.deleted_at IS NULL AND ti.item_status IN (\'received\',\'delivered\')) as item_received',
     '(SELECT ti.invoice_id FROM ' . $t . ' ti WHERE ti.rel_type = \'proposal\' AND ti.rel_id = ' . $p . '.id AND ti.invoice_id IS NOT NULL AND ti.deleted_at IS NULL LIMIT 1) as tracker_invoice_id',
 ];
 

@@ -130,12 +130,58 @@ class Item_tracker extends AdminController
         $data['invoice']            = $invoice;
         $data['no_tracker']         = false;
         $data['progress']           = $this->item_tracker_model->get_progress($proposal_id);
-        $data['item_statuses']      = otmain_item_tracker_status_options();
-        $data['quotation_statuses'] = otmain_quotation_status_options();
-        $data['title']              = _l('otmain_item_tracker') . ' / ' . format_proposal_number($proposal_id);
-        $data['currency']           = get_currency($proposal->currency);
+        $data['item_statuses']            = otmain_item_tracker_status_options();
+        $data['quotation_statuses']       = otmain_quotation_status_options();
+        $data['vendor_payment_statuses']  = otmain_vendor_payment_status_options();
+        $data['attachments']              = $this->item_tracker_model->get_attachments($proposal_id);
+        $data['title']                    = _l('otmain_item_tracker') . ' / ' . format_proposal_number($proposal_id);
+        $data['currency']                 = get_currency($proposal->currency);
 
         $this->load->view('item_tracker/detail', $data);
+    }
+
+    /**
+     * Upload attachment for Item Tracker (per quotation).
+     *
+     * @param int $proposal_id
+     */
+    public function upload_attachment($proposal_id = '')
+    {
+        if (staff_cant('edit', 'otmain_item_tracker')) {
+            ajax_access_denied();
+        }
+
+        $proposal_id = (int) $proposal_id;
+        if ($proposal_id < 1 || !$this->item_tracker_model->has_tracker($proposal_id)) {
+            ajax_access_denied();
+        }
+
+        handle_sales_attachments($proposal_id, 'item_tracker');
+    }
+
+    /**
+     * Soft-delete (or hard-delete) an Item Tracker attachment.
+     *
+     * @param int $attachment_id
+     */
+    public function delete_attachment($attachment_id = '')
+    {
+        if (staff_cant('delete', 'otmain_item_tracker') && staff_cant('edit', 'otmain_item_tracker')) {
+            access_denied('otmain_item_tracker');
+        }
+
+        $attachment_id = (int) $attachment_id;
+        $this->db->where('id', $attachment_id);
+        $this->db->where('rel_type', 'item_tracker');
+        $file = $this->db->get(db_prefix() . 'files')->row();
+        if (!$file) {
+            show_404();
+        }
+
+        $proposal_id = (int) $file->rel_id;
+        $this->item_tracker_model->delete_attachment($attachment_id);
+        set_alert('success', _l('deleted', _l('otmain_attachment')));
+        redirect(admin_url('otmain/item_tracker/detail/' . $proposal_id));
     }
 
     public function update_quotation_status($proposal_id = '')

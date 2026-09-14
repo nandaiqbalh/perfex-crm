@@ -168,6 +168,11 @@ class Download extends App_Controller
                 show_404();
             }
 
+            // Soft-deleted files (Recycle Bin): staff only
+            if (!empty($attachment->deleted_at) && !is_staff_logged_in()) {
+                show_404();
+            }
+
             $path = get_upload_path_by_type($attachment->rel_type) . $attachment->rel_id . '/' . $attachment->file_name;
         } elseif ($folder_indicator == 'expense') {
             if (! is_staff_logged_in()) {

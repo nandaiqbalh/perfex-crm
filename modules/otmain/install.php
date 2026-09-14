@@ -335,6 +335,53 @@ if (!$CI->db->field_exists('quotation_status', db_prefix() . 'proposals')) {
         COMMENT 'pending|in_progress|ready_for_shipment|shipped' AFTER `status`");
 }
 
+// Item Tracker: vendor / vendor invoice / vendor payment status (per line)
+$trackerTable = db_prefix() . 'otmain_item_tracker';
+if ($CI->db->table_exists($trackerTable)) {
+    if (!$CI->db->field_exists('supplier_id', $trackerTable)) {
+        $CI->db->query('ALTER TABLE `' . $trackerTable . '` ADD `supplier_id` INT(11) NULL DEFAULT NULL AFTER `admin_notes`');
+        $idxCheck = $CI->db->query("SHOW INDEX FROM `{$trackerTable}` WHERE Key_name = 'supplier_id'")->num_rows();
+        if ($idxCheck < 1) {
+            $CI->db->query("ALTER TABLE `{$trackerTable}` ADD INDEX `supplier_id` (`supplier_id`)");
+        }
+    }
+    if (!$CI->db->field_exists('vendor_invoice_number', $trackerTable)) {
+        $CI->db->query('ALTER TABLE `' . $trackerTable . '` ADD `vendor_invoice_number` VARCHAR(100) NULL DEFAULT NULL AFTER `supplier_id`');
+    }
+    if (!$CI->db->field_exists('vendor_payment_status', $trackerTable)) {
+        $CI->db->query("ALTER TABLE `{$trackerTable}` ADD `vendor_payment_status` VARCHAR(20) NOT NULL DEFAULT 'unpaid' AFTER `vendor_invoice_number`");
+    }
+}
+
+// Multi-currency payment records
+$paymentsTable = db_prefix() . 'invoicepaymentrecords';
+if ($CI->db->table_exists($paymentsTable)) {
+    if (!$CI->db->field_exists('payment_currency', $paymentsTable)) {
+        $CI->db->query('ALTER TABLE `' . $paymentsTable . '` ADD `payment_currency` INT(11) NULL DEFAULT NULL AFTER `amount`');
+    }
+    if (!$CI->db->field_exists('original_amount', $paymentsTable)) {
+        $CI->db->query('ALTER TABLE `' . $paymentsTable . '` ADD `original_amount` DECIMAL(15,2) NULL DEFAULT NULL AFTER `payment_currency`');
+    }
+    if (!$CI->db->field_exists('exchange_rate', $paymentsTable)) {
+        $CI->db->query('ALTER TABLE `' . $paymentsTable . '` ADD `exchange_rate` DECIMAL(15,8) NULL DEFAULT NULL AFTER `original_amount`');
+    }
+}
+
+// Recycle Bin: soft-delete columns on files
+$filesTable = db_prefix() . 'files';
+if ($CI->db->table_exists($filesTable)) {
+    if (!$CI->db->field_exists('deleted_at', $filesTable)) {
+        $CI->db->query('ALTER TABLE `' . $filesTable . '` ADD `deleted_at` DATETIME NULL DEFAULT NULL');
+        $idxCheck = $CI->db->query("SHOW INDEX FROM `{$filesTable}` WHERE Key_name = 'deleted_at'")->num_rows();
+        if ($idxCheck < 1) {
+            $CI->db->query("ALTER TABLE `{$filesTable}` ADD INDEX `deleted_at` (`deleted_at`)");
+        }
+    }
+    if (!$CI->db->field_exists('deleted_by', $filesTable)) {
+        $CI->db->query('ALTER TABLE `' . $filesTable . '` ADD `deleted_by` INT(11) NULL DEFAULT NULL AFTER `deleted_at`');
+    }
+}
+
 // Expense: payment until date + amount paid + expense payment modes
 if ($CI->db->table_exists(db_prefix() . 'expenses') && !$CI->db->field_exists('payment_until', db_prefix() . 'expenses')) {
     $CI->db->query('ALTER TABLE `' . db_prefix() . 'expenses` ADD `payment_until` DATE NULL DEFAULT NULL');

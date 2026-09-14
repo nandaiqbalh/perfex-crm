@@ -4,6 +4,7 @@
 .item-status-ordered,.quote-status-in_progress{background:#3b82f6;color:#fff;}
 .item-status-eta{background:#a855f7;color:#fff;}
 .item-status-quality_check{background:#9ca3af;color:#fff;}
+.item-status-delivered{background:#0ea5e9;color:#fff;}
 .item-status-received,.quote-status-ready_for_shipment{background:#22c55e;color:#fff;}
 .quote-status-shipped{background:#6b7280;color:#fff;}
 .otmain-status-badge{display:inline-block;padding:3px 10px;border-radius:12px;font-size:12px;font-weight:600;line-height:1.4;}

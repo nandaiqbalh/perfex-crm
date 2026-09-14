@@ -9,7 +9,20 @@ class Item_tracker_model extends App_Model
         'ordered',
         'eta',
         'quality_check',
+        'delivered',
         'received',
+    ];
+
+    /** Statuses that count as "done" for progress / ready_for_shipment. */
+    public const ITEM_DONE_STATUSES = [
+        'delivered',
+        'received',
+    ];
+
+    public const VENDOR_PAYMENT_STATUSES = [
+        'unpaid',
+        'paid',
+        'partially_paid',
     ];
 
     public const QUOTATION_STATUSES = [
@@ -422,6 +435,27 @@ class Item_tracker_model extends App_Model
             $update['admin_notes'] = $data['admin_notes'];
         }
 
+        if (array_key_exists('supplier_id', $data)) {
+            $supplierId = (int) $data['supplier_id'];
+            $update['supplier_id'] = $supplierId > 0 ? $supplierId : null;
+        }
+
+        if (array_key_exists('vendor_invoice_number', $data)) {
+            $vin = trim((string) $data['vendor_invoice_number']);
+            $update['vendor_invoice_number'] = $vin !== '' ? $vin : null;
+        }
+
+        if (array_key_exists('vendor_payment_status', $data)) {
+            $vpStatus = $data['vendor_payment_status'];
+            if ($vpStatus === '' || $vpStatus === null) {
+                $vpStatus = 'unpaid';
+            }
+            if (!in_array($vpStatus, self::VENDOR_PAYMENT_STATUSES, true)) {
+                return 'invalid_vendor_payment_status';
+            }
+            $update['vendor_payment_status'] = $vpStatus;
+        }
+
         $this->db->where('id', (int) $item_id);
         $this->db->update($this->table, $update);
 
@@ -455,10 +489,13 @@ class Item_tracker_model extends App_Model
             }
 
             $result = $this->update_item($itemId, [
-                'item_status' => $row['item_status'] ?? $existing->item_status,
-                'eta_date'    => $row['eta_date'] ?? $existing->eta_date,
-                'notes'       => $row['notes'] ?? $existing->notes,
-                'admin_notes' => $row['admin_notes'] ?? $existing->admin_notes,
+                'item_status'            => $row['item_status'] ?? $existing->item_status,
+                'eta_date'               => $row['eta_date'] ?? $existing->eta_date,
+                'notes'                  => $row['notes'] ?? $existing->notes,
+                'admin_notes'            => $row['admin_notes'] ?? $existing->admin_notes,
+                'supplier_id'            => array_key_exists('supplier_id', $row) ? $row['supplier_id'] : ($existing->supplier_id ?? null),
+                'vendor_invoice_number'  => array_key_exists('vendor_invoice_number', $row) ? $row['vendor_invoice_number'] : ($existing->vendor_invoice_number ?? null),
+                'vendor_payment_status'  => array_key_exists('vendor_payment_status', $row) ? $row['vendor_payment_status'] : ($existing->vendor_payment_status ?? 'unpaid'),
             ]);
 
             if ($result !== true) {
@@ -524,18 +561,18 @@ class Item_tracker_model extends App_Model
             return;
         }
 
-        $received   = 0;
+        $done       = 0;
         $nonPending = 0;
         foreach ($items as $item) {
-            if ($item['item_status'] === 'received') {
-                $received++;
+            if (in_array($item['item_status'], self::ITEM_DONE_STATUSES, true)) {
+                $done++;
             }
             if ($item['item_status'] !== 'pending') {
                 $nonPending++;
             }
         }
 
-        if ($received === $total) {
+        if ($done === $total) {
             $newStatus = 'ready_for_shipment';
         } elseif ($nonPending > 0) {
             $newStatus = 'in_progress';
@@ -612,6 +649,7 @@ class Item_tracker_model extends App_Model
 
     /**
      * Progress stats for a proposal tracker.
+     * "received" key counts both delivered and received (done statuses).
      *
      * @param int $proposal_id
      * @return array{total:int,received:int}
@@ -622,7 +660,7 @@ class Item_tracker_model extends App_Model
         $total = count($items);
         $received = 0;
         foreach ($items as $item) {
-            if ($item['item_status'] === 'received') {
+            if (in_array($item['item_status'], self::ITEM_DONE_STATUSES, true)) {
                 $received++;
             }
         }
@@ -648,7 +686,7 @@ class Item_tracker_model extends App_Model
         $sql = "SELECT {$p}.id, {$p}.subject, {$p}.date, {$p}.status, {$p}.quotation_status,
                        {$p}.invoice_id, {$p}.currency, {$p}.hash,
                        (SELECT COUNT(*) FROM {$t} ti WHERE ti.rel_type = 'proposal' AND ti.rel_id = {$p}.id AND ti.deleted_at IS NULL) AS item_total,
-                       (SELECT COUNT(*) FROM {$t} ti WHERE ti.rel_type = 'proposal' AND ti.rel_id = {$p}.id AND ti.deleted_at IS NULL AND ti.item_status = 'received') AS item_received
+                       (SELECT COUNT(*) FROM {$t} ti WHERE ti.rel_type = 'proposal' AND ti.rel_id = {$p}.id AND ti.deleted_at IS NULL AND ti.item_status IN ('received','delivered')) AS item_received
                 FROM {$p}
                 WHERE {$p}.rel_type = 'customer'
                   AND {$p}.rel_id = ?
@@ -682,5 +720,65 @@ class Item_tracker_model extends App_Model
         }
 
         return $proposal;
+    }
+
+    /**
+     * Get Item Tracker attachments for a proposal (active only).
+     *
+     * @param int $proposal_id
+     * @return array
+     */
+    public function get_attachments($proposal_id)
+    {
+        $this->db->where('rel_id', (int) $proposal_id);
+        $this->db->where('rel_type', 'item_tracker');
+        if ($this->db->field_exists('deleted_at', db_prefix() . 'files')) {
+            $this->db->where('deleted_at IS NULL', null, false);
+        }
+        $this->db->order_by('dateadded', 'desc');
+
+        return $this->db->get(db_prefix() . 'files')->result_array();
+    }
+
+    /**
+     * Soft-delete or hard-delete an Item Tracker attachment.
+     * Soft-delete when deleted_at column exists (Recycle Bin).
+     *
+     * @param int $attachment_id
+     * @return bool
+     */
+    public function delete_attachment($attachment_id)
+    {
+        $attachment_id = (int) $attachment_id;
+        $this->db->where('id', $attachment_id);
+        $this->db->where('rel_type', 'item_tracker');
+        $file = $this->db->get(db_prefix() . 'files')->row();
+
+        if (!$file) {
+            return false;
+        }
+
+        if ($this->db->field_exists('deleted_at', db_prefix() . 'files')) {
+            $this->db->where('id', $attachment_id);
+            $this->db->update(db_prefix() . 'files', [
+                'deleted_at' => date('Y-m-d H:i:s'),
+                'deleted_by' => get_staff_user_id(),
+            ]);
+
+            return true;
+        }
+
+        // Fallback hard delete if soft-delete columns not yet migrated
+        if (empty($file->external)) {
+            $path = get_upload_path_by_type('item_tracker') . $file->rel_id . '/' . $file->file_name;
+            if (file_exists($path)) {
+                @unlink($path);
+            }
+        }
+
+        $this->db->where('id', $attachment_id);
+        $this->db->delete(db_prefix() . 'files');
+
+        return true;
     }
 }

@@ -42,8 +42,22 @@
                 </td>
                 <td><?= e(_d($payment['date'])); ?>
                 </td>
-                <td><?= e(app_format_money($payment['amount'], $invoice->currency_name)); ?>
-                </td>
+                <td><?php
+                    echo e(app_format_money($payment['amount'], $invoice->currency_name));
+                    if (!empty($payment['payment_currency'])
+                        && !empty($payment['original_amount'])
+                        && (int) $payment['payment_currency'] !== (int) $invoice->currency
+                    ) {
+                        $payCurrency = get_currency((int) $payment['payment_currency']);
+                        $payName = $payCurrency ? $payCurrency->name : '';
+                        echo '<br /><small class="text-muted">'
+                            . e(app_format_money($payment['original_amount'], $payName));
+                        if (!empty($payment['exchange_rate'])) {
+                            echo ' @ ' . e(rtrim(rtrim(number_format((float) $payment['exchange_rate'], 8, '.', ''), '0'), '.'));
+                        }
+                        echo '</small>';
+                    }
+                ?></td>
                 <td>
                     <div class="tw-flex tw-items-center tw-space-x-2">
                         <a href="<?= admin_url('payments/payment/' . $payment['paymentid']); ?>"

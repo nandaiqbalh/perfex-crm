@@ -3139,8 +3139,37 @@ function otmain_item_tracker_status_options()
         'ordered'       => _l('otmain_status_ordered'),
         'eta'           => _l('otmain_status_eta'),
         'quality_check' => _l('otmain_status_quality_check'),
+        'delivered'     => _l('otmain_status_delivered'),
         'received'      => _l('otmain_status_received'),
     ];
+}
+
+/**
+ * Vendor payment status options for Item Tracker line items.
+ *
+ * @return array
+ */
+function otmain_vendor_payment_status_options()
+{
+    return [
+        'unpaid'         => _l('otmain_vpstatus_unpaid'),
+        'paid'           => _l('otmain_vpstatus_paid'),
+        'partially_paid' => _l('otmain_vpstatus_partially_paid'),
+    ];
+}
+
+/**
+ * Format vendor payment status badge HTML.
+ *
+ * @param string $status
+ * @return string
+ */
+function otmain_format_vendor_payment_status($status)
+{
+    $options = otmain_vendor_payment_status_options();
+    $label   = $options[$status] ?? ucfirst(str_replace('_', ' ', (string) $status));
+
+    return '<span class="otmain-status-badge vpstatus-' . e($status) . '">' . e($label) . '</span>';
 }
 
 /**
@@ -3156,4 +3185,133 @@ function otmain_quotation_status_options()
         'ready_for_shipment' => _l('otmain_qstatus_ready_for_shipment'),
         'shipped'            => _l('otmain_qstatus_shipped'),
     ];
+}
+
+/**
+ * Rel types covered by OT-Main Recycle Bin.
+ *
+ * @return array
+ */
+function otmain_recycle_bin_rel_types()
+{
+    return ['invoice', 'proposal', 'estimate', 'credit_note', 'item_tracker'];
+}
+
+/**
+ * Whether tblfiles has soft-delete columns.
+ *
+ * @return bool
+ */
+function otmain_files_soft_delete_enabled()
+{
+    static $enabled = null;
+    if ($enabled === null) {
+        $CI = &get_instance();
+        $enabled = $CI->db->field_exists('deleted_at', db_prefix() . 'files');
+    }
+
+    return $enabled;
+}
+
+/**
+ * Apply "not deleted" filter to current DB query on tblfiles.
+ */
+function otmain_apply_files_not_deleted_filter()
+{
+    if (otmain_files_soft_delete_enabled()) {
+        get_instance()->db->where(db_prefix() . 'files.deleted_at IS NULL', null, false);
+    }
+}
+
+/**
+ * Soft-delete a file row (move to Recycle Bin). Does not unlink disk file.
+ *
+ * @param object $attachment file row
+ * @param string $activityLabel e.g. Invoice / Proposal
+ * @return bool
+ */
+function otmain_soft_delete_file_row($attachment, $activityLabel = '')
+{
+    if (!$attachment || empty($attachment->id) || !otmain_files_soft_delete_enabled()) {
+        return false;
+    }
+
+    // Already in bin
+    if (!empty($attachment->deleted_at)) {
+        return true;
+    }
+
+    $CI = &get_instance();
+    $CI->db->where('id', (int) $attachment->id);
+    $CI->db->update(db_prefix() . 'files', [
+        'deleted_at' => date('Y-m-d H:i:s'),
+        'deleted_by' => get_staff_user_id(),
+    ]);
+
+    if ($CI->db->affected_rows() > 0) {
+        $label = $activityLabel !== '' ? $activityLabel : ($attachment->rel_type ?? 'File');
+        log_activity($label . ' Attachment Moved to Recycle Bin [FileID: ' . $attachment->id . ', RelID: ' . ($attachment->rel_id ?? '') . ']');
+
+        return true;
+    }
+
+    return false;
+}
+
+/**
+ * Permanently delete a soft-deleted file (unlink + DB row).
+ *
+ * @param object|array $file
+ * @return bool
+ */
+function otmain_permanently_delete_file($file)
+{
+    $file = (object) $file;
+    if (empty($file->id) || empty($file->rel_type)) {
+        return false;
+    }
+
+    $CI = &get_instance();
+
+    if (empty($file->external) && !empty($file->file_name) && !empty($file->rel_id)) {
+        $path = get_upload_path_by_type($file->rel_type) . $file->rel_id . '/' . $file->file_name;
+        if (file_exists($path)) {
+            @unlink($path);
+        }
+        $dir = get_upload_path_by_type($file->rel_type) . $file->rel_id;
+        if (is_dir($dir)) {
+            $remaining = list_files($dir);
+            if (count($remaining) === 0) {
+                @delete_dir($dir);
+            }
+        }
+    }
+
+    $CI->db->where('id', (int) $file->id);
+    $CI->db->delete(db_prefix() . 'files');
+
+    return $CI->db->affected_rows() > 0;
+}
+
+/**
+ * Restore a soft-deleted file from Recycle Bin.
+ *
+ * @param int $file_id
+ * @return bool
+ */
+function otmain_restore_file($file_id)
+{
+    if (!otmain_files_soft_delete_enabled()) {
+        return false;
+    }
+
+    $CI = &get_instance();
+    $CI->db->where('id', (int) $file_id);
+    $CI->db->where_in('rel_type', otmain_recycle_bin_rel_types());
+    $CI->db->update(db_prefix() . 'files', [
+        'deleted_at' => null,
+        'deleted_by' => null,
+    ]);
+
+    return $CI->db->affected_rows() > 0;
 }

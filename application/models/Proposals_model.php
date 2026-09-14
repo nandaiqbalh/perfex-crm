@@ -419,6 +419,9 @@ class Proposals_model extends App_Model
             $this->db->where('rel_id', $proposal_id);
         }
         $this->db->where('rel_type', 'proposal');
+        if (function_exists('otmain_apply_files_not_deleted_filter')) {
+            otmain_apply_files_not_deleted_filter();
+        }
         $result = $this->db->get(db_prefix() . 'files');
         if (is_numeric($id)) {
             return $result->row();
@@ -439,6 +442,13 @@ class Proposals_model extends App_Model
         $attachment = $this->get_attachments('', $id);
         $deleted    = false;
         if ($attachment) {
+            if (function_exists('otmain_files_soft_delete_enabled')
+                && otmain_files_soft_delete_enabled()
+                && function_exists('otmain_soft_delete_file_row')
+            ) {
+                return otmain_soft_delete_file_row($attachment, 'Proposal');
+            }
+
             if (empty($attachment->external)) {
                 unlink(get_upload_path_by_type('proposal') . $attachment->rel_id . '/' . $attachment->file_name);
             }

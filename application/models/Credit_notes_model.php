@@ -378,6 +378,14 @@ class Credit_notes_model extends App_Model
 
         $deleted = false;
         if ($attachment) {
+            if (function_exists('otmain_files_soft_delete_enabled')
+                && otmain_files_soft_delete_enabled()
+                && function_exists('otmain_soft_delete_file_row')
+                && ($attachment->rel_type ?? '') === 'credit_note'
+            ) {
+                return otmain_soft_delete_file_row($attachment, 'Credit Note');
+            }
+
             if (empty($attachment->external)) {
                 unlink(get_upload_path_by_type('credit_note') . $attachment->rel_id . '/' . $attachment->file_name);
             }
@@ -404,6 +412,9 @@ class Credit_notes_model extends App_Model
     {
         $this->db->where('rel_id', $credit_note_id);
         $this->db->where('rel_type', 'credit_note');
+        if (function_exists('otmain_apply_files_not_deleted_filter')) {
+            otmain_apply_files_not_deleted_filter();
+        }
 
         return $this->db->get(db_prefix() . 'files')->result_array();
     }

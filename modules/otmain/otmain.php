@@ -42,7 +42,249 @@ hooks()->add_action('after_invoice_added', 'otmain_sync_invoice_proposal_backlin
 hooks()->add_action('invoice_updated', 'otmain_sync_invoice_proposal_backlink_on_update');
 hooks()->add_action('before_invoice_preview_more_menu_button', 'otmain_render_invoice_status_dropdown');
 hooks()->add_action('after_total_summary_invoicehtml', 'otmain_render_invoicehtml_converted_total');
+hooks()->add_filter('before_payment_recorded', 'otmain_before_payment_recorded_multicurrency');
+hooks()->add_action('after_admin_last_record_payment_form_field', 'otmain_render_payment_currency_fields');
+hooks()->add_filter('get_upload_path_by_type', 'otmain_get_upload_path_by_type', 10, 2);
 hooks()->add_action('clients_init', 'otmain_item_tracker_client_menu');
+hooks()->add_action('after_cron_run', 'otmain_recycle_bin_cron_purge');
+
+/**
+ * Auto-purge Recycle Bin files older than 30 days (batched).
+ */
+function otmain_recycle_bin_cron_purge()
+{
+    $CI = &get_instance();
+    $CI->load->helper('otmain/otmain');
+    if (!function_exists('otmain_files_soft_delete_enabled') || !otmain_files_soft_delete_enabled()) {
+        return;
+    }
+    $CI->load->model('otmain/recycle_bin_model');
+    $CI->recycle_bin_model->purge_expired();
+}
+
+/**
+ * Convert multi-currency payment amount to invoice currency before insert.
+ *
+ * Rate convention (same as document conversion):
+ * 1 unit of invoice currency = N units of payment currency.
+ * So: amount_invoice = original_amount / exchange_rate
+ *
+ * @param array $data
+ * @return array
+ */
+function otmain_before_payment_recorded_multicurrency($data)
+{
+    if (!is_array($data) || empty($data['invoiceid'])) {
+        return $data;
+    }
+
+    $CI = &get_instance();
+    $paymentsTable = db_prefix() . 'invoicepaymentrecords';
+    if (!$CI->db->field_exists('payment_currency', $paymentsTable)) {
+        unset($data['payment_currency'], $data['original_amount'], $data['exchange_rate'], $data['otmain_converted_preview']);
+
+        return $data;
+    }
+
+    $CI->db->select('id, currency, total');
+    if ($CI->db->field_exists('conversion_rate', db_prefix() . 'invoices')) {
+        $CI->db->select('conversion_rate, conversion_currency');
+    }
+    $invoice = $CI->db->where('id', (int) $data['invoiceid'])
+        ->get(db_prefix() . 'invoices')
+        ->row();
+
+    if (!$invoice) {
+        return $data;
+    }
+
+    $invoiceCurrencyId = (int) $invoice->currency;
+    $paymentCurrencyId = isset($data['payment_currency']) ? (int) $data['payment_currency'] : $invoiceCurrencyId;
+    if ($paymentCurrencyId < 1) {
+        $paymentCurrencyId = $invoiceCurrencyId;
+    }
+
+    $originalAmount = isset($data['amount']) ? (float) str_replace(',', '.', (string) $data['amount']) : 0;
+    $rate           = isset($data['exchange_rate']) ? (float) str_replace(',', '.', (string) $data['exchange_rate']) : 1.0;
+
+    if ($paymentCurrencyId === $invoiceCurrencyId) {
+        $rate = 1.0;
+        $data['amount']           = $originalAmount;
+        $data['original_amount']  = $originalAmount;
+        $data['payment_currency'] = $paymentCurrencyId;
+        $data['exchange_rate']    = $rate;
+    } else {
+        if ($rate <= 0) {
+            // Fallback: invoice conversion rate if payment currency matches conversion_currency
+            $docRate = function_exists('otmain_get_conversion_rate') ? otmain_get_conversion_rate($invoice) : 0;
+            $docConvCurrency = function_exists('otmain_get_conversion_currency_id') ? (int) otmain_get_conversion_currency_id($invoice) : 0;
+            if ($docConvCurrency === $paymentCurrencyId && $docRate > 0) {
+                $rate = $docRate;
+            } else {
+                $rate = 1.0;
+            }
+        }
+
+        // 1 invoice currency = rate payment currency → invoice amount = paid / rate
+        $converted = $originalAmount / $rate;
+        $decimals  = function_exists('get_decimal_places') ? get_decimal_places() : 2;
+        $converted = round($converted, $decimals);
+
+        $data['original_amount']  = $originalAmount;
+        $data['payment_currency'] = $paymentCurrencyId;
+        $data['exchange_rate']    = $rate;
+        $data['amount']           = $converted;
+    }
+
+    unset($data['otmain_converted_preview']);
+
+    return $data;
+}
+
+/**
+ * Inject currency + rate fields into Record Payment form.
+ *
+ * @param object $invoice
+ */
+function otmain_render_payment_currency_fields($invoice)
+{
+    if (!is_object($invoice) || empty($invoice->id)) {
+        return;
+    }
+
+    $CI = &get_instance();
+    $CI->load->model('currencies_model');
+    $currencies = $CI->currencies_model->get();
+
+    $invoiceCurrencyId = (int) $invoice->currency;
+    $defaultRate       = 1;
+    $defaultPayCurrency = $invoiceCurrencyId;
+
+    // Prefill payment currency/rate from invoice conversion fields when set
+    if (!empty($invoice->conversion_currency) && (int) $invoice->conversion_currency !== $invoiceCurrencyId) {
+        $defaultPayCurrency = (int) $invoice->conversion_currency;
+        $defaultRate        = function_exists('otmain_get_conversion_rate') ? otmain_get_conversion_rate($invoice) : 1;
+        if ($defaultRate <= 0) {
+            $defaultRate = 1;
+        }
+    }
+
+    $leftToPay = isset($invoice->total_left_to_pay) ? (float) $invoice->total_left_to_pay : 0;
+    $invoiceCurrency = get_currency($invoiceCurrencyId);
+    $invoiceCurrencyName = $invoiceCurrency ? $invoiceCurrency->name : '';
+
+    echo '<div id="otmain-payment-currency-fields">';
+    echo '<div class="form-group">';
+    echo '<label for="payment_currency" class="control-label">' . _l('otmain_payment_currency') . '</label>';
+    echo '<select name="payment_currency" id="payment_currency" class="selectpicker" data-width="100%" data-live-search="true">';
+    foreach ($currencies as $c) {
+        $cid = (int) ($c['id'] ?? 0);
+        if ($cid < 1) {
+            continue;
+        }
+        $label = ($c['name'] ?? '') . (!empty($c['symbol']) ? ' (' . $c['symbol'] . ')' : '');
+        $selected = $cid === $defaultPayCurrency ? ' selected' : '';
+        echo '<option value="' . $cid . '" data-name="' . e($c['name'] ?? '') . '"' . $selected . '>' . e($label) . '</option>';
+    }
+    echo '</select>';
+    echo '</div>';
+    echo render_input('exchange_rate', 'otmain_payment_exchange_rate', $defaultRate, 'number', [
+        'step' => 'any',
+        'min'  => '0',
+        'id'   => 'otmain_payment_exchange_rate',
+    ]);
+    echo '<p class="text-muted">' . _l('otmain_payment_exchange_rate_help') . '</p>';
+    echo '<div class="alert alert-info" id="otmain-payment-converted-preview" style="display:none;">';
+    echo '<strong>' . _l('otmain_payment_converted_amount') . ':</strong> ';
+    echo '<span id="otmain-payment-converted-value">-</span>';
+    echo ' <span class="text-muted">(' . e($invoiceCurrencyName) . ')</span>';
+    echo '</div>';
+    echo '</div>';
+
+    $rateMap = [];
+    foreach ($currencies as $c) {
+        $cid = (int) ($c['id'] ?? 0);
+        $rateMap[$cid] = 1;
+    }
+    // Prefill rate for invoice conversion currency
+    if (!empty($invoice->conversion_currency)) {
+        $convId = (int) $invoice->conversion_currency;
+        $convRate = function_exists('otmain_get_conversion_rate') ? (float) otmain_get_conversion_rate($invoice) : 1;
+        if ($convId > 0 && $convRate > 0) {
+            $rateMap[$convId] = $convRate;
+        }
+    }
+    $rateMap[$invoiceCurrencyId] = 1;
+
+    ?>
+<script>
+(function($) {
+    var invoiceCurrencyId = <?php echo (int) $invoiceCurrencyId; ?>;
+    var leftToPay = <?php echo json_encode((float) $leftToPay); ?>;
+    var rateMap = <?php echo json_encode($rateMap); ?>;
+    var $amount = $('#record_payment_form input[name="amount"]');
+    var $currency = $('#payment_currency');
+    var $rate = $('#otmain_payment_exchange_rate');
+    var $preview = $('#otmain-payment-converted-preview');
+    var $previewVal = $('#otmain-payment-converted-value');
+    var $fields = $('#otmain-payment-currency-fields');
+
+    // Move currency fields right after amount input
+    if ($amount.length && $fields.length) {
+        $amount.closest('.form-group').after($fields);
+    }
+
+    function updatePreview() {
+        var payCurrency = parseInt($currency.val(), 10) || invoiceCurrencyId;
+        var amount = parseFloat(String($amount.val()).replace(',', '.')) || 0;
+        var rate = parseFloat(String($rate.val()).replace(',', '.')) || 0;
+        if (payCurrency === invoiceCurrencyId || rate <= 0) {
+            $preview.hide();
+            $amount.attr('max', leftToPay);
+            return;
+        }
+        var converted = amount / rate;
+        $previewVal.text(converted.toFixed(2));
+        $preview.show();
+        // Allow entering payment-currency amounts larger than invoice left-to-pay
+        $amount.removeAttr('max');
+    }
+
+    function onCurrencyChange() {
+        var payCurrency = parseInt($currency.val(), 10) || invoiceCurrencyId;
+        var suggested = rateMap[payCurrency] !== undefined ? rateMap[payCurrency] : 1;
+        if (payCurrency === invoiceCurrencyId) {
+            $rate.val(1);
+        } else {
+            $rate.val(suggested);
+        }
+        updatePreview();
+    }
+
+    $currency.on('changed.bs.select change', onCurrencyChange);
+    $rate.on('input change', updatePreview);
+    $amount.on('input change', updatePreview);
+    onCurrencyChange();
+})(jQuery);
+</script>
+    <?php
+}
+
+/**
+ * Upload path for Item Tracker attachments.
+ *
+ * @param string $path
+ * @param string $type
+ * @return string
+ */
+function otmain_get_upload_path_by_type($path, $type)
+{
+    if ($type === 'item_tracker') {
+        return FCPATH . 'uploads/item_tracker' . '/';
+    }
+
+    return $path;
+}
 
 hooks()->add_filter('sales_number_format', 'otmain_sales_number_format', 10, 2);
 hooks()->add_filter('format_estimate_number', 'otmain_format_estimate_number', 10, 2);
@@ -799,6 +1041,25 @@ function otmain_init_menu()
         ]);
     }
 
+    // Recycle Bin — visible to staff who can manage sales files / item tracker
+    if (is_admin() || staff_can('view', 'otmain_item_tracker') || staff_can('view', 'invoices') || staff_can('view', 'proposals')) {
+        $binCount = 0;
+        if (function_exists('otmain_files_soft_delete_enabled') && otmain_files_soft_delete_enabled()) {
+            $CI->load->model('otmain/recycle_bin_model');
+            $binCount = $CI->recycle_bin_model->count_bin_items();
+        }
+        $CI->app_menu->add_sidebar_children_item('sales', [
+            'slug'     => 'otmain-recycle-bin',
+            'name'     => _l('otmain_recycle_bin'),
+            'href'     => admin_url('otmain/recycle_bin'),
+            'position' => 29,
+            'badge'    => $binCount > 0 ? [
+                'value' => $binCount,
+                'type'  => 'warning',
+            ] : [],
+        ]);
+    }
+
     $CI->app->add_settings_section_child('finance', 'otmain', [
         'name'     => _l('otmain_settings'),
         'view'     => 'otmain/settings',
@@ -900,8 +1161,12 @@ function otmain_admin_footer_assets()
 .item-status-ordered,.quote-status-in_progress{background:#3b82f6;color:#fff;}
 .item-status-eta{background:#a855f7;color:#fff;}
 .item-status-quality_check{background:#9ca3af;color:#fff;}
+.item-status-delivered{background:#0ea5e9;color:#fff;}
 .item-status-received,.quote-status-ready_for_shipment{background:#22c55e;color:#fff;}
 .quote-status-shipped{background:#6b7280;color:#fff;}
+.vpstatus-unpaid{background:#ef4444;color:#fff;}
+.vpstatus-paid{background:#22c55e;color:#fff;}
+.vpstatus-partially_paid{background:#f59e0b;color:#fff;}
 .otmain-status-badge{display:inline-block;padding:3px 10px;border-radius:12px;font-size:12px;font-weight:600;line-height:1.4;}
 .table-otmain-item-trackers .row-options{position:static!important;left:auto!important;}
 </style>';
