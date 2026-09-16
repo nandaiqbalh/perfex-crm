@@ -31,6 +31,11 @@ return App_table::find('proposals')
 
         $where = [];
 
+        // OT-Main Recycle Bin: exclude soft-deleted proposals
+        if (function_exists('otmain_doc_soft_delete_enabled') && otmain_doc_soft_delete_enabled('proposals')) {
+            $where[] = 'AND ' . db_prefix() . 'proposals.deleted_at IS NULL';
+        }
+
         if ($filtersWhere = $this->getWhereFromRules()) {
             $where[] = $filtersWhere;
         }

@@ -43,6 +43,11 @@ if ($rel_type == 'customer') {
 
 $where = [$where];
 
+// OT-Main Recycle Bin: exclude soft-deleted proposals
+if (function_exists('otmain_doc_soft_delete_enabled') && otmain_doc_soft_delete_enabled('proposals')) {
+    $where[] = 'AND ' . db_prefix() . 'proposals.deleted_at IS NULL';
+}
+
 if (staff_cant('view', 'proposals')) {
     array_push($where, 'AND ' . get_proposals_sql_where_staff(get_staff_user_id()));
 }

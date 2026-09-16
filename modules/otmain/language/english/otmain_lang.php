@@ -172,7 +172,7 @@ $lang['otmain_payment_exchange_rate']     = 'Exchange Rate';
 $lang['otmain_payment_exchange_rate_help'] = '1 unit of invoice currency = this many units of payment currency. Editable.';
 $lang['otmain_payment_converted_amount']  = 'Amount in invoice currency';
 $lang['otmain_recycle_bin']               = 'Recycle Bin';
-$lang['otmain_recycle_bin_help']          = 'Deleted sales and Item Tracker files stay here for %s days, then are permanently removed automatically.';
+$lang['otmain_recycle_bin_help']          = 'Deleted sales documents and files stay here for %s days, then are permanently removed automatically.';
 $lang['otmain_recycle_bin_empty']         = 'Recycle Bin is empty.';
 $lang['otmain_recycle_bin_related']       = 'Related To';
 $lang['otmain_recycle_bin_deleted_at']    = 'Deleted At';
@@ -180,10 +180,14 @@ $lang['otmain_recycle_bin_deleted_by']    = 'Deleted By';
 $lang['otmain_recycle_bin_days_remaining'] = 'Days Remaining';
 $lang['otmain_recycle_bin_restore']       = 'Restore';
 $lang['otmain_recycle_bin_permanent_delete'] = 'Delete Permanently';
-$lang['otmain_recycle_bin_restored']      = 'File restored successfully.';
-$lang['otmain_recycle_bin_restore_failed'] = 'Could not restore file.';
-$lang['otmain_recycle_bin_permanently_deleted'] = 'File permanently deleted.';
-$lang['otmain_recycle_bin_delete_failed'] = 'Could not permanently delete file.';
+$lang['otmain_recycle_bin_restored']      = 'Item restored successfully.';
+$lang['otmain_recycle_bin_restore_failed'] = 'Could not restore item.';
+$lang['otmain_recycle_bin_permanently_deleted'] = 'Item permanently deleted.';
+$lang['otmain_recycle_bin_delete_failed'] = 'Could not permanently delete item.';
+$lang['otmain_recycle_bin_item_name']    = 'Name';
+$lang['otmain_recycle_bin_item_type']    = 'Type';
+$lang['otmain_recycle_bin_type_file']    = 'File';
+$lang['otmain_recycle_bin_type_document'] = 'Document';
 
 // Expenses
 $lang['otmain_expense_paid']                    = 'Paid';

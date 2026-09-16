@@ -91,6 +91,11 @@ class Invoices_model extends App_Model
         $this->db->from(db_prefix() . 'invoices');
         $this->db->join(db_prefix() . 'currencies', '' . db_prefix() . 'currencies.id = ' . db_prefix() . 'invoices.currency', 'left');
         $this->db->where($where);
+
+        // OT-Main Recycle Bin: hide soft-deleted invoices from normal queries
+        if (function_exists('otmain_doc_soft_delete_enabled') && otmain_doc_soft_delete_enabled('invoices')) {
+            $this->db->where(db_prefix() . 'invoices.deleted_at IS NULL', null, false);
+        }
         if (is_numeric($id)) {
             $this->db->where(db_prefix() . 'invoices' . '.id', $id);
             $invoice = $this->db->get()->row();
@@ -1205,6 +1210,14 @@ class Invoices_model extends App_Model
             $simpleDelete == false &&
             !is_last_invoice($id)) {
             return false;
+        }
+
+        // OT-Main Recycle Bin: soft-delete instead of permanent removal
+        if (empty($GLOBALS['otmain_force_hard_delete'])
+            && $simpleDelete == false
+            && function_exists('otmain_soft_delete_document')
+            && otmain_soft_delete_document('invoice', $id)) {
+            return true;
         }
 
         $number  = format_invoice_number($id);

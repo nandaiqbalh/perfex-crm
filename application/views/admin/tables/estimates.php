@@ -45,6 +45,11 @@ return App_table::find('estimates')
 
         $where = [];
 
+        // OT-Main Recycle Bin: exclude soft-deleted estimates
+        if (function_exists('otmain_doc_soft_delete_enabled') && otmain_doc_soft_delete_enabled('estimates')) {
+            $where[] = 'AND ' . db_prefix() . 'estimates.deleted_at IS NULL';
+        }
+
         if ($filtersWhere = $this->getWhereFromRules()) {
             $where[] = $filtersWhere;
         }

@@ -382,6 +382,30 @@ if ($CI->db->table_exists($filesTable)) {
     }
 }
 
+// Recycle Bin: soft-delete columns on sales document tables
+$docTables = [
+    'proposals'              => db_prefix() . 'proposals',
+    'invoices'               => db_prefix() . 'invoices',
+    'estimates'              => db_prefix() . 'estimates',
+    'creditnotes'            => db_prefix() . 'creditnotes',
+    'otmain_packing_lists'   => db_prefix() . 'otmain_packing_lists',
+    'otmain_purchase_orders' => db_prefix() . 'otmain_purchase_orders',
+];
+foreach ($docTables as $key => $docTable) {
+    if ($CI->db->table_exists($docTable)) {
+        if (!$CI->db->field_exists('deleted_at', $docTable)) {
+            $CI->db->query('ALTER TABLE `' . $docTable . '` ADD `deleted_at` DATETIME NULL DEFAULT NULL');
+            $idxCheck = $CI->db->query("SHOW INDEX FROM `{$docTable}` WHERE Key_name = 'idx_deleted_at'")->num_rows();
+            if ($idxCheck < 1) {
+                $CI->db->query("ALTER TABLE `{$docTable}` ADD INDEX `idx_deleted_at` (`deleted_at`)");
+            }
+        }
+        if (!$CI->db->field_exists('deleted_by', $docTable)) {
+            $CI->db->query('ALTER TABLE `' . $docTable . '` ADD `deleted_by` INT(11) NULL DEFAULT NULL AFTER `deleted_at`');
+        }
+    }
+}
+
 // Expense: payment until date + amount paid + expense payment modes
 if ($CI->db->table_exists(db_prefix() . 'expenses') && !$CI->db->field_exists('payment_until', db_prefix() . 'expenses')) {
     $CI->db->query('ALTER TABLE `' . db_prefix() . 'expenses` ADD `payment_until` DATE NULL DEFAULT NULL');

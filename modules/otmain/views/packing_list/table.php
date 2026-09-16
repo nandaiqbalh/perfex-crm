@@ -12,7 +12,13 @@ $aColumns = [
 $sIndexColumn = 'id';
 $sTable       = db_prefix() . 'otmain_packing_lists';
 
-$result = data_tables_init($aColumns, $sIndexColumn, $sTable, [], [], [
+$where = [];
+// OT-Main Recycle Bin: exclude soft-deleted packing lists
+if (function_exists('otmain_doc_soft_delete_enabled') && otmain_doc_soft_delete_enabled('otmain_packing_lists')) {
+    $where[] = 'AND ' . db_prefix() . 'otmain_packing_lists.deleted_at IS NULL';
+}
+
+$result = data_tables_init($aColumns, $sIndexColumn, $sTable, [], $where, [
     db_prefix() . 'otmain_packing_lists.id as id',
     db_prefix() . 'otmain_packing_lists.clientid as clientid',
 ]);

@@ -28,6 +28,11 @@ $where = [
     'AND EXISTS (SELECT 1 FROM ' . $t . ' tx WHERE tx.rel_type = \'proposal\' AND tx.rel_id = ' . $p . '.id)',
 ];
 
+// OT-Main Recycle Bin: exclude soft-deleted proposals from tracker listing
+if (function_exists('otmain_doc_soft_delete_enabled') && otmain_doc_soft_delete_enabled('proposals')) {
+    $where[] = 'AND ' . $p . '.deleted_at IS NULL';
+}
+
 $statusFilter = $CI->input->post('quotation_status');
 if ($statusFilter !== null && $statusFilter !== '') {
     $where[] = 'AND ' . $p . '.quotation_status = "' . $CI->db->escape_str($statusFilter) . '"';

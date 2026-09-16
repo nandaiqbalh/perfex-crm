@@ -43,6 +43,11 @@ return App_table::find('invoices')
 
         $where = [];
 
+        // OT-Main Recycle Bin: exclude soft-deleted invoices
+        if (function_exists('otmain_doc_soft_delete_enabled') && otmain_doc_soft_delete_enabled('invoices')) {
+            $where[] = 'AND ' . db_prefix() . 'invoices.deleted_at IS NULL';
+        }
+
         if ($filtersWhere = $this->getWhereFromRules()) {
             $where[] = $filtersWhere;
         }

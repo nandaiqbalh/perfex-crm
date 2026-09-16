@@ -14,14 +14,14 @@
                         </p>
 
                         <div class="table-responsive mtop15">
-                            <table class="table table-bordered table-hover dt-table" data-order-col="3" data-order-type="desc">
+                            <table class="table table-bordered table-hover dt-table" data-order-col="4" data-order-type="desc">
                                 <thead>
                                     <tr>
-                                        <th><?php echo _l('otmain_file_name'); ?></th>
+                                        <th><?php echo _l('otmain_recycle_bin_item_name'); ?></th>
+                                        <th><?php echo _l('otmain_recycle_bin_item_type'); ?></th>
                                         <th><?php echo _l('otmain_recycle_bin_related'); ?></th>
-                                        <th><?php echo _l('otmain_file_type'); ?></th>
-                                        <th><?php echo _l('otmain_recycle_bin_deleted_at'); ?></th>
                                         <th><?php echo _l('otmain_recycle_bin_deleted_by'); ?></th>
+                                        <th><?php echo _l('otmain_recycle_bin_deleted_at'); ?></th>
                                         <th><?php echo _l('otmain_recycle_bin_days_remaining'); ?></th>
                                         <th><?php echo _l('options'); ?></th>
                                     </tr>
@@ -34,23 +34,44 @@
                                         </td>
                                     </tr>
                                     <?php } else {
-                                        foreach ($items as $item) { ?>
+                                        foreach ($items as $item) {
+                                            $binType = $item['bin_type'] ?? 'file';
+                                            $docType = $item['doc_type'] ?? '';
+                                            $itemId  = (int) ($item['id'] ?? 0);
+                                    ?>
                                     <tr>
                                         <td>
-                                            <?php if (!empty($item['attachment_key'])) { ?>
+                                            <?php if ($binType === 'file' && !empty($item['attachment_key'])) { ?>
                                             <a href="<?php echo site_url('download/file/sales_attachment/' . $item['attachment_key']); ?>" target="_blank">
-                                                <?php echo e($item['file_name']); ?>
+                                                <i class="fa fa-paperclip"></i> <?php echo e($item['display_name']); ?>
                                             </a>
+                                            <?php } elseif ($binType === 'document') { ?>
+                                                <i class="fa fa-file-text-o"></i> <?php echo e($item['display_name']); ?>
                                             <?php } else {
-                                                echo e($item['file_name']);
+                                                echo e($item['display_name']);
                                             } ?>
                                         </td>
+                                        <td>
+                                            <?php
+                                            $labelClass = 'label-default';
+                                            $dtype = $item['doc_type'] ?? ($item['rel_type'] ?? '');
+                                            if (in_array($dtype, ['proposal', 'estimate'])) {
+                                                $labelClass = 'label-info';
+                                            } elseif ($dtype === 'invoice') {
+                                                $labelClass = 'label-success';
+                                            } elseif ($dtype === 'credit_note') {
+                                                $labelClass = 'label-warning';
+                                            } elseif (in_array($dtype, ['packing_list', 'purchase_order'])) {
+                                                $labelClass = 'label-primary';
+                                            }
+                                            ?>
+                                            <span class="label <?php echo $labelClass; ?>"><?php echo e($item['type_label']); ?></span>
+                                        </td>
                                         <td><?php echo e($item['related_label']); ?></td>
-                                        <td><?php echo e($item['rel_type']); ?></td>
+                                        <td><?php echo e($item['deleted_by_name'] ?: '-'); ?></td>
                                         <td data-order="<?php echo e($item['deleted_at']); ?>">
                                             <?php echo e(_dt($item['deleted_at'])); ?>
                                         </td>
-                                        <td><?php echo e($item['deleted_by_name'] ?: '-'); ?></td>
                                         <td>
                                             <?php
                                             $days = (int) $item['days_remaining'];
@@ -60,12 +81,16 @@
                                         </td>
                                         <td>
                                             <div class="tw-flex tw-items-center tw-space-x-3">
-                                                <a href="<?php echo admin_url('otmain/recycle_bin/restore/' . $item['id']); ?>"
+                                                <?php
+                                                $restoreUrl = admin_url('otmain/recycle_bin/restore/' . $itemId . '?type=' . urlencode($binType) . '&doc_type=' . urlencode($docType));
+                                                $deleteUrl  = admin_url('otmain/recycle_bin/permanently_delete/' . $itemId . '?type=' . urlencode($binType) . '&doc_type=' . urlencode($docType));
+                                                ?>
+                                                <a href="<?php echo $restoreUrl; ?>"
                                                    class="tw-text-success"
                                                    title="<?php echo _l('otmain_recycle_bin_restore'); ?>">
                                                     <i class="fa fa-undo"></i>
                                                 </a>
-                                                <a href="<?php echo admin_url('otmain/recycle_bin/permanently_delete/' . $item['id']); ?>"
+                                                <a href="<?php echo $deleteUrl; ?>"
                                                    class="tw-text-danger _delete"
                                                    title="<?php echo _l('otmain_recycle_bin_permanent_delete'); ?>">
                                                     <i class="fa fa-trash"></i>
@@ -85,5 +110,16 @@
     </div>
 </div>
 <?php init_tail(); ?>
+<script>
+$(function(){
+    // Force Sales sidebar to stay expanded on Recycle Bin page
+    var $binLink = $('#side-menu').find('li.sub-menu-item-otmain-recycle-bin > a');
+    if ($binLink.length) {
+        $binLink.parents('li').addClass('active');
+        $binLink.parents('ul.nav-second-level').addClass('in').prop('aria-expanded', true);
+        $binLink.parents('li').find('> a:first').prop('aria-expanded', true);
+    }
+});
+</script>
 </body>
 </html>

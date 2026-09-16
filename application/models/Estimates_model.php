@@ -47,6 +47,11 @@ class Estimates_model extends App_Model
         $this->db->from(db_prefix() . 'estimates');
         $this->db->join(db_prefix() . 'currencies', db_prefix() . 'currencies.id = ' . db_prefix() . 'estimates.currency', 'left');
         $this->db->where($where);
+
+        // OT-Main Recycle Bin: hide soft-deleted estimates from normal queries
+        if (function_exists('otmain_doc_soft_delete_enabled') && otmain_doc_soft_delete_enabled('estimates')) {
+            $this->db->where(db_prefix() . 'estimates.deleted_at IS NULL', null, false);
+        }
         if (is_numeric($id)) {
             $this->db->where(db_prefix() . 'estimates.id', $id);
             $estimate = $this->db->get()->row();
@@ -1062,6 +1067,15 @@ class Estimates_model extends App_Model
                 'is_invoiced_estimate_delete_error' => true,
             ];
         }
+
+        // OT-Main Recycle Bin: soft-delete instead of permanent removal
+        if (empty($GLOBALS['otmain_force_hard_delete'])
+            && $simpleDelete == false
+            && function_exists('otmain_soft_delete_document')
+            && otmain_soft_delete_document('estimate', $id)) {
+            return true;
+        }
+
         hooks()->do_action('before_estimate_deleted', $id);
 
         $number = format_estimate_number($id);

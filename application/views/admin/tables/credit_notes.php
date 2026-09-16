@@ -46,6 +46,11 @@ return App_table::find('credit_notes')
 
         $where = [];
 
+        // OT-Main Recycle Bin: exclude soft-deleted credit notes
+        if (function_exists('otmain_doc_soft_delete_enabled') && otmain_doc_soft_delete_enabled('creditnotes')) {
+            $where[] = 'AND ' . db_prefix() . 'creditnotes.deleted_at IS NULL';
+        }
+
         if ($filtersWhere = $this->getWhereFromRules()) {
             $where[] = $filtersWhere;
         }

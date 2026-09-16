@@ -21,6 +21,11 @@ class Packing_list_model extends App_Model
             return $packing;
         }
 
+        // OT-Main Recycle Bin: hide soft-deleted packing lists
+        if (function_exists('otmain_doc_soft_delete_enabled') && otmain_doc_soft_delete_enabled('otmain_packing_lists')) {
+            $this->db->where('deleted_at IS NULL', null, false);
+        }
+
         return $this->db->get(db_prefix() . 'otmain_packing_lists')->result_array();
     }
 
@@ -78,6 +83,13 @@ class Packing_list_model extends App_Model
 
     public function delete($id)
     {
+        // OT-Main Recycle Bin: soft-delete instead of permanent removal
+        if (empty($GLOBALS['otmain_force_hard_delete'])
+            && function_exists('otmain_soft_delete_document')
+            && otmain_soft_delete_document('packing_list', $id)) {
+            return true;
+        }
+
         $this->db->where('id', $id);
         $this->db->delete(db_prefix() . 'otmain_packing_lists');
         $this->db->where('packing_list_id', $id);

@@ -149,6 +149,11 @@ class Credit_notes_model extends App_Model
         $this->db->join(db_prefix() . 'currencies', '' . db_prefix() . 'currencies.id = ' . db_prefix() . 'creditnotes.currency', 'left');
         $this->db->where($where);
 
+        // OT-Main Recycle Bin: hide soft-deleted credit notes from normal queries
+        if (function_exists('otmain_doc_soft_delete_enabled') && otmain_doc_soft_delete_enabled('creditnotes')) {
+            $this->db->where(db_prefix() . 'creditnotes.deleted_at IS NULL', null, false);
+        }
+
         if (is_numeric($id)) {
             $this->db->where(db_prefix() . 'creditnotes.id', $id);
             $credit_note = $this->db->get()->row();
@@ -426,6 +431,14 @@ class Credit_notes_model extends App_Model
     */
     public function delete($id, $simpleDelete = false)
     {
+        // OT-Main Recycle Bin: soft-delete instead of permanent removal
+        if (empty($GLOBALS['otmain_force_hard_delete'])
+            && $simpleDelete == false
+            && function_exists('otmain_soft_delete_document')
+            && otmain_soft_delete_document('credit_note', $id)) {
+            return true;
+        }
+
         hooks()->do_action('before_credit_note_deleted', $id);
         $this->db->where('id', $id);
         $this->db->delete(db_prefix() . 'creditnotes');

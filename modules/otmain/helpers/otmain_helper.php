@@ -3315,3 +3315,204 @@ function otmain_restore_file($file_id)
 
     return $CI->db->affected_rows() > 0;
 }
+
+/**
+ * Check whether a sales document table has soft-delete columns.
+ *
+ * @param string $table Table name WITHOUT db_prefix (e.g. 'proposals')
+ * @return bool
+ */
+function otmain_doc_soft_delete_enabled($table)
+{
+    static $cache = [];
+    if (!isset($cache[$table])) {
+        $CI = &get_instance();
+        $cache[$table] = $CI->db->field_exists('deleted_at', db_prefix() . $table);
+    }
+    return $cache[$table];
+}
+
+/**
+ * Map a document rel_type to its DB table name (without prefix).
+ *
+ * @param string $type 'proposal','invoice','estimate','credit_note'
+ * @return string|null
+ */
+function otmain_doc_type_to_table($type)
+{
+    $map = [
+        'proposal'       => 'proposals',
+        'invoice'        => 'invoices',
+        'estimate'       => 'estimates',
+        'credit_note'    => 'creditnotes',
+        'packing_list'   => 'otmain_packing_lists',
+        'purchase_order' => 'otmain_purchase_orders',
+    ];
+    return $map[$type] ?? null;
+}
+
+/**
+ * Soft-delete a sales document (proposal/invoice/estimate/credit note).
+ * Returns true if soft-deleted, false if not possible (fall through to hard delete).
+ *
+ * @param string $type 'proposal','invoice','estimate','credit_note'
+ * @param int    $id   Document ID
+ * @return bool
+ */
+function otmain_soft_delete_document($type, $id)
+{
+    $table = otmain_doc_type_to_table($type);
+    if (!$table || !otmain_doc_soft_delete_enabled($table)) {
+        return false;
+    }
+
+    $CI = &get_instance();
+    $fullTable = db_prefix() . $table;
+
+    // Verify the record exists and is not already soft-deleted
+    $CI->db->where('id', (int) $id);
+    $CI->db->where('deleted_at IS NULL', null, false);
+    $row = $CI->db->get($fullTable)->row();
+    if (!$row) {
+        return false;
+    }
+
+    $CI->db->where('id', (int) $id);
+    $CI->db->update($fullTable, [
+        'deleted_at' => date('Y-m-d H:i:s'),
+        'deleted_by' => get_staff_user_id(),
+    ]);
+
+    if ($CI->db->affected_rows() > 0) {
+        $labels = [
+            'proposal'       => 'Proposal',
+            'invoice'        => 'Invoice',
+            'estimate'       => 'Estimate',
+            'credit_note'    => 'Credit Note',
+            'packing_list'   => 'Packing List',
+            'purchase_order' => 'Purchase Order',
+        ];
+        log_activity(($labels[$type] ?? ucfirst($type)) . ' Moved to Recycle Bin [ID: ' . $id . ']');
+        return true;
+    }
+
+    return false;
+}
+
+/**
+ * Restore a soft-deleted sales document from the Recycle Bin.
+ *
+ * @param string $type 'proposal','invoice','estimate','credit_note'
+ * @param int    $id   Document ID
+ * @return bool
+ */
+function otmain_restore_document($type, $id)
+{
+    $table = otmain_doc_type_to_table($type);
+    if (!$table || !otmain_doc_soft_delete_enabled($table)) {
+        return false;
+    }
+
+    $CI = &get_instance();
+    $fullTable = db_prefix() . $table;
+
+    $CI->db->where('id', (int) $id);
+    $CI->db->where('deleted_at IS NOT NULL', null, false);
+    $CI->db->update($fullTable, [
+        'deleted_at' => null,
+        'deleted_by' => null,
+    ]);
+
+    if ($CI->db->affected_rows() > 0) {
+        $labels = [
+            'proposal'       => 'Proposal',
+            'invoice'        => 'Invoice',
+            'estimate'       => 'Estimate',
+            'credit_note'    => 'Credit Note',
+            'packing_list'   => 'Packing List',
+            'purchase_order' => 'Purchase Order',
+        ];
+        log_activity(($labels[$type] ?? ucfirst($type)) . ' Restored from Recycle Bin [ID: ' . $id . ']');
+        return true;
+    }
+
+    return false;
+}
+
+/**
+ * Permanently delete a soft-deleted document by calling the original model delete.
+ * This bypasses the soft-delete check because we set a flag.
+ *
+ * @param string $type 'proposal','invoice','estimate','credit_note'
+ * @param int    $id   Document ID
+ * @return bool
+ */
+function otmain_permanently_delete_document($type, $id)
+{
+    $table = otmain_doc_type_to_table($type);
+    if (!$table) {
+        return false;
+    }
+
+    $CI = &get_instance();
+    $fullTable = db_prefix() . $table;
+
+    // First, clear the soft-delete flag so the model can find the record
+    if (otmain_doc_soft_delete_enabled($table)) {
+        $CI->db->where('id', (int) $id);
+        $CI->db->update($fullTable, [
+            'deleted_at' => null,
+            'deleted_by' => null,
+        ]);
+    }
+
+    // Set a global flag so the model's delete() does hard delete instead of re-soft-deleting
+    $GLOBALS['otmain_force_hard_delete'] = true;
+
+    $modelMap = [
+        'proposal'       => 'proposals_model',
+        'invoice'        => 'invoices_model',
+        'estimate'       => 'estimates_model',
+        'credit_note'    => 'credit_notes_model',
+        'packing_list'   => 'otmain/packing_list_model',
+        'purchase_order' => 'otmain/purchase_order_model',
+    ];
+    $modelName = $modelMap[$type] ?? null;
+    if (!$modelName) {
+        unset($GLOBALS['otmain_force_hard_delete']);
+        return false;
+    }
+
+    $CI->load->model($modelName);
+    // For module models, the loaded name is the last segment
+    $shortName = basename($modelName);
+    $result = $CI->{$shortName}->delete((int) $id);
+
+    unset($GLOBALS['otmain_force_hard_delete']);
+
+    return $result === true;
+}
+
+/**
+ * Document types supported by the Recycle Bin.
+ *
+ * @return array
+ */
+function otmain_recycle_bin_doc_types()
+{
+    return ['proposal', 'invoice', 'estimate', 'credit_note', 'packing_list', 'purchase_order'];
+}
+
+/**
+ * Apply "not deleted" WHERE clause for a sales document table.
+ * Call before querying the table to exclude soft-deleted records.
+ *
+ * @param string $tableAlias Full table reference, e.g. db_prefix().'proposals'
+ * @param string $bareTable  Table name without prefix, e.g. 'proposals'
+ */
+function otmain_apply_doc_not_deleted_filter($tableAlias, $bareTable)
+{
+    if (otmain_doc_soft_delete_enabled($bareTable)) {
+        get_instance()->db->where($tableAlias . '.deleted_at IS NULL', null, false);
+    }
+}

@@ -348,6 +348,11 @@ class Proposals_model extends App_Model
             $this->db->where('status !=', 0);
         }
 
+        // OT-Main Recycle Bin: hide soft-deleted proposals from normal queries
+        if (function_exists('otmain_doc_soft_delete_enabled') && otmain_doc_soft_delete_enabled('proposals')) {
+            $this->db->where(db_prefix() . 'proposals.deleted_at IS NULL', null, false);
+        }
+
         $this->db->select('*,' . db_prefix() . 'currencies.id as currencyid, ' . db_prefix() . 'proposals.id as id, ' . db_prefix() . 'currencies.name as currency_name');
         $this->db->from(db_prefix() . 'proposals');
         $this->db->join(db_prefix() . 'currencies', db_prefix() . 'currencies.id = ' . db_prefix() . 'proposals.currency', 'left');
@@ -863,6 +868,13 @@ class Proposals_model extends App_Model
      */
     public function delete($id)
     {
+        // OT-Main Recycle Bin: soft-delete instead of permanent removal
+        if (empty($GLOBALS['otmain_force_hard_delete'])
+            && function_exists('otmain_soft_delete_document')
+            && otmain_soft_delete_document('proposal', $id)) {
+            return true;
+        }
+
         hooks()->do_action('before_proposal_deleted', $id);
 
         $this->clear_signature($id);

@@ -683,6 +683,11 @@ class Item_tracker_model extends App_Model
         $p         = db_prefix() . 'proposals';
         $t         = $this->table;
 
+        $deletedFilter = '';
+        if (function_exists('otmain_doc_soft_delete_enabled') && otmain_doc_soft_delete_enabled('proposals')) {
+            $deletedFilter = "AND {$p}.deleted_at IS NULL";
+        }
+
         $sql = "SELECT {$p}.id, {$p}.subject, {$p}.date, {$p}.status, {$p}.quotation_status,
                        {$p}.invoice_id, {$p}.currency, {$p}.hash,
                        (SELECT COUNT(*) FROM {$t} ti WHERE ti.rel_type = 'proposal' AND ti.rel_id = {$p}.id AND ti.deleted_at IS NULL) AS item_total,
@@ -691,6 +696,7 @@ class Item_tracker_model extends App_Model
                 WHERE {$p}.rel_type = 'customer'
                   AND {$p}.rel_id = ?
                   AND {$p}.status = 3
+                  {$deletedFilter}
                   AND EXISTS (
                       SELECT 1 FROM {$t} tx
                       WHERE tx.rel_type = 'proposal' AND tx.rel_id = {$p}.id AND tx.deleted_at IS NULL
@@ -713,6 +719,10 @@ class Item_tracker_model extends App_Model
         $this->db->where('rel_type', 'customer');
         $this->db->where('rel_id', (int) $client_id);
         $this->db->where('status', 3);
+        // OT-Main Recycle Bin: prevent client access to soft-deleted proposals
+        if (function_exists('otmain_doc_soft_delete_enabled') && otmain_doc_soft_delete_enabled('proposals')) {
+            $this->db->where(db_prefix() . 'proposals.deleted_at IS NULL', null, false);
+        }
         $proposal = $this->db->get(db_prefix() . 'proposals')->row();
 
         if (!$proposal || !$this->has_tracker($proposal_id)) {

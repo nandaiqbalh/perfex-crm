@@ -13,19 +13,28 @@ class Recycle_bin extends AdminController
 
     public function index()
     {
-        if (!is_admin() && staff_cant('view', 'otmain_item_tracker') && staff_cant('delete', 'invoices')) {
+        if (!is_admin() && staff_cant('view', 'otmain_item_tracker') && staff_cant('view', 'invoices') && staff_cant('view', 'proposals')) {
             access_denied('otmain_recycle_bin');
         }
 
-        $items = $this->recycle_bin_model->get_bin_items();
+        $items = $this->recycle_bin_model->get_all_bin_items();
         foreach ($items as &$item) {
-            $item['related_label'] = $this->format_related_label($item);
+            $binType = $item['bin_type'] ?? 'file';
+            if ($binType === 'file') {
+                $item['related_label'] = $this->format_related_label($item);
+                $item['display_name']  = $item['file_name'] ?? '-';
+                $item['type_label']    = $this->format_type_label($item['rel_type'] ?? 'file');
+            } else {
+                $item['related_label'] = $item['doc_label'] ?? '-';
+                $item['display_name']  = $item['doc_label'] ?? '-';
+                $item['type_label']    = $this->format_type_label($item['doc_type'] ?? 'document');
+            }
             $item['days_remaining'] = $this->days_remaining($item['deleted_at'] ?? null);
         }
         unset($item);
 
-        $data['title'] = _l('otmain_recycle_bin');
-        $data['items'] = $items;
+        $data['title']      = _l('otmain_recycle_bin');
+        $data['items']      = $items;
         $data['purge_days'] = Recycle_bin_model::PURGE_DAYS;
 
         $this->load->view('recycle_bin/manage', $data);
@@ -38,7 +47,17 @@ class Recycle_bin extends AdminController
         }
 
         $id = (int) $id;
-        if ($this->recycle_bin_model->restore($id)) {
+
+        $binType = $this->input->get('type') ?: 'file';
+        $docType = $this->input->get('doc_type') ?: '';
+
+        if ($binType === 'document' && $docType) {
+            $success = $this->recycle_bin_model->restore_document($docType, $id);
+        } else {
+            $success = $this->recycle_bin_model->restore_file($id);
+        }
+
+        if ($success) {
             set_alert('success', _l('otmain_recycle_bin_restored'));
         } else {
             set_alert('danger', _l('otmain_recycle_bin_restore_failed'));
@@ -54,7 +73,17 @@ class Recycle_bin extends AdminController
         }
 
         $id = (int) $id;
-        if ($this->recycle_bin_model->permanently_delete($id)) {
+
+        $binType = $this->input->get('type') ?: 'file';
+        $docType = $this->input->get('doc_type') ?: '';
+
+        if ($binType === 'document' && $docType) {
+            $success = $this->recycle_bin_model->permanently_delete_document($docType, $id);
+        } else {
+            $success = $this->recycle_bin_model->permanently_delete_file($id);
+        }
+
+        if ($success) {
             set_alert('success', _l('otmain_recycle_bin_permanently_deleted'));
         } else {
             set_alert('danger', _l('otmain_recycle_bin_delete_failed'));
@@ -63,10 +92,6 @@ class Recycle_bin extends AdminController
         redirect(admin_url('otmain/recycle_bin'));
     }
 
-    /**
-     * @param array $item
-     * @return string
-     */
     protected function format_related_label(array $item)
     {
         $type  = $item['rel_type'] ?? '';
@@ -88,10 +113,6 @@ class Recycle_bin extends AdminController
         }
     }
 
-    /**
-     * @param string|null $deletedAt
-     * @return int
-     */
     protected function days_remaining($deletedAt)
     {
         if (empty($deletedAt)) {
@@ -102,5 +123,20 @@ class Recycle_bin extends AdminController
         $days    = (int) ceil(($expires - time()) / 86400);
 
         return max(0, $days);
+    }
+
+    protected function format_type_label($type)
+    {
+        $map = [
+            'proposal'       => _l('proposal'),
+            'invoice'        => _l('invoice'),
+            'estimate'       => _l('estimate'),
+            'credit_note'    => _l('credit_note'),
+            'packing_list'   => _l('otmain_packing_list'),
+            'purchase_order' => _l('otmain_purchase_order'),
+            'item_tracker'   => _l('otmain_item_tracker'),
+        ];
+
+        return $map[$type] ?? ucfirst(str_replace('_', ' ', $type));
     }
 }

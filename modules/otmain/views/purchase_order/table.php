@@ -12,7 +12,13 @@ $aColumns = [
 $sIndexColumn = 'id';
 $sTable       = db_prefix() . 'otmain_purchase_orders';
 
-$result = data_tables_init($aColumns, $sIndexColumn, $sTable, [], [], [
+$where = [];
+// OT-Main Recycle Bin: exclude soft-deleted purchase orders
+if (function_exists('otmain_doc_soft_delete_enabled') && otmain_doc_soft_delete_enabled('otmain_purchase_orders')) {
+    $where[] = 'AND ' . db_prefix() . 'otmain_purchase_orders.deleted_at IS NULL';
+}
+
+$result = data_tables_init($aColumns, $sIndexColumn, $sTable, [], $where, [
     db_prefix() . 'otmain_purchase_orders.id as id',
     db_prefix() . 'otmain_purchase_orders.supplierid as supplierid',
     db_prefix() . 'otmain_purchase_orders.currency as currency',
