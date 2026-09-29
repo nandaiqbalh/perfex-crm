@@ -14,5 +14,5 @@ $pdf->writeHTML(otmain_pdf_items_table_html($proposal->items, 'proposal', $propo
 $pdf->Ln(4);
 $pdf->writeHTML(otmain_pdf_proposal_footer_html($proposal, $itemsTable, $proposal->currency_name), true, false, false, false, '');
 
-otmain_pdf_append_quotation_terms($pdf, $font_name, $font_size, $proposal->currency_name);
+otmain_pdf_append_quotation_terms($pdf, $font_name, $font_size, $proposal->currency_name, $proposal);
 

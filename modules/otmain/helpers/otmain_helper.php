@@ -554,9 +554,105 @@ The Seller shall not be liable for any indirect or consequential damages arising
 All invoices shall be governed by the laws of Indonesia and/or the Netherlands, at the Seller\'s discretion. Any disputes shall be submitted to a competent court chosen by the Seller.';
 }
 
-function otmain_pdf_append_quotation_terms($pdf, $font_name, $font_size, $currencyName = '')
+function otmain_format_quotation_terms_body_html()
 {
-    otmain_pdf_append_customize_image_page($pdf, 'generated/Term and Condition Qutation_page-0001.jpg', true);
+    $html = '';
+    foreach (preg_split("/\r\n|\n/", otmain_get_quotation_terms()) as $line) {
+        $trim = trim($line);
+        if ($trim === '') {
+            continue;
+        }
+        if (preg_match('/^\d+\.\s/', $trim)) {
+            $html .= '<p style="margin:10px 0 2px;"><strong>' . e($trim) . '</strong></p>';
+        } else {
+            $html .= '<p style="margin:0 0 4px;">' . e($trim) . '</p>';
+        }
+    }
+
+    return $html;
+}
+
+function otmain_proposal_signature_src($proposal, $forPdf = false)
+{
+    if (!is_object($proposal) || empty($proposal->signature) || empty($proposal->id)) {
+        return '';
+    }
+
+    $path = get_upload_path_by_type('proposal') . $proposal->id . '/' . $proposal->signature;
+    if (!is_file($path)) {
+        return '';
+    }
+
+    if ($forPdf) {
+        return $path;
+    }
+
+    $mime = function_exists('mime_content_type') ? mime_content_type($path) : 'image/png';
+    if (!$mime) {
+        $mime = 'image/png';
+    }
+
+    return 'data:' . $mime . ';base64,' . base64_encode((string) file_get_contents($path));
+}
+
+function otmain_proposal_acceptance_block_html($proposal = null, $forPdf = false)
+{
+    $name = '';
+    $date = '';
+    if (is_object($proposal)) {
+        $name = trim((string) (($proposal->acceptance_firstname ?? '') . ' ' . ($proposal->acceptance_lastname ?? '')));
+        if (!empty($proposal->acceptance_date)) {
+            $date = _d(explode(' ', $proposal->acceptance_date)[0]);
+        }
+    }
+
+    $sigSrc = otmain_proposal_signature_src($proposal, $forPdf);
+    if ($sigSrc !== '') {
+        $sigInner = '<img src="' . $sigSrc . '" height="70" />';
+    } else {
+        $sigInner = '&nbsp;';
+    }
+
+    return '<p style="margin:16px 0 8px;"><strong>Official Acceptance</strong><br />'
+        . 'By initialling and signing below, the customer confirms this quotation is officially accepted, including these Terms &amp; Conditions.</p>'
+        . '<table cellpadding="4" cellspacing="0" width="100%">'
+        . '<tr>'
+        . '<td width="38%" valign="top"><strong>Initials / Paraf</strong></td>'
+        . '<td width="8%">&nbsp;</td>'
+        . '<td width="54%" valign="top"><strong>Customer Signature</strong></td>'
+        . '</tr>'
+        . '<tr>'
+        . '<td width="38%" height="80" valign="top" style="border:1px solid #333;">&nbsp;</td>'
+        . '<td width="8%">&nbsp;</td>'
+        . '<td width="54%" height="80" valign="middle" style="border:1px solid #333;">' . $sigInner . '</td>'
+        . '</tr>'
+        . '<tr>'
+        . '<td width="38%">&nbsp;</td>'
+        . '<td width="8%">&nbsp;</td>'
+        . '<td width="54%">Name: ' . ($name !== '' ? e($name) : '________________________')
+        . '<br />Date: ' . ($date !== '' ? e($date) : '________________________') . '</td>'
+        . '</tr></table>';
+}
+
+function otmain_quotation_terms_document_html($proposal = null, $forPdf = false)
+{
+    $size = $forPdf ? '9px' : '13px';
+
+    return '<div style="font-size:' . $size . ';line-height:1.45;color:#222;">'
+        . '<h3 style="margin:0 0 2px;color:#00205B;">Terms &amp; Conditions - Sales Quotations</h3>'
+        . '<p style="margin:0 0 10px;"><strong>OT-Main</strong></p>'
+        . otmain_format_quotation_terms_body_html()
+        . otmain_proposal_acceptance_block_html($proposal, $forPdf)
+        . '</div>';
+}
+
+function otmain_pdf_append_quotation_terms($pdf, $font_name, $font_size, $currencyName = '', $document = null)
+{
+    $pdf->AddPage();
+    if ($font_name) {
+        $pdf->SetFont($font_name, '', $font_size ?: 9);
+    }
+    $pdf->writeHTML(otmain_quotation_terms_document_html($document, true), true, false, true, false, '');
 }
 
 function otmain_pdf_append_invoice_tc_page($pdf)
@@ -2124,6 +2220,7 @@ function otmain_pdf_company_contact_block_html($alignRight = false, $includeBank
     $website = get_option('companywebsite') ?: 'www.otmain.com';
     $vat     = get_option('company_vat') ?: 'NL004830818B51';
     $coc     = get_option('company_registration_number') ?: '90597427';
+    $eori    = 'NL3800694734';
     $address = get_option('invoice_company_address') ?: 'Bajonetstraat 52';
     $city    = get_option('invoice_company_city') ?: 'Rotterdam';
     $postal  = get_option('invoice_company_postal_code') ?: '3014ZK';
@@ -2151,6 +2248,7 @@ function otmain_pdf_company_contact_block_html($alignRight = false, $includeBank
         null,
         ['VAT N.:', e($vat)],
         ['COC N.:', e($coc)],
+        ['EORI No.:', e($eori)],
     ];
 
     if ($includeBankDetails) {

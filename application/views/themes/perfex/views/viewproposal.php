@@ -351,6 +351,17 @@ $proposal->content = str_replace('{proposal_items}', $items, $proposal->content)
             </div>
         </div>
     </div>
+    <?php if (function_exists('otmain_quotation_terms_document_html')) { ?>
+    <div class="row">
+        <div class="col-md-12">
+            <div class="panel_s">
+                <div class="panel-body proposal-terms-conditions">
+                    <?= otmain_quotation_terms_document_html($proposal, false); ?>
+                </div>
+            </div>
+        </div>
+    </div>
+    <?php } ?>
 </div>
 <?php
    if ($identity_confirmation_enabled == '1') {
