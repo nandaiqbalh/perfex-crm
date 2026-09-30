@@ -614,22 +614,16 @@ function otmain_proposal_acceptance_block_html($proposal = null, $forPdf = false
     }
 
     return '<p style="margin:16px 0 8px;"><strong>Official Acceptance</strong><br />'
-        . 'By initialling and signing below, the customer confirms this quotation is officially accepted, including these Terms &amp; Conditions.</p>'
+        . 'By signing below, the customer confirms this quotation is officially accepted, including these Terms &amp; Conditions.</p>'
         . '<table cellpadding="4" cellspacing="0" width="100%">'
         . '<tr>'
-        . '<td width="38%" valign="top"><strong>Initials / Paraf</strong></td>'
-        . '<td width="8%">&nbsp;</td>'
-        . '<td width="54%" valign="top"><strong>Customer Signature</strong></td>'
+        . '<td width="70%" valign="top"><strong>Customer Signature</strong></td>'
         . '</tr>'
         . '<tr>'
-        . '<td width="38%" height="80" valign="top" style="border:1px solid #333;">&nbsp;</td>'
-        . '<td width="8%">&nbsp;</td>'
-        . '<td width="54%" height="80" valign="middle" style="border:1px solid #333;">' . $sigInner . '</td>'
+        . '<td width="70%" height="80" valign="middle" style="border:1px solid #333;">' . $sigInner . '</td>'
         . '</tr>'
         . '<tr>'
-        . '<td width="38%">&nbsp;</td>'
-        . '<td width="8%">&nbsp;</td>'
-        . '<td width="54%">Name: ' . ($name !== '' ? e($name) : '________________________')
+        . '<td width="70%">Name: ' . ($name !== '' ? e($name) : '________________________')
         . '<br />Date: ' . ($date !== '' ? e($date) : '________________________') . '</td>'
         . '</tr></table>';
 }
