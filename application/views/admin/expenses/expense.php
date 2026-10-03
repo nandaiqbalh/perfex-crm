@@ -378,11 +378,9 @@ $currency_attr = hooks()->apply_filters('expense_currency_attributes', $currency
         $('body').on('change', '#project_id', function() {
             var project_id = $(this).val();
             if (project_id != '') {
-                if (customer_currency != 0) {
+                if ($('input[name="billable"]').prop('checked') == true && customer_currency != 0) {
                     selectCurrency.val(customer_currency);
                     selectCurrency.selectpicker('refresh');
-                } else {
-                    set_base_currency();
                 }
             } else {
                 do_billable_checkbox();
@@ -554,7 +552,6 @@ $currency_attr = hooks()->apply_filters('expense_currency_attributes', $currency
         $('#project_ajax_search_wrapper').append(clonedProjectsAjaxSearchSelect);
         init_ajax_project_search_by_customer_id();
         if (!customer_id) {
-            set_base_currency();
             projectsWrapper.addClass('hide');
         }
         $.get(admin_url + 'expenses/get_customer_change_data/' + customer_id, function(response) {
@@ -569,7 +566,6 @@ $currency_attr = hooks()->apply_filters('expense_currency_attributes', $currency
                 do_billable_checkbox();
             } else {
                 customer_currency = '';
-                set_base_currency();
             }
         }, 'json');
     }
@@ -577,6 +573,10 @@ $currency_attr = hooks()->apply_filters('expense_currency_attributes', $currency
     function expenseSubmitHandler(form) {
 
         selectCurrency.prop('disabled', false);
+        var pickedCurrency = selectCurrency.selectpicker('val');
+        if (pickedCurrency) {
+            selectCurrency.val(pickedCurrency);
+        }
 
         $('select[name="tax2"]').prop('disabled', false);
         $('input[name="billable"]').prop('disabled', false);
@@ -621,13 +621,8 @@ $currency_attr = hooks()->apply_filters('expense_currency_attributes', $currency
                 }
             } else {
                 $('.billable_recurring_options').addClass('hide');
-                // When project is selected, the project currency will be used, either customer currency or base currency
-                if ($('#project_id').selectpicker('val') == '') {
-                    set_base_currency();
-                }
             }
         } else {
-            set_base_currency();
             $('.billable').addClass('hide');
             $('.billable_recurring_options').addClass('hide');
         }
